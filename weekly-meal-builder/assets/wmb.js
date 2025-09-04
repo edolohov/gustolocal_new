@@ -134,9 +134,11 @@
       var now = new Date();
       var ms = new Date(delivery.deadline_iso).getTime() - now.getTime();
       if (ms <= 0){ fill('0д 00:00'); clearInterval(countdownTimer); return; }
-      var sec = Math.floor(ms/1000), h = Math.floor(sec/3600);
-      var m = Math.floor((sec%3600)/60), s = sec%60;
-      fill(pad2(h)+':'+pad2(m)+':'+pad2(s));
+      var sec = Math.floor(ms/1000);
+      var days = Math.floor(sec/86400);
+      var h = Math.floor((sec%86400)/3600);
+      var m = Math.floor((sec%3600)/60);
+      fill(days+'д '+pad2(h)+':'+pad2(m));
     }
     if (countdownTimer) clearInterval(countdownTimer);
     tick();
