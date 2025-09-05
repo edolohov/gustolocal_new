@@ -64,6 +64,11 @@ add_action('admin_menu', function(){
 });
 function wmb_page_root(){ echo '<div class="wrap"><h1>Meal Builder</h1><p>Выберите раздел слева.</p></div>'; }
 
+// Добавляем страницу "Кухня" в меню WooCommerce
+add_action('admin_menu', function(){
+  add_submenu_page('woocommerce','Кухня','Кухня','manage_woocommerce','wmb_kitchen','wmb_page_kitchen');
+}, 99);
+
 /* ---------- CPT + tax ---------- */
 add_action('init', function(){
   register_post_type('wmb_dish', [
@@ -650,14 +655,41 @@ add_action('woocommerce_before_calculate_totals', function($cart){
 
 add_action('woocommerce_checkout_create_order_line_item', function($item,$key,$values){
   if (!empty($values['wmb_payload'])){
-    $item->add_meta_data('Meal plan payload', wp_json_encode($values['wmb_payload'], JSON_UNESCAPED_UNICODE), true);
+    $json = wp_json_encode($values['wmb_payload'], JSON_UNESCAPED_UNICODE);
+    // Сохраняем в скрытом ключе для аккуратного отображения
+    $item->add_meta_data('_wmb_payload', $json, false);
   }
 },10,3);
 
   add_filter('woocommerce_hidden_order_itemmeta', function($hidden){
     $hidden[] = 'Meal plan payload';
+    $hidden[] = '_wmb_payload';
     return $hidden;
   });
+
+// Красивый вывод состава набора в деталях заказа и письмах
+add_action('woocommerce_order_item_meta_end', function($item_id, $item, $order, $plain_text){
+  $meta = $item->get_meta('_wmb_payload', true);
+  if (!$meta) $meta = $item->get_meta('Meal plan payload', true);
+  if (!$meta) return;
+  $payload = json_decode($meta, true);
+  if (!$payload || empty($payload['items_list'])) return;
+  $lines = [];
+  foreach($payload['items_list'] as $row){
+    $name = isset($row['name']) ? $row['name'] : '';
+    $qty  = isset($row['qty']) ? intval($row['qty']) : 0;
+    $price= isset($row['price']) ? floatval($row['price']) : 0.0;
+    $subtotal = $price * $qty;
+    $lines[] = sprintf('%s × %d — %s', $name, $qty, strip_tags(wc_price($subtotal)));
+  }
+  if (!$lines) return;
+  if ($plain_text){
+    echo "\nСостав набора:\n" . implode("\n", $lines) . "\n";
+  } else {
+    $html = implode('<br>', array_map('esc_html', $lines));
+    echo '<div class="wmb-order-breakdown"><strong>Состав набора:</strong><br>'.$html.'</div>';
+  }
+}, 10, 4);
 
 
 add_filter('woocommerce_is_purchasable', function($purchasable,$product){
@@ -687,7 +719,8 @@ function wmb_page_kitchen(){
   $orderRows = [];
   foreach($orders as $order){
     foreach($order->get_items() as $item){
-      $meta = $item->get_meta('Meal plan payload', true);
+      $meta = $item->get_meta('_wmb_payload', true);
+      if (!$meta) $meta = $item->get_meta('Meal plan payload', true);
       if (!$meta) continue;
       $payload = json_decode($meta, true);
       if (!$payload || empty($payload['items_list'])) continue;
@@ -707,7 +740,7 @@ function wmb_page_kitchen(){
 
   if ($download){
     header('Content-Type: text/csv; charset=UTF-8');
-    header('Content-Disposition: attachment; filename="kitchen-'+"'"+'"+'+"'"+'-'+date('Ymd').'.csv"');
+    header('Content-Disposition: attachment; filename="kitchen-'.date('Ymd').'.csv"');
     $out = fopen('php://output','w');
     fputcsv($out, ['Блюдо','Кол-во']);
     foreach($agg as $name=>$qty){ fputcsv($out, [$name, $qty]); }
