@@ -619,23 +619,34 @@ add_action('woocommerce_before_calculate_totals', function($cart){
   }
 },10,1);
 
-add_filter('woocommerce_get_item_data', function($item_data, $cart_item){
-  if (!empty($cart_item['wmb_payload']['items_list'])){
-    $lines=[]; foreach($cart_item['wmb_payload']['items_list'] as $row){ $lines[] = sprintf('%s × %d', $row['name'], (int)$row['qty']); }
-    if ($lines){
-      $html = implode("<br>", array_map('esc_html',$lines));
-      $item_data[] = ['name'=>'Состав набора','value'=>$html,'display'=>$html];
+
+  add_filter('woocommerce_get_item_data', function($item_data, $cart_item){
+    if (!empty($cart_item['wmb_payload']['items_list'])){
+      $rows = $cart_item['wmb_payload']['items_list'];
+      $lines = [];
+      foreach($rows as $row){
+        $name = isset($row['name']) ? $row['name'] : '';
+        $qty  = isset($row['qty']) ? intval($row['qty']) : 0;
+        $price= isset($row['price']) ? floatval($row['price']) : 0.0;
+        $subtotal = $price * $qty;
+        $line = sprintf('%s × %d — %s', $name, $qty, strip_tags(wc_price($subtotal)));
+        $lines[] = $line;
+      }
+      if ($lines){
+        $html = implode('<br>', array_map('esc_html',$lines));
+        $item_data[] = ['name'=>'Состав набора','value'=>$html,'display'=>$html];
+      }
     }
-  }
-  if (!empty($cart_item['wmb_payload']['delivery'])){
-    $d = $cart_item['wmb_payload']['delivery'];
-    $nice = sprintf('%s, %s', isset($d['weekday_ru'])?$d['weekday_ru']:$d['weekday'], $d['date'] ?? '');
-    $dl  = isset($d['deadline_human']) ? $d['deadline_human'] : '';
-    $html = esc_html($nice) . ($dl ? ' (дедлайн: '.esc_html($dl).')' : '');
-    $item_data[] = ['name'=>'Доставка','value'=>$html,'display'=>$html];
-  }
-  return $item_data;
-},10,2);
+    if (!empty($cart_item['wmb_payload']['delivery'])){
+      $d = $cart_item['wmb_payload']['delivery'];
+      $nice = sprintf('%s, %s', isset($d['weekday_ru'])?$d['weekday_ru']:$d['weekday'], $d['date'] ?? '');
+      $dl  = isset($d['deadline_human']) ? $d['deadline_human'] : '';
+      $html = esc_html($nice) . ($dl ? ' (дедлайн: '.esc_html($dl).')' : '');
+      $item_data[] = ['name'=>'Доставка','value'=>$html,'display'=>$html];
+    }
+    return $item_data;
+  },10,2);
+
 
 add_action('woocommerce_checkout_create_order_line_item', function($item,$key,$values){
   if (!empty($values['wmb_payload'])){
@@ -643,9 +654,85 @@ add_action('woocommerce_checkout_create_order_line_item', function($item,$key,$v
   }
 },10,3);
 
+  add_filter('woocommerce_hidden_order_itemmeta', function($hidden){
+    $hidden[] = 'Meal plan payload';
+    return $hidden;
+  });
+
+
 add_filter('woocommerce_is_purchasable', function($purchasable,$product){
   if ($product && intval($product->get_id())===intval(WMB_PRODUCT_ID)) return true; return $purchasable;
 },10,2);
 add_filter('woocommerce_product_is_in_stock', function($in_stock,$product){
   if ($product && intval($product->get_id())===intval(WMB_PRODUCT_ID)) return true; return $in_stock;
 },10,2);
+
+
+// ---------- Admin: Kitchen aggregation ----------
+function wmb_page_kitchen(){
+  if (!current_user_can('manage_woocommerce')){ wp_die('Недостаточно прав'); }
+  $date = isset($_GET['date']) ? sanitize_text_field($_GET['date']) : date('Y-m-d');
+  $statuses = isset($_GET['st']) ? array_map('wc_clean', (array)$_GET['st']) : ['processing','on-hold'];
+  $download = isset($_GET['download']) && $_GET['download']=='1';
+
+  $query = new WC_Order_Query([
+    'limit' => -1,
+    'status' => $statuses,
+    'orderby' => 'date',
+    'order' => 'DESC',
+  ]);
+  $orders = $query->get_orders();
+
+  $agg = [];
+  $orderRows = [];
+  foreach($orders as $order){
+    foreach($order->get_items() as $item){
+      $meta = $item->get_meta('Meal plan payload', true);
+      if (!$meta) continue;
+      $payload = json_decode($meta, true);
+      if (!$payload || empty($payload['items_list'])) continue;
+      $delivery = isset($payload['delivery']) ? $payload['delivery'] : [];
+      $delDate = isset($delivery['date']) ? $delivery['date'] : '';
+      if ($date && $delDate !== $date) continue;
+      foreach($payload['items_list'] as $row){
+        $name = isset($row['name']) ? $row['name'] : '';
+        $qty  = isset($row['qty']) ? intval($row['qty']) : 0;
+        if (!$name || !$qty) continue;
+        if (!isset($agg[$name])) $agg[$name] = 0;
+        $agg[$name] += $qty;
+      }
+      $orderRows[] = [ 'order_id'=>$order->get_id(), 'customer'=>$order->get_billing_first_name().' '.$order->get_billing_last_name(), 'items'=>$payload['items_list'] ];
+    }
+  }
+
+  if ($download){
+    header('Content-Type: text/csv; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="kitchen-'+"'"+'"+'+"'"+'-'+date('Ymd').'.csv"');
+    $out = fopen('php://output','w');
+    fputcsv($out, ['Блюдо','Кол-во']);
+    foreach($agg as $name=>$qty){ fputcsv($out, [$name, $qty]); }
+    fclose($out); exit;
+  }
+
+  echo '<div class="wrap"><h1>Кухня — агрегатор</h1>';
+  echo '<form method="get" style="margin-bottom:12px">';
+  echo '<input type="hidden" name="page" value="wmb_kitchen">';
+  echo '<label>Дата доставки: <input type="date" name="date" value="'.esc_attr($date).'"/></label> ';
+  echo '<label>Статусы: ';
+  foreach(['processing'=>'Обработка','on-hold'=>'Ожидает','pending'=>'Ожидает оплаты','completed'=>'Выполнен'] as $key=>$label){
+    $chk = in_array($key,$statuses)?'checked':''; echo '<label style="margin-right:8px"><input type="checkbox" name="st[]" value="'.esc_attr($key).'" '.$chk.'> '.esc_html($label).'</label>';
+  }
+  echo '</label> ';
+  echo '<button class="button">Показать</button> ';
+  echo '<a class="button button-primary" href="'.esc_url(add_query_arg(['page'=>'wmb_kitchen','date'=>$date,'st'=>$statuses,'download'=>1], admin_url('admin.php'))).'">Экспорт CSV</a>';
+  echo '</form>';
+
+  if (!$agg){ echo '<p>Нет данных по выбранным параметрам.</p>'; }
+  else {
+    echo '<h2>Сводка по блюдам</h2><table class="widefat"><thead><tr><th>Блюдо</th><th>Кол-во</th></tr></thead><tbody>';
+    foreach($agg as $name=>$qty){ echo '<tr><td>'.esc_html($name).'</td><td>'.intval($qty).'</td></tr>'; }
+    echo '</tbody></table>';
+  }
+
+  echo '</div>';
+}
