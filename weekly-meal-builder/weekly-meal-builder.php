@@ -691,6 +691,27 @@ add_action('woocommerce_order_item_meta_end', function($item_id, $item, $order, 
   }
 }, 10, 4);
 
+// Отображаем состав набора в админке (страница редактирования заказа)
+add_action('woocommerce_after_order_itemmeta', function($item_id, $item, $product){
+  if (!is_admin()) return;
+  $meta = $item->get_meta('_wmb_payload', true);
+  if (!$meta) $meta = $item->get_meta('Meal plan payload', true);
+  if (!$meta) return;
+  $payload = json_decode($meta, true);
+  if (!$payload || empty($payload['items_list'])) return;
+  $lines = [];
+  foreach($payload['items_list'] as $row){
+    $name = isset($row['name']) ? $row['name'] : '';
+    $qty  = isset($row['qty']) ? intval($row['qty']) : 0;
+    $price= isset($row['price']) ? floatval($row['price']) : 0.0;
+    $subtotal = $price * $qty;
+    $lines[] = sprintf('%s × %d — %s', $name, $qty, strip_tags(wc_price($subtotal)));
+  }
+  if (!$lines) return;
+  $html = implode('<br>', array_map('esc_html', $lines));
+  echo '<div class="wmb-order-breakdown" style="margin-top:6px;">'.$html.'</div>';
+}, 10, 3);
+
 
 add_filter('woocommerce_is_purchasable', function($purchasable,$product){
   if ($product && intval($product->get_id())===intval(WMB_PRODUCT_ID)) return true; return $purchasable;
@@ -730,9 +751,19 @@ function wmb_page_kitchen(){
       foreach($payload['items_list'] as $row){
         $name = isset($row['name']) ? $row['name'] : '';
         $qty  = isset($row['qty']) ? intval($row['qty']) : 0;
+        $rid  = isset($row['id']) ? (string)$row['id'] : '';
+        $post_id = 0;
+        if (strpos($rid,'dish-')===0) $post_id = intval(substr($rid,5));
+        $category = '';
+        if ($post_id){
+          $terms = get_the_terms($post_id, 'wmb_section');
+          if (is_array($terms) && !empty($terms)) $category = $terms[0]->name;
+        }
+        $unit = $post_id ? get_post_meta($post_id, 'wmb_unit', true) : '';
         if (!$name || !$qty) continue;
-        if (!isset($agg[$name])) $agg[$name] = 0;
-        $agg[$name] += $qty;
+        $key = $post_id ? ('id-'.$post_id) : ('name-'.md5($name));
+        if (!isset($agg[$key])) $agg[$key] = ['name'=>$name,'category'=>$category,'unit'=>$unit,'qty'=>0];
+        $agg[$key]['qty'] += $qty;
       }
       $orderRows[] = [ 'order_id'=>$order->get_id(), 'customer'=>$order->get_billing_first_name().' '.$order->get_billing_last_name(), 'items'=>$payload['items_list'] ];
     }
@@ -742,8 +773,8 @@ function wmb_page_kitchen(){
     header('Content-Type: text/csv; charset=UTF-8');
     header('Content-Disposition: attachment; filename="kitchen-'.date('Ymd').'.csv"');
     $out = fopen('php://output','w');
-    fputcsv($out, ['Блюдо','Кол-во']);
-    foreach($agg as $name=>$qty){ fputcsv($out, [$name, $qty]); }
+    fputcsv($out, ['Категория','Блюдо','Ед.изм','Кол-во']);
+    foreach($agg as $row){ fputcsv($out, [$row['category'],$row['name'],$row['unit'],$row['qty']]); }
     fclose($out); exit;
   }
 
@@ -762,8 +793,28 @@ function wmb_page_kitchen(){
 
   if (!$agg){ echo '<p>Нет данных по выбранным параметрам.</p>'; }
   else {
-    echo '<h2>Сводка по блюдам</h2><table class="widefat"><thead><tr><th>Блюдо</th><th>Кол-во</th></tr></thead><tbody>';
-    foreach($agg as $name=>$qty){ echo '<tr><td>'.esc_html($name).'</td><td>'.intval($qty).'</td></tr>'; }
+    $base = remove_query_arg(['sort','dir']);
+    $sort = isset($_GET['sort']) ? sanitize_text_field($_GET['sort']) : 'name';
+    $dir  = strtolower(isset($_GET['dir']) ? sanitize_text_field($_GET['dir']) : 'asc');
+    $dir  = ($dir==='desc') ? 'desc' : 'asc';
+    uasort($agg, function($a,$b) use ($sort,$dir){
+      $va = $a[$sort] ?? '';
+      $vb = $b[$sort] ?? '';
+      if ($sort==='qty'){ $va = intval($va); $vb = intval($vb); }
+      $cmp = ($va==$vb) ? 0 : (($va<$vb)?-1:1);
+      return $dir==='asc' ? $cmp : -$cmp;
+    });
+    $mk = function($s) use ($base,$sort,$dir){
+      $next = ($sort===$s && $dir==='asc') ? 'desc' : 'asc';
+      return esc_url(add_query_arg(['sort'=>$s,'dir'=>$next], $base));
+    };
+    echo '<h2>Сводка по блюдам</h2><table class="widefat"><thead><tr>';
+    echo '<th><a href="'.$mk('category').'">Категория</a></th>';
+    echo '<th><a href="'.$mk('name').'">Блюдо</a></th>';
+    echo '<th>Ед.изм</th>';
+    echo '<th><a href="'.$mk('qty').'">Кол-во</a></th>';
+    echo '</tr></thead><tbody>';
+    foreach($agg as $row){ echo '<tr><td>'.esc_html($row['category']).'</td><td>'.esc_html($row['name']).'</td><td>'.esc_html($row['unit']).'</td><td>'.intval($row['qty']).'</td></tr>'; }
     echo '</tbody></table>';
   }
 
