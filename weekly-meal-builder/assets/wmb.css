@@ -1,5 +1,5 @@
 /* ============ Layout ============ */
-html,body{max-width:100%;overflow-x:hidden}
+body{overflow-x:hidden}
 #wmb *{box-sizing:border-box}
 .wmb-wrapper{max-width:1200px;margin:0 auto;padding:12px}
 .wmb-header{margin:12px 0 16px}
@@ -47,7 +47,7 @@ html,body{max-width:100%;overflow-x:hidden}
 .wmb-qty-value{min-width:20px;text-align:center;font-weight:600}
 
 /* Sidebar */
-.wmb-sidebar{position:sticky;top:12px}
+.wmb-sidebar{position:-webkit-sticky;position:sticky;top:12px}
 .wmb-summary{background:#fff;border:1px solid #eee;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px}
 .wmb-summary-row{display:flex;align-items:center;justify-content:space-between}
 .wmb-checkout-btn{width:100%;padding:12px 14px;border:0;border-radius:10px;background:#7b66ff;color:#fff;font-weight:700;cursor:pointer}
