@@ -417,6 +417,7 @@
   async function boot(){
     var root = document.getElementById('meal-builder-root');
     if (!root) return;
+    try{ root.style.paddingLeft='12px'; root.style.paddingRight='12px'; }catch(e){}
 
     try{
       var res = await fetch(MENU_URL, {credentials:'same-origin'});
