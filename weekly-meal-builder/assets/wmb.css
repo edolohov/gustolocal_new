@@ -4,6 +4,17 @@ html,body{overflow-x:hidden}
 @supports (padding: max(0px)){
   #meal-builder-root{padding-left:max(12px, env(safe-area-inset-left));padding-right:max(12px, env(safe-area-inset-right))}
 }
+
+/* Hard override against theme wrappers on small screens */
+@media (max-width:768px){
+  body .wp-site-blocks #meal-builder-root,
+  body #meal-builder-root,
+  body .wp-site-blocks #meal-builder-root .wmb-wrapper{
+    padding-left:max(16px, env(safe-area-inset-left)) !important;
+    padding-right:max(16px, env(safe-area-inset-right)) !important;
+    margin-left:auto; margin-right:auto;
+  }
+}
 #wmb *{box-sizing:border-box}
 .wmb-wrapper{max-width:1200px;margin:0 auto;padding:12px}
 @supports(padding:max(0px)){
