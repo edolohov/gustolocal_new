@@ -66,6 +66,9 @@ html,body{overflow-x:hidden}
 
 /* Sidebar */
 .wmb-sidebar{position:-webkit-sticky;position:sticky;top:12px}
+@media (min-width:769px){
+  .wmb-sidebar{position:-webkit-sticky;position:sticky;top:12px;align-self:start;height:fit-content}
+}
 .wmb-summary{background:#fff;border:1px solid #eee;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px}
 .wmb-summary-row{display:flex;align-items:center;justify-content:space-between}
 .wmb-checkout-btn{width:100%;padding:12px 14px;border:0;border-radius:10px;background:#7b66ff;color:#fff;font-weight:700;cursor:pointer}
