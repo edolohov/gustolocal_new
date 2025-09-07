@@ -576,6 +576,16 @@ add_shortcode('meal_builder', function(){
   return '<div id="meal-builder-root"></div>';
 });
 
+// Global tweak for WooCommerce cart/checkout tables on mobile: avoid horizontal scroll
+add_action('wp_enqueue_scripts', function(){
+  if (function_exists('is_cart') && (is_cart() || is_checkout())){
+    $css = 'html,body{overflow-x:hidden} .woocommerce .cart, .woocommerce table.shop_table{table-layout:fixed; width:100%} .woocommerce table.shop_table td, .woocommerce table.shop_table th{word-wrap:break-word;white-space:normal}';
+    wp_register_style('wmb-cart-fix', false);
+    wp_enqueue_style('wmb-cart-fix');
+    wp_add_inline_style('wmb-cart-fix', $css);
+  }
+}, 100);
+
 /* ---------- AJAX add to cart ---------- */
 add_action('wp_ajax_wmb_add_to_cart','wmb_ajax_add_to_cart');
 add_action('wp_ajax_nopriv_wmb_add_to_cart','wmb_ajax_add_to_cart');

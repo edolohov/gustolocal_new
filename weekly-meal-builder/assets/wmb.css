@@ -6,6 +6,9 @@ html,body{overflow-x:hidden}
 }
 #wmb *{box-sizing:border-box}
 .wmb-wrapper{max-width:1200px;margin:0 auto;padding:12px}
+@supports(padding:max(0px)){
+  .wmb-wrapper{padding-left:max(12px, env(safe-area-inset-left));padding-right:max(12px, env(safe-area-inset-right))}
+}
 .wmb-header{margin:12px 0 16px}
 .wmb-sub{font-size:18px;color:#333;opacity:.9}
 .wmb-banner{margin-top:8px;color:#333}
