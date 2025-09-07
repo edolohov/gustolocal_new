@@ -1,8 +1,8 @@
 /* ============ Layout ============ */
 html,body{overflow-x:hidden}
-#wmb{padding-left:12px;padding-right:12px}
+#meal-builder-root{padding-left:12px;padding-right:12px}
 @supports (padding: max(0px)){
-  #wmb{padding-left:max(12px, env(safe-area-inset-left));padding-right:max(12px, env(safe-area-inset-right))}
+  #meal-builder-root{padding-left:max(12px, env(safe-area-inset-left));padding-right:max(12px, env(safe-area-inset-right))}
 }
 #wmb *{box-sizing:border-box}
 .wmb-wrapper{max-width:1200px;margin:0 auto;padding:12px}
