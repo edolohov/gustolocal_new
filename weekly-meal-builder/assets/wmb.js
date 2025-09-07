@@ -267,6 +267,14 @@
             '</div>',
           '</aside>',
         '</div>',
+        // Mobile sticky bar
+        '<div class="wmb-sticky">',
+          '<div style="display:flex;flex-direction:column;gap:2px">',
+            '<div style="font-size:12px;color:#666">Итого</div>',
+            '<div style="font-weight:700" id="wmb-total-price-mobile">'+money(totalPrice())+'</div>',
+          '</div>',
+          '<button id="wmb-checkout-mobile" class="wmb-checkout-btn" '+(totalPortions()===0?'disabled':'')+'>Перейти к оформлению</button>',
+        '</div>',
       '</div>'
     ].join("");
 
@@ -297,8 +305,8 @@
     });
 
     // qty
-    els('.wmb-qty-inc', root).forEach(function(b){ b.addEventListener('click', function(){ changeQty(b.dataset.id, +1, root); }) });
-    els('.wmb-qty-dec', root).forEach(function(b){ b.addEventListener('click', function(){ changeQty(b.dataset.id, -1, root); }) });
+    els('.wmb-qty-inc', root).forEach(function(b){ b.addEventListener('click', function(){ changeQty(b.dataset.id, +1, root); var p=el('#wmb-total-price'); var pm=el('#wmb-total-price-mobile'); if(p) p.textContent=money(totalPrice()); if(pm) pm.textContent=money(totalPrice()); var pp=el('#wmb-total-portions'); if(pp) pp.textContent=totalPortions(); }); });
+    els('.wmb-qty-dec', root).forEach(function(b){ b.addEventListener('click', function(){ changeQty(b.dataset.id, -1, root); var p=el('#wmb-total-price'); var pm=el('#wmb-total-price-mobile'); if(p) p.textContent=money(totalPrice()); if(pm) pm.textContent=money(totalPrice()); var pp=el('#wmb-total-portions'); if(pp) pp.textContent=totalPortions(); }); });
 
     // состав
     els('.wmb-ing-btn', root).forEach(function(b){
@@ -306,6 +314,7 @@
     });
 
     var btn = el('#wmb-checkout', root); if (btn) btn.addEventListener('click', function(){ onCheckout(delivery); });
+    var btnm = el('#wmb-checkout-mobile', document); if (btnm) btnm.addEventListener('click', function(){ onCheckout(delivery); });
   }
 
   function renderSection(section){
