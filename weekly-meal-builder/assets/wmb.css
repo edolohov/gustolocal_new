@@ -1,5 +1,8 @@
 /* ============ Layout ============ */
+/* Updated: Grid optimization applied - auto-fit with minmax */
+/* Убираем overflow-x:hidden который ломает sticky */
 html,body{overflow-x:hidden}
+html,body{overflow:visible !important}
 #meal-builder-root{padding-left:12px;padding-right:12px}
 @supports (padding: max(0px)){
   #meal-builder-root{padding-left:max(12px, env(safe-area-inset-left));padding-right:max(12px, env(safe-area-inset-right))}
@@ -41,19 +44,54 @@ html,body{overflow-x:hidden}
 /* Catalog */
 .wmb-section{margin:12px 0 24px}
 .wmb-section-title{font-size:28px;margin:0 0 10px}
-.wmb-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-@media (max-width: 1200px){ .wmb-grid{grid-template-columns:repeat(3,1fr)} }
-@media (max-width: 900px){ .wmb-grid{grid-template-columns:repeat(2,1fr)} }
+.wmb-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px}
+@media (max-width: 1400px){ .wmb-grid{grid-template-columns:repeat(auto-fit, minmax(260px, 1fr))} }
+@media (max-width: 1200px){ .wmb-grid{grid-template-columns:repeat(auto-fit, minmax(240px, 1fr))} }
+@media (max-width: 900px){ .wmb-grid{grid-template-columns:repeat(auto-fit, minmax(220px, 1fr))} }
 @media (max-width: 560px){ .wmb-grid{grid-template-columns:1fr} }
 
 /* Card */
-.wmb-card{background:#fff;border:1px solid #eee;border-radius:16px;padding:16px}
-.wmb-card-title{font-weight:700;font-size:20px;line-height:1.25;margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-.wmb-card-title .wmb-ing-btn{font-size:14px;padding:6px 10px;border-radius:999px;border:1px solid #e6e6ef;background:#fff;cursor:pointer}
+.wmb-card{background:#fff;border:1px solid #eee;border-radius:16px;padding:16px;height:fit-content}
+
+/* Optimized grid when filters are active */
+.wmb-catalog.has-filters .wmb-grid{
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+}
+@media (max-width: 1400px){ 
+  .wmb-catalog.has-filters .wmb-grid{grid-template-columns:repeat(auto-fit, minmax(230px, 1fr))} 
+}
+@media (max-width: 1200px){ 
+  .wmb-catalog.has-filters .wmb-grid{grid-template-columns:repeat(auto-fit, minmax(210px, 1fr))} 
+}
+@media (max-width: 900px){ 
+  .wmb-catalog.has-filters .wmb-grid{grid-template-columns:repeat(auto-fit, minmax(200px, 1fr))} 
+}
+
+/* Compact mode for sections with many items */
+.wmb-section.has-many-items .wmb-grid{
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px;
+}
+@media (max-width: 1400px){ 
+  .wmb-section.has-many-items .wmb-grid{grid-template-columns:repeat(auto-fit, minmax(220px, 1fr))} 
+}
+@media (max-width: 1200px){ 
+  .wmb-section.has-many-items .wmb-grid{grid-template-columns:repeat(auto-fit, minmax(200px, 1fr))} 
+}
+@media (max-width: 900px){ 
+  .wmb-section.has-many-items .wmb-grid{grid-template-columns:repeat(auto-fit, minmax(180px, 1fr))} 
+}
+.wmb-card-title{font-weight:700;font-size:20px;line-height:1.25;margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between}
+.wmb-card-buttons{display:flex;gap:8px;flex-wrap:wrap}
+.wmb-card-buttons .wmb-ing-btn{font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid #4a90e2;background:#e3f2fd;color:#1976d2;cursor:pointer;font-weight:500;transition:all 0.2s ease}
+.wmb-card-buttons .wmb-ing-btn:hover{background:#bbdefb;border-color:#1976d2}
+.wmb-card-buttons .wmb-allergens-btn{font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid #f57c00;background:#fff3e0;color:#e65100;cursor:pointer;font-weight:500;transition:all 0.2s ease}
+.wmb-card-buttons .wmb-allergens-btn:hover{background:#ffcc02;border-color:#f57c00}
 .wmb-card-meta{display:flex;gap:12px;align-items:center;margin-bottom:8px}
 .wmb-unit{color:#666}
-.wmb-card-tags{display:flex;flex-wrap:wrap;gap:8px;margin:4px 0 8px}
-.wmb-tag{padding:6px 10px;border-radius:999px;background:#f6f6fb;border:1px solid #e6e6ef}
+.wmb-card-tags{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px}
+.wmb-tag{padding:4px 8px;border-radius:999px;background:#f6f6fb;border:1px solid #e6e6ef;font-size:12px;color:#666}
 .wmb-allergens{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
 .wmb-allergen{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#fff;border:1px solid #e6e6ef;font-size:.9rem}
 .wmb-allergen i{font-style:normal;opacity:.8}
@@ -65,9 +103,9 @@ html,body{overflow-x:hidden}
 .wmb-qty-value{min-width:20px;text-align:center;font-weight:600}
 
 /* Sidebar */
-.wmb-sidebar{position:-webkit-sticky;position:sticky;top:12px}
+.wmb-sidebar{position:-webkit-sticky;position:sticky;top:12px;z-index:10}
 @media (min-width:769px){
-  .wmb-sidebar{position:-webkit-sticky;position:sticky;top:12px;align-self:start;height:fit-content}
+  .wmb-sidebar{position:-webkit-sticky;position:sticky;top:12px;align-self:start;height:fit-content;z-index:10}
 }
 .wmb-summary{background:#fff;border:1px solid #eee;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px}
 .wmb-summary-row{display:flex;align-items:center;justify-content:space-between}
@@ -81,6 +119,12 @@ html,body{overflow-x:hidden}
   .wmb-sticky{display:flex}
   .wmb-sidebar{display:none}
   .wmb-wrapper{padding-bottom:84px}
+}
+
+/* Принудительно показываем сайдбар на десктопе */
+@media (min-width:769px){
+  .wmb-sidebar{display:block !important}
+  .wmb-sticky{display:none !important}
 }
 
 /* Empty / loading */
@@ -101,5 +145,130 @@ html,body{overflow-x:hidden}
   overflow: auto;
 }
 
-#wmb-ing-modal .allergy-row{margin:8px 0 0;color:#555}
-#wmb-ing-modal .allergy-row .pill{display:inline-block;margin-right:6px;margin-top:6px;padding:4px 8px;border-radius:999px;background:#f6f6fb;border:1px solid #e6e6ef}
+/* ============ Allergens modal ============ */
+#wmb-allergens-modal{position:fixed;inset:0;display:none}
+#wmb-allergens-modal.open{display:block}
+#wmb-allergens-modal .back{position:absolute;inset:0;background:rgba(0,0,0,.35)}
+#wmb-allergens-modal .dialog{position:relative;max-width:600px;margin:60px auto;background:#fff;border-radius:24px;padding:20px}
+#wmb-allergens-modal .close{position:absolute;top:8px;right:12px;border:0;background:transparent;font-size:26px;cursor:pointer}
+#wmb-allergens-modal h3{margin:0 24px 4px 0;font-size:22px}
+#wmb-allergens-modal .allergens-list{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0}
+#wmb-allergens-modal .allergen-pill{display:inline-block;padding:8px 16px;border-radius:999px;background:#fff3cd;border:1px solid #ffeaa7;color:#856404;font-weight:500}
+
+/* ============ Sticky Fixes ============ */
+/* Убираем возможные ограничения от родительских элементов */
+.wmb-wrapper,
+.wmb-body,
+.wmb-catalog{
+  overflow: visible !important;
+  transform: none !important;
+  contain: none !important;
+}
+
+/* Дополнительные правила для sticky sidebar */
+@media (min-width: 769px){
+  .wmb-sidebar{
+    position: -webkit-sticky !important;
+    position: sticky !important;
+    top: 24px !important;
+    align-self: start !important;
+    height: max-content !important;
+    z-index: 10 !important;
+  }
+  
+  .wmb-summary{
+    position: relative !important;
+    z-index: 10 !important;
+  }
+  
+  /* Обеспечиваем правильную работу grid layout */
+  .wmb-body{
+    display: grid !important;
+    grid-template-columns: 1fr 320px !important;
+    align-items: start !important;
+    gap: 24px !important;
+  }
+}
+
+/* ============ АГРЕССИВНЫЕ STICKY ПРАВИЛА ============ */
+/* Принудительно применяем sticky ко всем возможным селекторам */
+#meal-builder-root .wmb-sidebar,
+#meal-builder-root aside.wmb-sidebar,
+.wmb-sidebar,
+aside.wmb-sidebar{
+  position: -webkit-sticky !important;
+  position: sticky !important;
+  top: 24px !important;
+  z-index: 999 !important;
+  align-self: start !important;
+  height: max-content !important;
+}
+
+/* Убираем все возможные ограничения от родительских элементов */
+#meal-builder-root,
+#meal-builder-root *,
+.wmb-wrapper,
+.wmb-wrapper *,
+.wmb-body,
+.wmb-body *,
+.wmb-catalog,
+.wmb-catalog *{
+  overflow: visible !important;
+  transform: none !important;
+  contain: none !important;
+  isolation: auto !important;
+}
+
+/* Дополнительная защита для grid */
+@media (min-width: 769px){
+  .wmb-body{
+    display: grid !important;
+    grid-template-columns: 1fr 320px !important;
+    align-items: start !important;
+    gap: 24px !important;
+    overflow: visible !important;
+  }
+  
+  .wmb-catalog{
+    overflow: visible !important;
+    min-height: 100vh !important;
+  }
+}
+
+/* ============ КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ STICKY ============ */
+/* Исправляем все возможные конфликты */
+@media (min-width: 769px) {
+  /* Принудительно убираем все ограничения */
+  html, body, #meal-builder-root, .wmb-wrapper, .wmb-body, .wmb-catalog {
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    transform: none !important;
+    contain: none !important;
+    isolation: auto !important;
+  }
+  
+  /* Принудительно применяем sticky */
+  .wmb-sidebar,
+  aside.wmb-sidebar,
+  #meal-builder-root .wmb-sidebar,
+  #meal-builder-root aside.wmb-sidebar {
+    position: sticky !important;
+    position: -webkit-sticky !important;
+    top: 24px !important;
+    z-index: 999 !important;
+    align-self: start !important;
+    height: max-content !important;
+    display: block !important;
+    visibility: visible !important;
+  }
+  
+  /* Убираем возможные ограничения от grid */
+  .wmb-body {
+    display: grid !important;
+    grid-template-columns: 1fr 320px !important;
+    align-items: start !important;
+    gap: 24px !important;
+    overflow: visible !important;
+  }
+}

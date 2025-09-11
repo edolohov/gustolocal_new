@@ -154,12 +154,31 @@
         '<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="wmb-ing-title">',
           '<button class="close" aria-label="Закрыть">×</button>',
           '<h3 id="wmb-ing-title">Состав</h3>',
-          '<div id="wmb-ing-allergens" class="allergy-row" style="display:none"></div>',
           '<pre id="wmb-ing-text"></pre>',
         '</div>',
       '</div>'
     ].join(''));
     var modal = el('#wmb-ing-modal');
+    var close = function(){ modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); };
+    modal.querySelector('.back').addEventListener('click', close);
+    modal.querySelector('.close').addEventListener('click', close);
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') close(); });
+  }
+
+  /* ======== ALLERGENS MODAL ======== */
+  function ensureAllergensModal(){
+    if (document.getElementById('wmb-allergens-modal')) return;
+    document.body.insertAdjacentHTML('beforeend', [
+      '<div id="wmb-allergens-modal" aria-hidden="true">',
+        '<div class="back" tabindex="-1"></div>',
+        '<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="wmb-allergens-title">',
+          '<button class="close" aria-label="Закрыть">×</button>',
+          '<h3 id="wmb-allergens-title">Аллергены</h3>',
+          '<div id="wmb-allergens-content"></div>',
+        '</div>',
+      '</div>'
+    ].join(''));
+    var modal = el('#wmb-allergens-modal');
     var close = function(){ modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); };
     modal.querySelector('.back').addEventListener('click', close);
     modal.querySelector('.close').addEventListener('click', close);
@@ -173,17 +192,25 @@
     var modal = el('#wmb-ing-modal');
     el('#wmb-ing-title').textContent = item.name || 'Состав';
     el('#wmb-ing-text').textContent  = (item.ingredients || '').trim();
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden','false');
+  }
 
-    var wrap = el('#wmb-ing-allergens');
+  function openAllergensFor(id){
+    var item = byId(id);
+    if (!item) return;
+    ensureAllergensModal();
+    var modal = el('#wmb-allergens-modal');
+    el('#wmb-allergens-title').textContent = item.name || 'Аллергены';
+    
     var arr = Array.isArray(item.allergens) ? item.allergens : [];
+    var content = el('#wmb-allergens-content');
     if (arr.length){
-      wrap.style.display = '';
-      wrap.innerHTML = '<strong>Аллергены:</strong> ' + arr.map(function(a){
-        return '<span class="pill">'+escapeHtml(a)+'</span>';
-      }).join('');
+      content.innerHTML = '<div class="allergens-list">' + arr.map(function(a){
+        return '<span class="allergen-pill">'+escapeHtml(a)+'</span>';
+      }).join('') + '</div>';
     } else {
-      wrap.style.display = 'none';
-      wrap.innerHTML = '';
+      content.innerHTML = '<p>Аллергены не указаны</p>';
     }
     modal.classList.add('open');
     modal.setAttribute('aria-hidden','false');
@@ -213,6 +240,56 @@
     if (!menu) { root.innerHTML = '<div class="wmb-loading">Загрузка меню…</div>'; return; }
 
     ensureIngredientsModal();
+    
+    // Принудительно применяем sticky стили сразу после рендера
+    setTimeout(function(){
+      if (window.innerWidth >= 769) {
+        var sidebar = root.querySelector('.wmb-sidebar');
+        if (sidebar) {
+          // Агрессивно применяем sticky стили
+          sidebar.style.position = 'sticky';
+          sidebar.style.top = '24px';
+          sidebar.style.zIndex = '999';
+          sidebar.style.alignSelf = 'start';
+          sidebar.style.height = 'max-content';
+          sidebar.style.display = 'block';
+          sidebar.style.visibility = 'visible';
+          
+          // Убираем все возможные ограничения
+          var allElements = [
+            document.documentElement,
+            document.body,
+            root,
+            root.querySelector('.wmb-wrapper'),
+            root.querySelector('.wmb-body'),
+            root.querySelector('.wmb-catalog')
+          ];
+          
+          allElements.forEach(function(el){
+            if (el) {
+              el.style.overflow = 'visible';
+              el.style.overflowX = 'visible';
+              el.style.overflowY = 'visible';
+              el.style.transform = 'none';
+              el.style.contain = 'none';
+              el.style.isolation = 'auto';
+            }
+          });
+        }
+      }
+    }, 100);
+    
+    // Дополнительная проверка через 500мс
+    setTimeout(function(){
+      if (window.innerWidth >= 769) {
+        var sidebar = root.querySelector('.wmb-sidebar');
+        if (sidebar) {
+          sidebar.style.position = 'sticky';
+          sidebar.style.top = '24px';
+          sidebar.style.zIndex = '999';
+        }
+      }
+    }, 500);
 
     var secTitles = allSectionTitles();
     var tags = allTags();
@@ -280,6 +357,18 @@
 
     if (delivery && dcfg){ renderBanner(el('#wmb-banner', root), dcfg, delivery); }
 
+    // Добавляем класс has-filters если активны фильтры
+    var catalog = el('.wmb-catalog', root);
+    if (catalog) {
+      var hasActiveFilters = (state.filters.sections && state.filters.sections.length > 0) || 
+                            (state.filters.tags && state.filters.tags.length > 0);
+      if (hasActiveFilters) {
+        catalog.classList.add('has-filters');
+      } else {
+        catalog.classList.remove('has-filters');
+      }
+    }
+
     // фильтры
     els('.wmb-chip', root).forEach(function(chip){
       var type = chip.getAttribute('data-type');
@@ -313,6 +402,11 @@
       b.addEventListener('click', function(){ openIngredientsFor(b.getAttribute('data-id')); });
     });
 
+    // аллергены
+    els('.wmb-allergens-btn', root).forEach(function(b){
+      b.addEventListener('click', function(){ openAllergensFor(b.getAttribute('data-id')); });
+    });
+
     var btn = el('#wmb-checkout', root); if (btn) btn.addEventListener('click', function(){ onCheckout(delivery); });
     var btnm = el('#wmb-checkout-mobile', document); if (btnm) btnm.addEventListener('click', function(){ onCheckout(delivery); });
   }
@@ -323,8 +417,12 @@
       .filter(function(it){ return itemPasses(it, section.title); });
 
     if (!items.length) return "";
+    
+    // Добавляем класс has-many-items если в секции больше 6 элементов
+    var sectionClass = items.length > 6 ? 'wmb-section has-many-items' : 'wmb-section';
+    
     return [
-      '<section class="wmb-section">',
+      '<section class="'+sectionClass+'">',
         '<h2 class="wmb-section-title">'+escapeHtml(section.title)+'</h2>',
         '<div class="wmb-grid">',
           items.map(renderCard).join(''),
@@ -339,19 +437,22 @@
     var tags = normalizeTags(item.tags);
     var allergens = Array.isArray(item.allergens) ? item.allergens : [];
     var hasIngredients = !!(item.ingredients && String(item.ingredients).trim().length);
+    var hasAllergens = allergens.length > 0;
 
     return [
       '<div class="wmb-card">',
         '<div class="wmb-card-title">',
           escapeHtml(item.name),
-          (hasIngredients ? ' <button class="wmb-ing-btn" data-id="'+item.id+'" aria-label="Состав блюда '+escapeHtml(item.name)+'">Состав</button>' : ''),
+          '<div class="wmb-card-buttons">',
+            (hasIngredients ? '<button class="wmb-ing-btn" data-id="'+item.id+'" aria-label="Состав блюда '+escapeHtml(item.name)+'">Состав</button>' : ''),
+            (hasAllergens ? '<button class="wmb-allergens-btn" data-id="'+item.id+'" aria-label="Аллергены блюда '+escapeHtml(item.name)+'">Аллергены</button>' : ''),
+          '</div>',
         '</div>',
         '<div class="wmb-card-meta">',
           '<span>'+money(Number(item.price)||0)+'</span>',
           (unit ? '<span class="wmb-unit">'+escapeHtml(unit)+'</span>' : ''),
         '</div>',
         (tags.length? '<div class="wmb-card-tags">'+tags.map(function(t){return '<span class="wmb-tag">'+escapeHtml(t)+'</span>'}).join('')+'</div>' : ''),
-        (allergens.length ? '<div class="wmb-allergens">'+allergens.map(function(a){ return '<span class="wmb-allergen" title="Аллерген"><i>⚠️</i>'+escapeHtml(a)+'</span>'; }).join('')+'</div>' : ''),
         '<div class="wmb-qty">',
           '<button class="wmb-qty-dec" data-id="'+item.id+'" '+(q===0?'disabled':'')+' aria-label="Уменьшить">–</button>',
           '<span class="wmb-qty-value" aria-live="polite">'+q+'</span>',
@@ -377,28 +478,53 @@
   function setupDesktopSticky(root){
     try{
       if (window.innerWidth < 769) return;
+      
       var sidebar = root.querySelector('.wmb-sidebar');
       if (!sidebar) return;
-      var box = sidebar.querySelector('.wmb-summary') || sidebar;
-      var offset = 24;
-      var start = sidebar.getBoundingClientRect().top + window.pageYOffset - offset;
-
-      function reset(){ box.style.position=''; box.style.top=''; box.style.left=''; box.style.width=''; box.style.zIndex=''; }
-      function apply(){
-        if (window.innerWidth < 769){ reset(); return; }
-        var rect = sidebar.getBoundingClientRect();
-        if (window.pageYOffset > start){
-          box.style.position = 'fixed';
-          box.style.top = offset + 'px';
-          box.style.left = rect.left + 'px';
-          box.style.width = rect.width + 'px';
-          box.style.zIndex = '10';
-        } else { reset(); }
+      
+      // Принудительно применяем sticky стили через JavaScript
+      function forceSticky(){
+        if (window.innerWidth < 769) return;
+        
+        sidebar.style.position = 'sticky';
+        sidebar.style.top = '24px';
+        sidebar.style.zIndex = '999';
+        sidebar.style.alignSelf = 'start';
+        sidebar.style.height = 'max-content';
+        
+        // Убираем ограничения от родительских элементов
+        var parents = [
+          root,
+          root.querySelector('.wmb-wrapper'),
+          root.querySelector('.wmb-body'),
+          root.querySelector('.wmb-catalog')
+        ];
+        
+        parents.forEach(function(parent){
+          if (parent) {
+            parent.style.overflow = 'visible';
+            parent.style.transform = 'none';
+            parent.style.contain = 'none';
+          }
+        });
       }
-      window.addEventListener('scroll', apply);
-      window.addEventListener('resize', function(){ start = sidebar.getBoundingClientRect().top + window.pageYOffset - offset; apply(); });
-      apply();
-    }catch(e){}
+      
+      // Применяем сразу
+      forceSticky();
+      
+      // Применяем при изменении размера окна
+      window.addEventListener('resize', forceSticky);
+      
+      // Применяем при прокрутке (на случай конфликтов)
+      var scrollTimeout;
+      window.addEventListener('scroll', function(){
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(forceSticky, 100);
+      });
+      
+    }catch(e){
+      console.error('Sticky setup error:', e);
+    }
   }
 
   async function onCheckout(deliveryInfo){
