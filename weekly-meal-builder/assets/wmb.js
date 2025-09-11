@@ -373,6 +373,34 @@
     }
   }
 
+  /* ======== DESKTOP STICKY (fallback) ======== */
+  function setupDesktopSticky(root){
+    try{
+      if (window.innerWidth < 769) return;
+      var sidebar = root.querySelector('.wmb-sidebar');
+      if (!sidebar) return;
+      var box = sidebar.querySelector('.wmb-summary') || sidebar;
+      var offset = 24;
+      var start = sidebar.getBoundingClientRect().top + window.pageYOffset - offset;
+
+      function reset(){ box.style.position=''; box.style.top=''; box.style.left=''; box.style.width=''; box.style.zIndex=''; }
+      function apply(){
+        if (window.innerWidth < 769){ reset(); return; }
+        var rect = sidebar.getBoundingClientRect();
+        if (window.pageYOffset > start){
+          box.style.position = 'fixed';
+          box.style.top = offset + 'px';
+          box.style.left = rect.left + 'px';
+          box.style.width = rect.width + 'px';
+          box.style.zIndex = '10';
+        } else { reset(); }
+      }
+      window.addEventListener('scroll', apply);
+      window.addEventListener('resize', function(){ start = sidebar.getBoundingClientRect().top + window.pageYOffset - offset; apply(); });
+      apply();
+    }catch(e){}
+  }
+
   async function onCheckout(deliveryInfo){
     try{
       var payload = {
@@ -429,6 +457,7 @@
     }
     restore();
     render(root);
+    setupDesktopSticky(root);
   }
 
   document.addEventListener('DOMContentLoaded', boot);
