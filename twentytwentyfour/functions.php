@@ -295,7 +295,7 @@ function force_proceed_to_checkout_button() {
     if ( is_cart() ) {
         ?>
         <div class="wc-proceed-to-checkout" style="margin-top: 20px;">
-            <a href="<?php echo esc_url( wc_get_checkout_url() ); ?>" class="checkout-button button alt wc-forward" style="display: inline-block; padding: 12px 24px; background-color: #7c3aed; color: white; text-decoration: none; border-radius: 4px; font-weight: bold;">
+            <a href="<?php echo esc_url( wc_get_checkout_url() ); ?>" class="checkout-button button alt wc-forward" style="display: inline-block; padding: 12px 24px; background-color: #6a5eb7; color: white; text-decoration: none; border-radius: 4px; font-weight: bold;">
                 <?php esc_html_e( 'Proceed to checkout', 'woocommerce' ); ?>
             </a>
         </div>
@@ -304,12 +304,12 @@ function force_proceed_to_checkout_button() {
 }
 add_action( 'woocommerce_after_cart', 'force_proceed_to_checkout_button' );
 
-// Remove deadline text from cart item data
-function remove_deadline_from_cart_item_data( $item_data, $cart_item ) {
+// Remove delivery information from cart item data
+function remove_delivery_from_cart_item_data( $item_data, $cart_item ) {
+    // Remove all delivery-related information
     if ( isset( $item_data['delivery'] ) ) {
-        // Remove deadline text from delivery information
-        $item_data['delivery']['value'] = preg_replace( '/\s*\([^)]*дедлайн[^)]*\)/', '', $item_data['delivery']['value'] );
+        unset( $item_data['delivery'] );
     }
     return $item_data;
 }
-add_filter( 'woocommerce_get_item_data', 'remove_deadline_from_cart_item_data', 10, 2 );
+add_filter( 'woocommerce_get_item_data', 'remove_delivery_from_cart_item_data', 10, 2 );
