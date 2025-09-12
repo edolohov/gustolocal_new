@@ -236,10 +236,20 @@ function hide_stripe_buttons_on_cart_css() {
             font-weight: 500 !important;
         }
         
-        /* Hide duplicate "Proceed to checkout" button at bottom */
+        /* Hide ALL "Proceed to checkout" buttons except the one next to Stripe */
         .woocommerce-cart .woocommerce-cart-form__actions .wc-proceed-to-checkout,
         .woocommerce-cart .woocommerce-cart-form__actions .checkout-button,
-        .woocommerce-cart .woocommerce-cart-form__actions .woocommerce-checkout-button {
+        .woocommerce-cart .woocommerce-cart-form__actions .woocommerce-checkout-button,
+        .woocommerce-cart .woocommerce-cart-form__actions a[href*="checkout"],
+        .woocommerce-cart .woocommerce-cart-form__actions .button.checkout,
+        .woocommerce-cart .woocommerce-cart-form__actions .button.wc-forward {
+            display: none !important;
+        }
+        
+        /* Hide any other checkout buttons that might appear */
+        .woocommerce-cart .woocommerce-cart-form .wc-proceed-to-checkout:not(.cart-collaterals .wc-proceed-to-checkout),
+        .woocommerce-cart .woocommerce-cart-form .checkout-button:not(.cart-collaterals .checkout-button),
+        .woocommerce-cart .woocommerce-cart-form .woocommerce-checkout-button:not(.cart-collaterals .woocommerce-checkout-button) {
             display: none !important;
         }
         
@@ -604,6 +614,16 @@ function remove_cart_colons_and_title() {
                 var element = document.querySelector(selector);
                 if (element) {
                     element.remove();
+                }
+            });
+            
+            // Remove duplicate checkout buttons
+            var checkoutButtons = document.querySelectorAll('.woocommerce-cart .wc-proceed-to-checkout, .woocommerce-cart .checkout-button, .woocommerce-cart .woocommerce-checkout-button');
+            var keepButton = document.querySelector('.woocommerce-cart .cart-collaterals .wc-proceed-to-checkout');
+            
+            checkoutButtons.forEach(function(button) {
+                if (button !== keepButton) {
+                    button.remove();
                 }
             });
         });
