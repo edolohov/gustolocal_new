@@ -236,10 +236,17 @@ function hide_stripe_buttons_on_cart_css() {
             font-weight: 500 !important;
         }
         
-        /* Ensure "Proceed to checkout" button is visible */
-        .wc-proceed-to-checkout,
-        .checkout-button,
-        .woocommerce-checkout-button {
+        /* Hide duplicate "Proceed to checkout" button at bottom */
+        .woocommerce-cart .woocommerce-cart-form__actions .wc-proceed-to-checkout,
+        .woocommerce-cart .woocommerce-cart-form__actions .checkout-button,
+        .woocommerce-cart .woocommerce-cart-form__actions .woocommerce-checkout-button {
+            display: none !important;
+        }
+        
+        /* Keep only the button next to Stripe buttons */
+        .woocommerce-cart .cart-collaterals .wc-proceed-to-checkout,
+        .woocommerce-cart .cart-collaterals .checkout-button,
+        .woocommerce-cart .cart-collaterals .woocommerce-checkout-button {
             display: block !important;
         }
         
@@ -444,7 +451,13 @@ function hide_stripe_buttons_on_cart_css() {
                 margin-bottom: 10px !important;
             }
             
-            .woocommerce-cart .wc-proceed-to-checkout {
+            /* Hide duplicate button on mobile */
+            .woocommerce-cart .woocommerce-cart-form__actions .wc-proceed-to-checkout {
+                display: none !important;
+            }
+            
+            /* Keep only the button next to Stripe buttons on mobile */
+            .woocommerce-cart .cart-collaterals .wc-proceed-to-checkout {
                 width: 100% !important;
                 margin: 0 !important;
                 padding: 0 !important;
@@ -452,7 +465,7 @@ function hide_stripe_buttons_on_cart_css() {
                 display: block !important;
             }
             
-            .woocommerce-cart .wc-proceed-to-checkout a {
+            .woocommerce-cart .cart-collaterals .wc-proceed-to-checkout a {
                 width: 100% !important;
                 max-width: 100% !important;
                 text-align: center !important;
