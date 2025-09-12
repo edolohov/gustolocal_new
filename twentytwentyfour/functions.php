@@ -626,6 +626,27 @@ function contact_form_7_styling() {
         margin-bottom: 12px;
     }
     
+    /* Remove default paragraph margins from Contact Form 7 */
+    .wpcf7-form p {
+        margin: 0 0 12px 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Remove all default spacing from form elements */
+    .wpcf7-form br {
+        display: none !important;
+    }
+    
+    .wpcf7-form .wpcf7-form-control-wrap {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    
+    /* Ensure consistent spacing between form groups */
+    .wpcf7-form p:last-child {
+        margin-bottom: 0 !important;
+    }
+    
     .wpcf7-form label {
         display: block;
         font-weight: 600;
