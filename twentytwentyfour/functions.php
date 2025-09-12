@@ -423,6 +423,70 @@ function simple_checkout_styling() {
 }
 add_action( 'wp_head', 'simple_checkout_styling' );
 
+// Order received page styling
+function order_received_styling() {
+    if ( is_wc_endpoint_url( 'order-received' ) ) {
+        ?>
+        <style>
+        /* Center content on mobile */
+        @media (max-width: 768px) {
+            .woocommerce-order {
+                max-width: 100% !important;
+                margin: 0 auto !important;
+                padding: 15px !important;
+                box-sizing: border-box !important;
+            }
+            
+            .woocommerce-order .woocommerce-order-details {
+                max-width: 100% !important;
+                margin: 0 auto !important;
+                padding: 15px !important;
+                box-sizing: border-box !important;
+            }
+            
+            .woocommerce-order .woocommerce-customer-details {
+                max-width: 100% !important;
+                margin: 0 auto !important;
+                padding: 15px !important;
+                box-sizing: border-box !important;
+            }
+            
+            /* Ensure text doesn't overflow */
+            .woocommerce-order * {
+                max-width: 100% !important;
+                word-wrap: break-word !important;
+                box-sizing: border-box !important;
+            }
+            
+            /* Center the main content area */
+            .entry-content {
+                max-width: 100% !important;
+                margin: 0 auto !important;
+                padding: 15px !important;
+            }
+            
+            /* Center any tables or lists */
+            .woocommerce-order table,
+            .woocommerce-order ul,
+            .woocommerce-order ol {
+                max-width: 100% !important;
+                margin: 0 auto !important;
+            }
+        }
+        
+        /* Desktop centering */
+        @media (min-width: 769px) {
+            .woocommerce-order {
+                max-width: 800px !important;
+                margin: 0 auto !important;
+            }
+        }
+        </style>
+        <?php
+    }
+}
+add_action( 'wp_head', 'order_received_styling' );
+
 // Remove delivery information from cart item data
 function remove_delivery_from_cart_item_data( $item_data, $cart_item ) {
     // Remove all delivery-related information
