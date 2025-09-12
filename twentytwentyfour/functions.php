@@ -611,6 +611,71 @@ function clear_cart_on_order_completion($order_id) {
 // Disable persistent cart completely
 add_filter('woocommerce_persistent_cart_enabled', '__return_false');
 
+// Remove clickable links from Weekly Meal Plan product
+function remove_weekly_meal_plan_links() {
+    ?>
+    <style>
+    /* Remove links from Weekly Meal Plan product everywhere */
+    a[href*="weekly-meal-plan"],
+    a[href*="product/weekly-meal-plan"] {
+        pointer-events: none !important;
+        cursor: default !important;
+        text-decoration: none !important;
+        color: inherit !important;
+    }
+    
+    /* Remove hover effects */
+    a[href*="weekly-meal-plan"]:hover,
+    a[href*="product/weekly-meal-plan"]:hover {
+        text-decoration: none !important;
+        color: inherit !important;
+    }
+    
+    /* In cart - make product name not clickable */
+    .woocommerce-cart .product-name a[href*="weekly-meal-plan"] {
+        pointer-events: none !important;
+        cursor: default !important;
+    }
+    
+    /* In meal builder - make product name not clickable */
+    .wmb-item-name a[href*="weekly-meal-plan"] {
+        pointer-events: none !important;
+        cursor: default !important;
+    }
+    </style>
+    <?php
+}
+add_action('wp_head', 'remove_weekly_meal_plan_links');
+
+// JavaScript to prevent clicks on Weekly Meal Plan links
+function prevent_weekly_meal_plan_clicks() {
+    ?>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Find all links to Weekly Meal Plan
+        var links = document.querySelectorAll('a[href*="weekly-meal-plan"], a[href*="product/weekly-meal-plan"]');
+        
+        links.forEach(function(link) {
+            // Remove href attribute
+            link.removeAttribute('href');
+            
+            // Add click prevention
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                return false;
+            });
+            
+            // Remove link styling
+            link.style.cursor = 'default';
+            link.style.textDecoration = 'none';
+        });
+    });
+    </script>
+    <?php
+}
+add_action('wp_footer', 'prevent_weekly_meal_plan_clicks');
+
 // Contact Form 7 styling
 function contact_form_7_styling() {
     ?>
