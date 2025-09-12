@@ -269,6 +269,21 @@ function hide_stripe_buttons_on_cart_css() {
         .woocommerce-checkout-button {
             display: block !important;
         }
+        
+        /* Cart table improvements */
+        .woocommerce-cart-form__contents .product-name {
+            width: 50% !important;
+        }
+        
+        .woocommerce-cart-form__contents .product-thumbnail {
+            display: none !important;
+        }
+        
+        /* Make product name column wider */
+        .woocommerce-cart-form__contents td.product-name {
+            width: 50% !important;
+            max-width: none !important;
+        }
         </style>
         <?php
     }
@@ -280,7 +295,7 @@ function force_proceed_to_checkout_button() {
     if ( is_cart() ) {
         ?>
         <div class="wc-proceed-to-checkout" style="margin-top: 20px;">
-            <a href="<?php echo esc_url( wc_get_checkout_url() ); ?>" class="checkout-button button alt wc-forward" style="display: inline-block; padding: 12px 24px; background-color: #0073aa; color: white; text-decoration: none; border-radius: 4px; font-weight: bold;">
+            <a href="<?php echo esc_url( wc_get_checkout_url() ); ?>" class="checkout-button button alt wc-forward" style="display: inline-block; padding: 12px 24px; background-color: #7c3aed; color: white; text-decoration: none; border-radius: 4px; font-weight: bold;">
                 <?php esc_html_e( 'Proceed to checkout', 'woocommerce' ); ?>
             </a>
         </div>
@@ -288,3 +303,13 @@ function force_proceed_to_checkout_button() {
     }
 }
 add_action( 'woocommerce_after_cart', 'force_proceed_to_checkout_button' );
+
+// Remove deadline text from cart item data
+function remove_deadline_from_cart_item_data( $item_data, $cart_item ) {
+    if ( isset( $item_data['delivery'] ) ) {
+        // Remove deadline text from delivery information
+        $item_data['delivery']['value'] = preg_replace( '/\s*\([^)]*дедлайн[^)]*\)/', '', $item_data['delivery']['value'] );
+    }
+    return $item_data;
+}
+add_filter( 'woocommerce_get_item_data', 'remove_deadline_from_cart_item_data', 10, 2 );

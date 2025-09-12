@@ -20,8 +20,7 @@ do_action( 'woocommerce_before_cart' ); ?>
 		<thead>
 			<tr>
 				<th class="product-remove"><span class="screen-reader-text"><?php esc_html_e( 'Remove item', 'woocommerce' ); ?></span></th>
-				<th class="product-thumbnail"><span class="screen-reader-text"><?php esc_html_e( 'Thumbnail image', 'woocommerce' ); ?></span></th>
-				<th scope="col" class="product-name"><?php esc_html_e( 'Product', 'woocommerce' ); ?></th>
+				<th scope="col" class="product-name" style="width: 50%;"><?php esc_html_e( 'Product', 'woocommerce' ); ?></th>
 				<th scope="col" class="product-price"><?php esc_html_e( 'Price', 'woocommerce' ); ?></th>
 				<th scope="col" class="product-quantity"><?php esc_html_e( 'Quantity', 'woocommerce' ); ?></th>
 				<th scope="col" class="product-subtotal"><?php esc_html_e( 'Subtotal', 'woocommerce' ); ?></th>
@@ -64,31 +63,6 @@ do_action( 'woocommerce_before_cart' ); ?>
 									$cart_item_key
 								);
 							?>
-						</td>
-
-						<td class="product-thumbnail">
-						<?php
-						/**
-						 * Filter the product thumbnail displayed in the WooCommerce cart.
-						 *
-						 * This filter allows developers to customize the HTML output of the product
-						 * thumbnail. It passes the product image along with cart item data
-						 * for potential modifications before being displayed in the cart.
-						 *
-						 * @param string $thumbnail     The HTML for the product image.
-						 * @param array  $cart_item     The cart item data.
-						 * @param string $cart_item_key Unique key for the cart item.
-						 *
-						 * @since 2.1.0
-						 */
-						$thumbnail = apply_filters( 'woocommerce_cart_item_thumbnail', $_product->get_image(), $cart_item, $cart_item_key );
-
-						if ( ! $product_permalink ) {
-							echo $thumbnail; // PHPCS: XSS ok.
-						} else {
-							printf( '<a href="%s">%s</a>', esc_url( $product_permalink ), $thumbnail ); // PHPCS: XSS ok.
-						}
-						?>
 						</td>
 
 						<td scope="row" role="rowheader" class="product-name" data-title="<?php esc_attr_e( 'Product', 'woocommerce' ); ?>">
