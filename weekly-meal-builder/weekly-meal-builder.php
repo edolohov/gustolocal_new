@@ -649,7 +649,7 @@ add_action('woocommerce_before_calculate_totals', function($cart){
       }
       if ($lines){
         $html = implode('<br>', array_map('esc_html',$lines));
-        $item_data[] = ['name'=>'','value'=>$html,'display'=>$html];
+        $item_data[] = ['name'=>'Состав','value'=>$html,'display'=>$html];
       }
     }
     // Delivery info removed - no longer displaying in cart
@@ -695,10 +695,10 @@ add_action('woocommerce_order_item_meta_end', function($item_id, $item, $order, 
   }
   if (!$lines) return;
   if ($plain_text){
-    echo "\nСостав набора:\n" . implode("\n", $lines) . "\n";
+    echo "\n" . implode("\n", $lines) . "\n";
   } else {
     $html = implode('<br>', array_map('esc_html', $lines));
-    echo '<div class="wmb-order-breakdown"><strong>Состав набора:</strong><br>'.$html.'</div>';
+    echo '<div class="wmb-order-breakdown">'.$html.'</div>';
   }
 }, 10, 4);
 
