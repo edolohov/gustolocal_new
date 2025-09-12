@@ -218,7 +218,11 @@ function simple_cart_styling() {
         }
         
         /* Hide page title */
-        .woocommerce-cart .entry-title {
+        .woocommerce-cart .entry-title,
+        .woocommerce-cart h1.entry-title,
+        .woocommerce-cart .page-title,
+        .woocommerce-cart h1.page-title,
+        .woocommerce-cart h1 {
             display: none !important;
         }
         
@@ -229,6 +233,112 @@ function simple_cart_styling() {
             padding: 12px 24px !important;
             border-radius: 4px !important;
             text-decoration: none !important;
+        }
+        
+        /* Mobile responsive fixes */
+        @media (max-width: 768px) {
+            .woocommerce-cart-form__contents {
+                display: block !important;
+            }
+            
+            .woocommerce-cart-form__contents thead {
+                display: none !important;
+            }
+            
+            .woocommerce-cart-form__contents tbody {
+                display: block !important;
+            }
+            
+            .woocommerce-cart-form__contents tr {
+                display: block !important;
+                border: 1px solid #ddd !important;
+                margin-bottom: 15px !important;
+                padding: 15px !important;
+                border-radius: 8px !important;
+                background: #f9f9f9 !important;
+            }
+            
+            .woocommerce-cart-form__contents td {
+                display: block !important;
+                width: 100% !important;
+                padding: 8px 0 !important;
+                border: none !important;
+                text-align: left !important;
+            }
+            
+            .woocommerce-cart-form__contents .product-remove {
+                position: absolute !important;
+                top: 10px !important;
+                right: 10px !important;
+                width: auto !important;
+            }
+            
+            .woocommerce-cart-form__contents .product-name {
+                width: 100% !important;
+                padding-right: 40px !important;
+                margin-bottom: 15px !important;
+                display: block !important;
+            }
+            
+            .woocommerce-cart-form__contents .product-price,
+            .woocommerce-cart-form__contents .product-quantity,
+            .woocommerce-cart-form__contents .product-subtotal {
+                width: 100% !important;
+                display: flex !important;
+                justify-content: space-between !important;
+                align-items: center !important;
+                margin-bottom: 5px !important;
+            }
+            
+            .woocommerce-cart-form__contents .product-price:before {
+                content: "Цена: " !important;
+                font-weight: bold !important;
+            }
+            
+            .woocommerce-cart-form__contents .product-quantity:before {
+                content: "Количество: " !important;
+                font-weight: bold !important;
+            }
+            
+            .woocommerce-cart-form__contents .product-subtotal:before {
+                content: "Подытог: " !important;
+                font-weight: bold !important;
+            }
+            
+            /* Fix buttons on mobile */
+            .woocommerce-cart .coupon,
+            .woocommerce-cart .cart-actions {
+                display: block !important;
+                width: 100% !important;
+                margin-bottom: 15px !important;
+            }
+            
+            .woocommerce-cart .coupon input[type="text"] {
+                width: 100% !important;
+                margin-bottom: 10px !important;
+            }
+            
+            .woocommerce-cart .coupon button,
+            .woocommerce-cart .cart-actions button {
+                width: 100% !important;
+                margin-bottom: 10px !important;
+            }
+            
+            .woocommerce-cart .wc-proceed-to-checkout {
+                width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                text-align: center !important;
+                display: block !important;
+            }
+            
+            .woocommerce-cart .wc-proceed-to-checkout a {
+                width: 100% !important;
+                text-align: center !important;
+                display: block !important;
+                margin: 0 !important;
+                padding: 12px 24px !important;
+            }
         }
         </style>
         <?php
