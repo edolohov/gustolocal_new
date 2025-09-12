@@ -355,6 +355,34 @@ function hide_stripe_buttons_on_cart_css() {
             width: 3% !important;
         }
         
+        /* Remove unnecessary borders on desktop */
+        .woocommerce-cart .woocommerce-cart-form__contents {
+            border: none !important;
+        }
+        
+        .woocommerce-cart .woocommerce-cart-form__contents tr {
+            border-bottom: 1px solid #eee !important;
+        }
+        
+        .woocommerce-cart .woocommerce-cart-form__contents td {
+            border: none !important;
+            vertical-align: top !important;
+        }
+        
+        /* Better product name display on desktop */
+        .woocommerce-cart-form__contents .product-name {
+            line-height: 1.4 !important;
+        }
+        
+        .woocommerce-cart-form__contents .product-name .variation {
+            margin-top: 8px !important;
+        }
+        
+        .woocommerce-cart-form__contents .product-name .variation dd {
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        
         /* Mobile responsive fixes */
         @media (max-width: 768px) {
             .woocommerce-cart-form__contents {
@@ -445,12 +473,53 @@ function hide_stripe_buttons_on_cart_css() {
             
             .woocommerce-cart .wc-proceed-to-checkout {
                 width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
             }
             
             .woocommerce-cart .wc-proceed-to-checkout a {
                 width: 100% !important;
                 text-align: center !important;
                 display: block !important;
+                margin: 0 !important;
+                padding: 12px 24px !important;
+            }
+            
+            /* Remove borders between cart sections */
+            .woocommerce-cart .woocommerce-cart-form__contents {
+                border: none !important;
+            }
+            
+            .woocommerce-cart .woocommerce-cart-form__contents tr {
+                border-bottom: none !important;
+            }
+            
+            .woocommerce-cart .woocommerce-cart-form__contents td {
+                border: none !important;
+            }
+            
+            /* Make product name take full width */
+            .woocommerce-cart-form__contents .product-name {
+                width: 100% !important;
+                padding-right: 40px !important;
+                margin-bottom: 15px !important;
+                display: block !important;
+            }
+            
+            .woocommerce-cart-form__contents .product-name br {
+                display: none !important;
+            }
+            
+            /* Better spacing for product details */
+            .woocommerce-cart-form__contents .product-name .variation {
+                margin-top: 8px !important;
+            }
+            
+            .woocommerce-cart-form__contents .product-name .variation dd {
+                margin: 0 !important;
+                padding: 0 !important;
+                display: block !important;
+                width: 100% !important;
             }
         }
         
