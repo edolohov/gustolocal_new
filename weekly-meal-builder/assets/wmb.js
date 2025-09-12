@@ -519,17 +519,18 @@
         total_portions: totalPortions(),
         total_price: Number((Math.round(totalPrice()*100)/100).toFixed(2))
       };
-      if (deliveryInfo){
-        payload.delivery = {
-          target: deliveryInfo.target,
-          tz: deliveryInfo.tz,
-          date: deliveryInfo.date,
-          weekday: deliveryInfo.weekday,
-          weekday_ru: deliveryInfo.weekday_full,
-          deadline_iso: deliveryInfo.deadline_iso,
-          deadline_human: deliveryInfo.deadline_human
-        };
-      }
+      // Delivery info removed - no longer adding to cart
+      // if (deliveryInfo){
+      //   payload.delivery = {
+      //     target: deliveryInfo.target,
+      //     tz: deliveryInfo.tz,
+      //     date: deliveryInfo.date,
+      //     weekday: deliveryInfo.weekday,
+      //     weekday_ru: deliveryInfo.weekday_full,
+      //     deadline_iso: deliveryInfo.deadline_iso,
+      //     deadline_human: deliveryInfo.deadline_human
+      //   };
+      // }
       var body = new URLSearchParams();
       body.append('action','wmb_add_to_cart');
       body.append('nonce', CFG.nonce);

@@ -652,13 +652,14 @@ add_action('woocommerce_before_calculate_totals', function($cart){
         $item_data[] = ['name'=>'Состав набора','value'=>$html,'display'=>$html];
       }
     }
-    if (!empty($cart_item['wmb_payload']['delivery'])){
-      $d = $cart_item['wmb_payload']['delivery'];
-      $nice = sprintf('%s, %s', isset($d['weekday_ru'])?$d['weekday_ru']:$d['weekday'], $d['date'] ?? '');
-      $dl  = isset($d['deadline_human']) ? $d['deadline_human'] : '';
-      $html = esc_html($nice) . ($dl ? ' (дедлайн: '.esc_html($dl).')' : '');
-      $item_data[] = ['name'=>'Доставка','value'=>$html,'display'=>$html];
-    }
+    // Delivery info removed - no longer displaying in cart
+    // if (!empty($cart_item['wmb_payload']['delivery'])){
+    //   $d = $cart_item['wmb_payload']['delivery'];
+    //   $nice = sprintf('%s, %s', isset($d['weekday_ru'])?$d['weekday_ru']:$d['weekday'], $d['date'] ?? '');
+    //   $dl  = isset($d['deadline_human']) ? $d['deadline_human'] : '';
+    //   $html = esc_html($nice) . ($dl ? ' (дедлайн: '.esc_html($dl).')' : '');
+    //   $item_data[] = ['name'=>'Доставка','value'=>$html,'display'=>$html];
+    // }
     return $item_data;
   },10,2);
 
