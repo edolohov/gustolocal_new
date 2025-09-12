@@ -209,58 +209,31 @@ add_action( 'init', 'twentytwentyfour_pattern_categories' );
  * WooCommerce customizations
  */
 
-// Remove Stripe payment buttons from cart page
-function remove_stripe_buttons_from_cart() {
-    if ( is_cart() ) {
-        // Remove Stripe Express Checkout buttons from cart
-        remove_action( 'woocommerce_cart_actions', 'woocommerce_cart_totals', 10 );
-        
-        // Remove any Stripe buttons that might be added via hooks
-        remove_action( 'woocommerce_cart_collaterals', 'woocommerce_cart_totals', 10 );
-        
-        // Remove Stripe Express Checkout buttons
-        if ( class_exists( 'WC_Stripe_Express_Checkout_Button_Handler' ) ) {
-            remove_action( 'woocommerce_cart_actions', array( WC_Stripe_Express_Checkout_Button_Handler::instance(), 'display_cart_page_express_checkout_buttons' ), 10 );
-        }
-        
-        // Ensure proceed to checkout button is added
-        add_action( 'woocommerce_cart_collaterals', 'woocommerce_cart_totals', 10 );
-    }
-}
-add_action( 'wp', 'remove_stripe_buttons_from_cart' );
+// Stripe buttons are now managed via plugin settings - no need to remove them
+// Removed functions: remove_stripe_buttons_from_cart() and ensure_stripe_buttons_only_on_checkout()
 
-// Ensure Stripe buttons only appear on checkout page
-function ensure_stripe_buttons_only_on_checkout() {
-    if ( ! is_checkout() ) {
-        // Remove all Stripe payment buttons from non-checkout pages
-        remove_action( 'woocommerce_cart_collaterals', 'woocommerce_cart_totals', 10 );
-        
-        // Remove Stripe Express Checkout buttons from cart
-        if ( class_exists( 'WC_Stripe_Express_Checkout_Button_Handler' ) ) {
-            remove_action( 'woocommerce_cart_actions', array( WC_Stripe_Express_Checkout_Button_Handler::instance(), 'display_cart_page_express_checkout_buttons' ), 10 );
-            remove_action( 'woocommerce_cart_collaterals', array( WC_Stripe_Express_Checkout_Button_Handler::instance(), 'display_cart_page_express_checkout_buttons' ), 10 );
-        }
-    }
-}
-add_action( 'wp', 'ensure_stripe_buttons_only_on_checkout' );
-
-// Add CSS to hide Stripe buttons on cart page
+// Add CSS for cart page styling
 function hide_stripe_buttons_on_cart_css() {
     if ( is_cart() ) {
         ?>
         <style>
-        /* Hide Stripe payment buttons on cart page */
+        /* Show Stripe payment buttons on cart page with styling */
         .wc-stripe-express-checkout-buttons,
-        .stripe-express-checkout-buttons,
-        .woocommerce-checkout-payment,
-        .payment_method_stripe,
-        .stripe-payment-button,
-        .apple-pay-button,
-        .google-pay-button,
-        .link-payment-button,
-        .wc-stripe-payment-request-wrapper,
-        .wc-stripe-payment-request-button-separator {
-            display: none !important;
+        .stripe-express-checkout-buttons {
+            display: block !important;
+            margin: 20px 0 !important;
+            padding: 15px !important;
+            background: #f8f9fa !important;
+            border: 1px solid #e9ecef !important;
+            border-radius: 8px !important;
+        }
+        
+        .wc-stripe-express-checkout-buttons button,
+        .stripe-express-checkout-buttons button {
+            margin: 5px !important;
+            padding: 12px 20px !important;
+            border-radius: 6px !important;
+            font-weight: 500 !important;
         }
         
         /* Ensure "Proceed to checkout" button is visible */
@@ -811,6 +784,25 @@ function add_checkout_styling() {
             width: 0 !important;
             margin: 0 !important;
             padding: 0 !important;
+        }
+        
+        /* Show Stripe buttons on cart page */
+        .woocommerce-cart .wc-stripe-express-checkout-buttons,
+        .woocommerce-cart .stripe-express-checkout-buttons {
+            display: block !important;
+            margin: 20px 0 !important;
+            padding: 15px !important;
+            background: #f8f9fa !important;
+            border: 1px solid #e9ecef !important;
+            border-radius: 8px !important;
+        }
+        
+        .woocommerce-cart .wc-stripe-express-checkout-buttons button,
+        .woocommerce-cart .stripe-express-checkout-buttons button {
+            margin: 5px !important;
+            padding: 12px 20px !important;
+            border-radius: 6px !important;
+            font-weight: 500 !important;
         }
         
         /* Style Stripe buttons in payment section */
