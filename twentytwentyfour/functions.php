@@ -520,6 +520,8 @@ function hide_stripe_buttons_on_cart_css() {
                 margin-top: 8px !important;
                 width: 100% !important;
                 display: block !important;
+                float: none !important;
+                clear: both !important;
             }
             
             .woocommerce-cart-form__contents .product-name .variation dd {
@@ -530,6 +532,8 @@ function hide_stripe_buttons_on_cart_css() {
                 max-width: 100% !important;
                 word-wrap: break-word !important;
                 white-space: normal !important;
+                float: none !important;
+                clear: both !important;
             }
             
             /* Force product details to use full width */
@@ -538,6 +542,22 @@ function hide_stripe_buttons_on_cart_css() {
                 max-width: 100% !important;
                 margin: 0 !important;
                 padding: 0 !important;
+                float: none !important;
+                clear: both !important;
+            }
+            
+            /* Override any WooCommerce table cell constraints */
+            .woocommerce-cart-form__contents .product-name {
+                table-layout: fixed !important;
+                width: 100% !important;
+                max-width: 100% !important;
+            }
+            
+            /* Force all text content to use full width */
+            .woocommerce-cart-form__contents .product-name * {
+                max-width: 100% !important;
+                word-wrap: break-word !important;
+                white-space: normal !important;
             }
         }
         
