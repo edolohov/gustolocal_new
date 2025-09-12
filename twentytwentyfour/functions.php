@@ -222,6 +222,9 @@ function remove_stripe_buttons_from_cart() {
         if ( class_exists( 'WC_Stripe_Express_Checkout_Button_Handler' ) ) {
             remove_action( 'woocommerce_cart_actions', array( WC_Stripe_Express_Checkout_Button_Handler::instance(), 'display_cart_page_express_checkout_buttons' ), 10 );
         }
+        
+        // Ensure proceed to checkout button is added
+        add_action( 'woocommerce_cart_collaterals', 'woocommerce_cart_totals', 10 );
     }
 }
 add_action( 'wp', 'remove_stripe_buttons_from_cart' );
@@ -271,3 +274,17 @@ function hide_stripe_buttons_on_cart_css() {
     }
 }
 add_action( 'wp_head', 'hide_stripe_buttons_on_cart_css' );
+
+// Force add proceed to checkout button on cart page
+function force_proceed_to_checkout_button() {
+    if ( is_cart() ) {
+        ?>
+        <div class="wc-proceed-to-checkout" style="margin-top: 20px;">
+            <a href="<?php echo esc_url( wc_get_checkout_url() ); ?>" class="checkout-button button alt wc-forward" style="display: inline-block; padding: 12px 24px; background-color: #0073aa; color: white; text-decoration: none; border-radius: 4px; font-weight: bold;">
+                <?php esc_html_e( 'Proceed to checkout', 'woocommerce' ); ?>
+            </a>
+        </div>
+        <?php
+    }
+}
+add_action( 'woocommerce_after_cart', 'force_proceed_to_checkout_button' );

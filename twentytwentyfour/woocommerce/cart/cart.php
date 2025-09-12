@@ -198,12 +198,6 @@ do_action( 'woocommerce_before_cart' ); ?>
 		do_action( 'woocommerce_cart_collaterals' );
 	?>
 	
-	<!-- Ensure Proceed to Checkout button is visible -->
-	<div class="wc-proceed-to-checkout">
-		<a href="<?php echo esc_url( wc_get_checkout_url() ); ?>" class="checkout-button button alt wc-forward">
-			<?php esc_html_e( 'Proceed to checkout', 'woocommerce' ); ?>
-		</a>
-	</div>
 </div>
 
 <?php do_action( 'woocommerce_after_cart' ); ?>
