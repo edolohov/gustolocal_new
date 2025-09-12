@@ -357,18 +357,6 @@
 
     if (delivery && dcfg){ renderBanner(el('#wmb-banner', root), dcfg, delivery); }
 
-    // Добавляем класс has-filters если активны фильтры
-    var catalog = el('.wmb-catalog', root);
-    if (catalog) {
-      var hasActiveFilters = (state.filters.sections && state.filters.sections.length > 0) || 
-                            (state.filters.tags && state.filters.tags.length > 0);
-      if (hasActiveFilters) {
-        catalog.classList.add('has-filters');
-      } else {
-        catalog.classList.remove('has-filters');
-      }
-    }
-
     // фильтры
     els('.wmb-chip', root).forEach(function(chip){
       var type = chip.getAttribute('data-type');
@@ -417,12 +405,8 @@
       .filter(function(it){ return itemPasses(it, section.title); });
 
     if (!items.length) return "";
-    
-    // Добавляем класс has-many-items если в секции больше 6 элементов
-    var sectionClass = items.length > 6 ? 'wmb-section has-many-items' : 'wmb-section';
-    
     return [
-      '<section class="'+sectionClass+'">',
+      '<section class="wmb-section">',
         '<h2 class="wmb-section-title">'+escapeHtml(section.title)+'</h2>',
         '<div class="wmb-grid">',
           items.map(renderCard).join(''),

@@ -1,5 +1,4 @@
 /* ============ Layout ============ */
-/* Updated: Grid optimization applied - auto-fit with minmax */
 /* Убираем overflow-x:hidden который ломает sticky */
 html,body{overflow-x:hidden}
 html,body{overflow:visible !important}
@@ -44,44 +43,13 @@ html,body{overflow:visible !important}
 /* Catalog */
 .wmb-section{margin:12px 0 24px}
 .wmb-section-title{font-size:28px;margin:0 0 10px}
-.wmb-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(280px, 1fr));gap:16px}
-@media (max-width: 1400px){ .wmb-grid{grid-template-columns:repeat(auto-fit, minmax(260px, 1fr))} }
-@media (max-width: 1200px){ .wmb-grid{grid-template-columns:repeat(auto-fit, minmax(240px, 1fr))} }
-@media (max-width: 900px){ .wmb-grid{grid-template-columns:repeat(auto-fit, minmax(220px, 1fr))} }
+.wmb-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+@media (max-width: 1200px){ .wmb-grid{grid-template-columns:repeat(3,1fr)} }
+@media (max-width: 900px){ .wmb-grid{grid-template-columns:repeat(2,1fr)} }
 @media (max-width: 560px){ .wmb-grid{grid-template-columns:1fr} }
 
 /* Card */
-.wmb-card{background:#fff;border:1px solid #eee;border-radius:16px;padding:16px;height:fit-content}
-
-/* Optimized grid when filters are active */
-.wmb-catalog.has-filters .wmb-grid{
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-  gap: 12px;
-}
-@media (max-width: 1400px){ 
-  .wmb-catalog.has-filters .wmb-grid{grid-template-columns:repeat(auto-fit, minmax(230px, 1fr))} 
-}
-@media (max-width: 1200px){ 
-  .wmb-catalog.has-filters .wmb-grid{grid-template-columns:repeat(auto-fit, minmax(210px, 1fr))} 
-}
-@media (max-width: 900px){ 
-  .wmb-catalog.has-filters .wmb-grid{grid-template-columns:repeat(auto-fit, minmax(200px, 1fr))} 
-}
-
-/* Compact mode for sections with many items */
-.wmb-section.has-many-items .wmb-grid{
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 14px;
-}
-@media (max-width: 1400px){ 
-  .wmb-section.has-many-items .wmb-grid{grid-template-columns:repeat(auto-fit, minmax(220px, 1fr))} 
-}
-@media (max-width: 1200px){ 
-  .wmb-section.has-many-items .wmb-grid{grid-template-columns:repeat(auto-fit, minmax(200px, 1fr))} 
-}
-@media (max-width: 900px){ 
-  .wmb-section.has-many-items .wmb-grid{grid-template-columns:repeat(auto-fit, minmax(180px, 1fr))} 
-}
+.wmb-card{background:#fff;border:1px solid #eee;border-radius:16px;padding:16px}
 .wmb-card-title{font-weight:700;font-size:20px;line-height:1.25;margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between}
 .wmb-card-buttons{display:flex;gap:8px;flex-wrap:wrap}
 .wmb-card-buttons .wmb-ing-btn{font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid #4a90e2;background:#e3f2fd;color:#1976d2;cursor:pointer;font-weight:500;transition:all 0.2s ease}

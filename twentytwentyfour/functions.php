@@ -204,3 +204,70 @@ if ( ! function_exists( 'twentytwentyfour_pattern_categories' ) ) :
 endif;
 
 add_action( 'init', 'twentytwentyfour_pattern_categories' );
+
+/**
+ * WooCommerce customizations
+ */
+
+// Remove Stripe payment buttons from cart page
+function remove_stripe_buttons_from_cart() {
+    if ( is_cart() ) {
+        // Remove Stripe Express Checkout buttons from cart
+        remove_action( 'woocommerce_cart_actions', 'woocommerce_cart_totals', 10 );
+        
+        // Remove any Stripe buttons that might be added via hooks
+        remove_action( 'woocommerce_cart_collaterals', 'woocommerce_cart_totals', 10 );
+        
+        // Remove Stripe Express Checkout buttons
+        if ( class_exists( 'WC_Stripe_Express_Checkout_Button_Handler' ) ) {
+            remove_action( 'woocommerce_cart_actions', array( WC_Stripe_Express_Checkout_Button_Handler::instance(), 'display_cart_page_express_checkout_buttons' ), 10 );
+        }
+    }
+}
+add_action( 'wp', 'remove_stripe_buttons_from_cart' );
+
+// Ensure Stripe buttons only appear on checkout page
+function ensure_stripe_buttons_only_on_checkout() {
+    if ( ! is_checkout() ) {
+        // Remove all Stripe payment buttons from non-checkout pages
+        remove_action( 'woocommerce_cart_collaterals', 'woocommerce_cart_totals', 10 );
+        
+        // Remove Stripe Express Checkout buttons from cart
+        if ( class_exists( 'WC_Stripe_Express_Checkout_Button_Handler' ) ) {
+            remove_action( 'woocommerce_cart_actions', array( WC_Stripe_Express_Checkout_Button_Handler::instance(), 'display_cart_page_express_checkout_buttons' ), 10 );
+            remove_action( 'woocommerce_cart_collaterals', array( WC_Stripe_Express_Checkout_Button_Handler::instance(), 'display_cart_page_express_checkout_buttons' ), 10 );
+        }
+    }
+}
+add_action( 'wp', 'ensure_stripe_buttons_only_on_checkout' );
+
+// Add CSS to hide Stripe buttons on cart page
+function hide_stripe_buttons_on_cart_css() {
+    if ( is_cart() ) {
+        ?>
+        <style>
+        /* Hide Stripe payment buttons on cart page */
+        .wc-stripe-express-checkout-buttons,
+        .stripe-express-checkout-buttons,
+        .woocommerce-checkout-payment,
+        .payment_method_stripe,
+        .stripe-payment-button,
+        .apple-pay-button,
+        .google-pay-button,
+        .link-payment-button,
+        .wc-stripe-payment-request-wrapper,
+        .wc-stripe-payment-request-button-separator {
+            display: none !important;
+        }
+        
+        /* Ensure "Proceed to checkout" button is visible */
+        .wc-proceed-to-checkout,
+        .checkout-button,
+        .woocommerce-checkout-button {
+            display: block !important;
+        }
+        </style>
+        <?php
+    }
+}
+add_action( 'wp_head', 'hide_stripe_buttons_on_cart_css' );
