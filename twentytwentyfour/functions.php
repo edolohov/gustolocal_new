@@ -807,8 +807,32 @@ function add_checkout_styling() {
             margin: 0 !important;
             padding: 0 !important;
         }
+        
+        /* Ensure header is visible on checkout */
+        .woocommerce-checkout-wrapper {
+            margin-top: 0 !important;
+        }
+        
+        /* Make sure checkout page has proper spacing */
+        .woocommerce-checkout .entry-content {
+            margin-top: 0 !important;
+        }
         </style>
         <?php
     }
 }
 add_action( 'wp_head', 'add_checkout_styling' );
+
+// Force header to show on checkout page
+function force_header_on_checkout() {
+    if ( is_checkout() ) {
+        // Remove any actions that might hide the header
+        remove_action( 'wp_head', 'hide_woocommerce_page_titles' );
+        
+        // Ensure header is loaded
+        if ( ! did_action( 'get_header' ) ) {
+            get_header();
+        }
+    }
+}
+add_action( 'woocommerce_before_checkout_form', 'force_header_on_checkout', 1 );
