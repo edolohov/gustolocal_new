@@ -649,6 +649,7 @@ add_action('woocommerce_before_calculate_totals', function($cart){
       }
       if ($lines){
         $html = implode('<br>', array_map('esc_html',$lines));
+        // Add as custom display without WooCommerce label
         $item_data[] = ['name'=>'','value'=>$html,'display'=>$html];
       }
     }

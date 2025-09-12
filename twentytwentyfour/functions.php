@@ -284,6 +284,60 @@ function hide_stripe_buttons_on_cart_css() {
             width: 50% !important;
             max-width: none !important;
         }
+        
+        /* Remove colons from cart item data */
+        .woocommerce-cart-form__contents .cart_item .variation dt,
+        .woocommerce-cart-form__contents .cart_item .variation dd {
+            display: inline !important;
+        }
+        
+        .woocommerce-cart-form__contents .cart_item .variation dt:after {
+            content: '' !important;
+        }
+        
+        /* Hide page title */
+        .woocommerce-cart .entry-title,
+        .woocommerce-cart h1.entry-title {
+            display: none !important;
+        }
+        
+        /* Make cart table full width */
+        .woocommerce-cart .woocommerce {
+            max-width: 100% !important;
+            width: 100% !important;
+        }
+        
+        .woocommerce-cart .woocommerce-cart-form {
+            width: 100% !important;
+        }
+        
+        /* Fix column headers - prevent wrapping */
+        .woocommerce-cart-form__contents th {
+            white-space: nowrap !important;
+            font-size: 14px !important;
+            padding: 12px 8px !important;
+        }
+        
+        /* Adjust column widths */
+        .woocommerce-cart-form__contents .product-name {
+            width: 45% !important;
+        }
+        
+        .woocommerce-cart-form__contents .product-price {
+            width: 15% !important;
+        }
+        
+        .woocommerce-cart-form__contents .product-quantity {
+            width: 15% !important;
+        }
+        
+        .woocommerce-cart-form__contents .product-subtotal {
+            width: 15% !important;
+        }
+        
+        .woocommerce-cart-form__contents .product-remove {
+            width: 10% !important;
+        }
         </style>
         <?php
     }
