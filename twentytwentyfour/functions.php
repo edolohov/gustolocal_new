@@ -432,3 +432,50 @@ function remove_delivery_from_cart_item_data( $item_data, $cart_item ) {
     return $item_data;
 }
 add_filter( 'woocommerce_get_item_data', 'remove_delivery_from_cart_item_data', 10, 2 );
+
+// Add automatic delivery fee for Valencia
+add_action('woocommerce_cart_calculate_fees', 'add_valencia_delivery_fee');
+function add_valencia_delivery_fee($cart) {
+    if (is_admin() && !defined('DOING_AJAX')) {
+        return;
+    }
+    
+    // Add 10 euro delivery fee
+    $delivery_fee = 10.00;
+    $cart->add_fee(__('Доставка до двери в Валенсии', 'woocommerce'), $delivery_fee);
+}
+
+// Hide shipping fields on checkout since we're using fixed delivery
+add_filter('woocommerce_checkout_fields', 'hide_shipping_fields');
+function hide_shipping_fields($fields) {
+    // Hide shipping address fields
+    unset($fields['shipping']['shipping_first_name']);
+    unset($fields['shipping']['shipping_last_name']);
+    unset($fields['shipping']['shipping_company']);
+    unset($fields['shipping']['shipping_address_1']);
+    unset($fields['shipping']['shipping_address_2']);
+    unset($fields['shipping']['shipping_city']);
+    unset($fields['shipping']['shipping_postcode']);
+    unset($fields['shipping']['shipping_country']);
+    unset($fields['shipping']['shipping_state']);
+    
+    return $fields;
+}
+
+// Set default shipping address to Valencia
+add_filter('woocommerce_checkout_get_value', 'set_default_shipping_address', 10, 2);
+function set_default_shipping_address($value, $input) {
+    if (strpos($input, 'shipping_') === 0) {
+        switch ($input) {
+            case 'shipping_city':
+                return 'Валенсия';
+            case 'shipping_country':
+                return 'ES';
+            case 'shipping_state':
+                return 'VC'; // Valencia province code
+            case 'shipping_postcode':
+                return '46000';
+        }
+    }
+    return $value;
+}
