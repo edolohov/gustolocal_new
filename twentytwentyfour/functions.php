@@ -295,10 +295,21 @@ function hide_stripe_buttons_on_cart_css() {
             content: '' !important;
         }
         
-        /* Hide page title */
+        /* Hide page title - more aggressive */
         .woocommerce-cart .entry-title,
-        .woocommerce-cart h1.entry-title {
+        .woocommerce-cart h1.entry-title,
+        .woocommerce-cart .page-title,
+        .woocommerce-cart h1.page-title,
+        .woocommerce-cart .woocommerce-cart-form h2,
+        .woocommerce-cart .woocommerce-cart-form h1,
+        .woocommerce-cart .woocommerce-cart-form .entry-title {
             display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            font-size: 0 !important;
+            line-height: 0 !important;
         }
         
         /* Make cart table full width */
@@ -338,11 +349,59 @@ function hide_stripe_buttons_on_cart_css() {
         .woocommerce-cart-form__contents .product-remove {
             width: 10% !important;
         }
+        
+        /* Force remove colons with JavaScript */
+        .woocommerce-cart-form__contents .cart_item .variation dt:after {
+            content: '' !important;
+            display: none !important;
+        }
+        
+        /* Hide any remaining colons */
+        .woocommerce-cart-form__contents .cart_item .variation dt {
+            display: none !important;
+        }
+        
+        .woocommerce-cart-form__contents .cart_item .variation dd {
+            display: block !important;
+            margin: 0 !important;
+        }
         </style>
         <?php
     }
 }
 add_action( 'wp_head', 'hide_stripe_buttons_on_cart_css' );
+
+// Add JavaScript to remove colons and page title
+function remove_cart_colons_and_title() {
+    if ( is_cart() ) {
+        ?>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Remove colons from cart item data
+            var cartItems = document.querySelectorAll('.woocommerce-cart-form__contents .cart_item .variation');
+            cartItems.forEach(function(item) {
+                var dt = item.querySelector('dt');
+                var dd = item.querySelector('dd');
+                if (dt && dd) {
+                    // Remove the dt element completely
+                    dt.remove();
+                    // Make dd display as block
+                    dd.style.display = 'block';
+                    dd.style.margin = '0';
+                }
+            });
+            
+            // Remove page title
+            var pageTitle = document.querySelector('.woocommerce-cart .entry-title, .woocommerce-cart h1.entry-title, .woocommerce-cart .page-title');
+            if (pageTitle) {
+                pageTitle.remove();
+            }
+        });
+        </script>
+        <?php
+    }
+}
+add_action( 'wp_footer', 'remove_cart_colons_and_title' );
 
 // Force add proceed to checkout button on cart page
 function force_proceed_to_checkout_button() {
