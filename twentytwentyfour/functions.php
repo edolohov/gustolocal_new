@@ -606,72 +606,7 @@ function clear_cart_on_order_completion($order_id) {
     WC()->cart->empty_cart();
 }
 
-// Add manual cart clear function for admin
-add_action('wp_ajax_clear_cart_manually', 'clear_cart_manually');
-add_action('wp_ajax_nopriv_clear_cart_manually', 'clear_cart_manually');
-function clear_cart_manually() {
-    WC()->cart->empty_cart();
-    wp_die('Cart cleared successfully');
-}
-
-// Add cart clear button to cart page for debugging
-add_action('woocommerce_before_cart', 'add_cart_clear_button');
-function add_cart_clear_button() {
-    if (current_user_can('manage_options')) { // Only for admins
-        ?>
-        <div style="background: #f0f0f0; padding: 10px; margin-bottom: 20px; border-radius: 5px;">
-            <strong>Debug: </strong>
-            <a href="<?php echo admin_url('admin-ajax.php?action=clear_cart_manually'); ?>" 
-               onclick="return confirm('Очистить корзину?')" 
-               style="background: #dc3545; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px; margin-right: 10px;">
-                Очистить корзину
-            </a>
-            <a href="<?php echo admin_url('admin-ajax.php?action=clear_cart_database'); ?>" 
-               onclick="return confirm('Очистить корзину из БД?')" 
-               style="background: #ff6b6b; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px;">
-                Очистить из БД
-            </a>
-            <span style="margin-left: 10px; color: #666;">
-                Товаров в корзине: <?php echo WC()->cart->get_cart_contents_count(); ?>
-            </span>
-        </div>
-        <?php
-    }
-}
-
-// Add database cart clear function
-add_action('wp_ajax_clear_cart_database', 'clear_cart_database');
-add_action('wp_ajax_nopriv_clear_cart_database', 'clear_cart_database');
-function clear_cart_database() {
-    if (current_user_can('manage_options')) {
-        // Clear current cart
-        WC()->cart->empty_cart();
-        
-        // Clear from database
-        global $wpdb;
-        $wpdb->delete(
-            $wpdb->usermeta,
-            array(
-                'user_id' => get_current_user_id(),
-                'meta_key' => '_woocommerce_persistent_cart'
-            )
-        );
-        
-        // Clear all persistent carts (nuclear option)
-        $wpdb->query("DELETE FROM {$wpdb->usermeta} WHERE meta_key = '_woocommerce_persistent_cart'");
-        
-        // Clear WooCommerce cart sessions
-        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_wc_session_%'");
-        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_timeout_wc_session_%'");
-        
-        // Clear user meta for current user
-        delete_user_meta(get_current_user_id(), '_woocommerce_persistent_cart');
-        delete_user_meta(get_current_user_id(), '_woocommerce_persistent_cart_hash');
-        
-        wp_die('Cart cleared from database successfully');
-    }
-    wp_die('Access denied');
-}
+// Debug functions removed - cart clearing now works automatically
 
 // Disable persistent cart completely
 add_filter('woocommerce_persistent_cart_enabled', '__return_false');
