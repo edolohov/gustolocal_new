@@ -709,22 +709,38 @@ add_filter( 'woocommerce_get_item_data', 'remove_delivery_from_cart_item_data', 
 
 // ===== CHECKOUT PAGE FIXES =====
 
-// Move Stripe buttons to bottom of checkout page
-function move_stripe_buttons_to_bottom() {
+// Move Stripe buttons to payment method selection
+function move_stripe_buttons_to_payment_section() {
     if ( is_checkout() ) {
         ?>
         <script>
         document.addEventListener('DOMContentLoaded', function() {
             // Find Stripe buttons at the top
-            var stripeButtons = document.querySelectorAll('.wc-stripe-express-checkout-buttons, .stripe-express-checkout-buttons, .woocommerce-checkout-payment .stripe-express-checkout-buttons');
+            var stripeButtons = document.querySelectorAll('.wc-stripe-express-checkout-buttons, .stripe-express-checkout-buttons');
             
             stripeButtons.forEach(function(buttonContainer) {
                 if (buttonContainer) {
-                    // Find the payment method section
-                    var paymentSection = document.querySelector('.woocommerce-checkout-payment');
-                    if (paymentSection) {
-                        // Move buttons to the top of payment section
-                        paymentSection.insertBefore(buttonContainer, paymentSection.firstChild);
+                    // Find the payment method radio buttons section
+                    var paymentMethods = document.querySelector('.woocommerce-checkout-payment .woocommerce-checkout-payment-methods');
+                    if (paymentMethods) {
+                        // Create a wrapper for Stripe buttons
+                        var stripeWrapper = document.createElement('div');
+                        stripeWrapper.className = 'stripe-payment-methods';
+                        stripeWrapper.innerHTML = '<h4 style="margin-bottom: 15px; font-size: 16px; font-weight: bold;">Экспресс-оплата:</h4>';
+                        
+                        // Move buttons to wrapper
+                        stripeWrapper.appendChild(buttonContainer);
+                        
+                        // Insert before payment methods
+                        paymentMethods.parentNode.insertBefore(stripeWrapper, paymentMethods);
+                        
+                        // Style the buttons
+                        var buttons = stripeWrapper.querySelectorAll('button');
+                        buttons.forEach(function(button) {
+                            button.style.marginBottom = '10px';
+                            button.style.width = '100%';
+                            button.style.maxWidth = '300px';
+                        });
                     }
                 }
             });
@@ -733,7 +749,7 @@ function move_stripe_buttons_to_bottom() {
         <?php
     }
 }
-add_action( 'wp_footer', 'move_stripe_buttons_to_bottom' );
+add_action( 'wp_footer', 'move_stripe_buttons_to_payment_section' );
 
 // Remove colons from checkout order details
 function remove_checkout_colons() {
@@ -774,15 +790,41 @@ function add_checkout_styling() {
             display: none !important;
         }
         
-        /* Show Stripe buttons only in payment section */
-        .woocommerce-checkout-payment .wc-stripe-express-checkout-buttons,
-        .woocommerce-checkout-payment .stripe-express-checkout-buttons {
-            display: block !important;
+        /* Style Stripe buttons in payment section */
+        .stripe-payment-methods {
+            background: #f8f9fa !important;
+            border: 1px solid #e9ecef !important;
+            border-radius: 8px !important;
+            padding: 20px !important;
             margin-bottom: 20px !important;
-            padding: 15px !important;
-            background: #f9f9f9 !important;
-            border: 1px solid #ddd !important;
-            border-radius: 5px !important;
+        }
+        
+        .stripe-payment-methods h4 {
+            color: #495057 !important;
+            margin-bottom: 15px !important;
+            font-size: 16px !important;
+            font-weight: 600 !important;
+        }
+        
+        .stripe-payment-methods .wc-stripe-express-checkout-buttons,
+        .stripe-payment-methods .stripe-express-checkout-buttons {
+            display: block !important;
+            margin-bottom: 0 !important;
+        }
+        
+        .stripe-payment-methods button {
+            width: 100% !important;
+            max-width: 300px !important;
+            margin-bottom: 10px !important;
+            padding: 12px 20px !important;
+            border-radius: 6px !important;
+            font-weight: 500 !important;
+            transition: all 0.2s ease !important;
+        }
+        
+        .stripe-payment-methods button:hover {
+            transform: translateY(-1px) !important;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1) !important;
         }
         
         /* Style the payment section better */
