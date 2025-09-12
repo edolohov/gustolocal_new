@@ -233,6 +233,44 @@ function simple_cart_styling() {
             padding: 12px 24px !important;
             border-radius: 4px !important;
             text-decoration: none !important;
+            display: inline-block !important;
+            width: 100% !important;
+            text-align: center !important;
+            box-sizing: border-box !important;
+        }
+        
+        /* Remove borders and improve layout */
+        .woocommerce-cart .woocommerce-cart-form__contents {
+            border: none !important;
+        }
+        
+        .woocommerce-cart .woocommerce-cart-form__contents tr {
+            border-bottom: 1px solid #eee !important;
+        }
+        
+        .woocommerce-cart .woocommerce-cart-form__contents td {
+            border: none !important;
+            vertical-align: top !important;
+        }
+        
+        /* Remove gray borders around cart sections */
+        .woocommerce-cart .woocommerce-cart-form {
+            border: none !important;
+            background: transparent !important;
+        }
+        
+        .woocommerce-cart .coupon {
+            border: none !important;
+            background: transparent !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+        
+        .woocommerce-cart .cart-actions {
+            border: none !important;
+            background: transparent !important;
+            padding: 0 !important;
+            margin: 0 !important;
         }
         
         /* Mobile responsive fixes */
@@ -338,6 +376,23 @@ function simple_cart_styling() {
                 display: block !important;
                 margin: 0 !important;
                 padding: 12px 24px !important;
+                box-sizing: border-box !important;
+            }
+            
+            /* Remove borders on mobile too */
+            .woocommerce-cart .woocommerce-cart-form {
+                border: none !important;
+                background: transparent !important;
+            }
+            
+            .woocommerce-cart .coupon {
+                border: none !important;
+                background: transparent !important;
+            }
+            
+            .woocommerce-cart .cart-actions {
+                border: none !important;
+                background: transparent !important;
             }
         }
         </style>
