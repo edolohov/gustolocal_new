@@ -567,6 +567,36 @@ function clear_cart_on_login($user_login, $user) {
             'meta_key' => '_woocommerce_persistent_cart'
         )
     );
+    
+    // Clear user meta for this user
+    delete_user_meta($user->ID, '_woocommerce_persistent_cart');
+    delete_user_meta($user->ID, '_woocommerce_persistent_cart_hash');
+}
+
+// Force clear cart on every page load for logged-in users
+add_action('wp_loaded', 'force_clear_cart_on_load');
+function force_clear_cart_on_load() {
+    if (is_user_logged_in() && is_cart()) {
+        // Check if cart has invalid items
+        $cart_items = WC()->cart->get_cart();
+        $has_invalid_items = false;
+        
+        foreach ($cart_items as $cart_item_key => $cart_item) {
+            if (!empty($cart_item['wmb_payload']['items_list'])) {
+                foreach ($cart_item['wmb_payload']['items_list'] as $row) {
+                    $name = isset($row['name']) ? trim($row['name']) : '';
+                    if (empty($name)) {
+                        $has_invalid_items = true;
+                        break 2;
+                    }
+                }
+            }
+        }
+        
+        if ($has_invalid_items) {
+            WC()->cart->empty_cart();
+        }
+    }
 }
 
 // Clear cart on order completion
@@ -629,6 +659,14 @@ function clear_cart_database() {
         
         // Clear all persistent carts (nuclear option)
         $wpdb->query("DELETE FROM {$wpdb->usermeta} WHERE meta_key = '_woocommerce_persistent_cart'");
+        
+        // Clear WooCommerce cart sessions
+        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_wc_session_%'");
+        $wpdb->query("DELETE FROM {$wpdb->options} WHERE option_name LIKE '_transient_timeout_wc_session_%'");
+        
+        // Clear user meta for current user
+        delete_user_meta(get_current_user_id(), '_woocommerce_persistent_cart');
+        delete_user_meta(get_current_user_id(), '_woocommerce_persistent_cart_hash');
         
         wp_die('Cart cleared from database successfully');
     }
