@@ -619,17 +619,17 @@ function contact_form_7_styling() {
     .wpcf7-form {
         max-width: 600px;
         margin: 0 auto;
-        padding: 20px;
+        padding: 10px 20px;
     }
     
     .wpcf7-form .form-group {
-        margin-bottom: 20px;
+        margin-bottom: 12px;
     }
     
     .wpcf7-form label {
         display: block;
         font-weight: 600;
-        margin-bottom: 8px;
+        margin-bottom: 4px;
         color: #333;
         font-size: 16px;
     }
@@ -726,7 +726,11 @@ function contact_form_7_styling() {
     /* Mobile responsive */
     @media (max-width: 768px) {
         .wpcf7-form {
-            padding: 15px;
+            padding: 8px 15px;
+        }
+        
+        .wpcf7-form .form-group {
+            margin-bottom: 10px;
         }
         
         .wpcf7-form input[type="text"],
