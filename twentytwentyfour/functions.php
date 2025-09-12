@@ -543,3 +543,55 @@ function set_default_shipping_address($value, $input) {
     }
     return $value;
 }
+
+// Force clear cart after successful order
+add_action('woocommerce_thankyou', 'clear_cart_after_order', 10, 1);
+function clear_cart_after_order($order_id) {
+    if ($order_id) {
+        WC()->cart->empty_cart();
+    }
+}
+
+// Clear cart when user logs in (remove persistent cart items)
+add_action('wp_login', 'clear_cart_on_login', 10, 2);
+function clear_cart_on_login($user_login, $user) {
+    // Only clear cart for specific user (you can modify this condition)
+    if ($user_login === 'your_username_here') { // Replace with your actual username
+        WC()->cart->empty_cart();
+    }
+}
+
+// Clear cart on order completion
+add_action('woocommerce_order_status_completed', 'clear_cart_on_order_completion');
+add_action('woocommerce_order_status_processing', 'clear_cart_on_order_completion');
+function clear_cart_on_order_completion($order_id) {
+    WC()->cart->empty_cart();
+}
+
+// Add manual cart clear function for admin
+add_action('wp_ajax_clear_cart_manually', 'clear_cart_manually');
+add_action('wp_ajax_nopriv_clear_cart_manually', 'clear_cart_manually');
+function clear_cart_manually() {
+    WC()->cart->empty_cart();
+    wp_die('Cart cleared successfully');
+}
+
+// Add cart clear button to cart page for debugging
+add_action('woocommerce_before_cart', 'add_cart_clear_button');
+function add_cart_clear_button() {
+    if (current_user_can('manage_options')) { // Only for admins
+        ?>
+        <div style="background: #f0f0f0; padding: 10px; margin-bottom: 20px; border-radius: 5px;">
+            <strong>Debug: </strong>
+            <a href="<?php echo admin_url('admin-ajax.php?action=clear_cart_manually'); ?>" 
+               onclick="return confirm('Очистить корзину?')" 
+               style="background: #dc3545; color: white; padding: 5px 10px; text-decoration: none; border-radius: 3px;">
+                Очистить корзину
+            </a>
+            <span style="margin-left: 10px; color: #666;">
+                Товаров в корзине: <?php echo WC()->cart->get_cart_contents_count(); ?>
+            </span>
+        </div>
+        <?php
+    }
+}
