@@ -295,14 +295,19 @@ function hide_stripe_buttons_on_cart_css() {
             content: '' !important;
         }
         
-        /* Hide page title - more aggressive */
+        /* Hide page title - target specific classes */
         .woocommerce-cart .entry-title,
         .woocommerce-cart h1.entry-title,
         .woocommerce-cart .page-title,
         .woocommerce-cart h1.page-title,
         .woocommerce-cart .woocommerce-cart-form h2,
         .woocommerce-cart .woocommerce-cart-form h1,
-        .woocommerce-cart .woocommerce-cart-form .entry-title {
+        .woocommerce-cart .woocommerce-cart-form .entry-title,
+        .woocommerce-cart h1.alignwide.wp-block-post-title,
+        .woocommerce-cart h1.wp-block-post-title,
+        .woocommerce-cart h1.alignwide,
+        .woocommerce-cart .wp-block-post-title,
+        .woocommerce-cart h1 {
             display: none !important;
             visibility: hidden !important;
             height: 0 !important;
@@ -391,17 +396,86 @@ function remove_cart_colons_and_title() {
                 }
             });
             
-            // Remove page title
-            var pageTitle = document.querySelector('.woocommerce-cart .entry-title, .woocommerce-cart h1.entry-title, .woocommerce-cart .page-title');
-            if (pageTitle) {
-                pageTitle.remove();
-            }
+            // Remove page title - try multiple selectors
+            var selectors = [
+                '.woocommerce-cart .entry-title',
+                '.woocommerce-cart h1.entry-title', 
+                '.woocommerce-cart .page-title',
+                '.woocommerce-cart h1.alignwide.wp-block-post-title',
+                '.woocommerce-cart h1.wp-block-post-title',
+                '.woocommerce-cart h1.alignwide',
+                '.woocommerce-cart .wp-block-post-title',
+                '.woocommerce-cart h1'
+            ];
+            
+            selectors.forEach(function(selector) {
+                var element = document.querySelector(selector);
+                if (element) {
+                    element.remove();
+                }
+            });
         });
         </script>
         <?php
     }
 }
 add_action( 'wp_footer', 'remove_cart_colons_and_title' );
+
+// Universal function to hide page titles on WooCommerce pages
+function hide_woocommerce_page_titles() {
+    if ( is_cart() || is_checkout() || is_wc_endpoint_url() ) {
+        ?>
+        <style>
+        /* Hide page titles on all WooCommerce pages */
+        .woocommerce .entry-title,
+        .woocommerce h1.entry-title,
+        .woocommerce .page-title,
+        .woocommerce h1.page-title,
+        .woocommerce h1.alignwide.wp-block-post-title,
+        .woocommerce h1.wp-block-post-title,
+        .woocommerce h1.alignwide,
+        .woocommerce .wp-block-post-title,
+        .woocommerce h1,
+        .woocommerce h2.entry-title,
+        .woocommerce h2.page-title {
+            display: none !important;
+            visibility: hidden !important;
+            height: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            font-size: 0 !important;
+            line-height: 0 !important;
+        }
+        </style>
+        
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Remove page titles on WooCommerce pages
+            var selectors = [
+                '.woocommerce .entry-title',
+                '.woocommerce h1.entry-title', 
+                '.woocommerce .page-title',
+                '.woocommerce h1.alignwide.wp-block-post-title',
+                '.woocommerce h1.wp-block-post-title',
+                '.woocommerce h1.alignwide',
+                '.woocommerce .wp-block-post-title',
+                '.woocommerce h1',
+                '.woocommerce h2.entry-title',
+                '.woocommerce h2.page-title'
+            ];
+            
+            selectors.forEach(function(selector) {
+                var elements = document.querySelectorAll(selector);
+                elements.forEach(function(element) {
+                    element.remove();
+                });
+            });
+        });
+        </script>
+        <?php
+    }
+}
+add_action( 'wp_footer', 'hide_woocommerce_page_titles' );
 
 // Force add proceed to checkout button on cart page
 function force_proceed_to_checkout_button() {
