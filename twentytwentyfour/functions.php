@@ -706,3 +706,109 @@ function remove_delivery_from_cart_item_data( $item_data, $cart_item ) {
     return $item_data;
 }
 add_filter( 'woocommerce_get_item_data', 'remove_delivery_from_cart_item_data', 10, 2 );
+
+// ===== CHECKOUT PAGE FIXES =====
+
+// Move Stripe buttons to bottom of checkout page
+function move_stripe_buttons_to_bottom() {
+    if ( is_checkout() ) {
+        ?>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Find Stripe buttons at the top
+            var stripeButtons = document.querySelectorAll('.wc-stripe-express-checkout-buttons, .stripe-express-checkout-buttons, .woocommerce-checkout-payment .stripe-express-checkout-buttons');
+            
+            stripeButtons.forEach(function(buttonContainer) {
+                if (buttonContainer) {
+                    // Find the payment method section
+                    var paymentSection = document.querySelector('.woocommerce-checkout-payment');
+                    if (paymentSection) {
+                        // Move buttons to the top of payment section
+                        paymentSection.insertBefore(buttonContainer, paymentSection.firstChild);
+                    }
+                }
+            });
+        });
+        </script>
+        <?php
+    }
+}
+add_action( 'wp_footer', 'move_stripe_buttons_to_bottom' );
+
+// Remove colons from checkout order details
+function remove_checkout_colons() {
+    if ( is_checkout() ) {
+        ?>
+        <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Remove colons from order details
+            var orderDetails = document.querySelectorAll('.woocommerce-checkout-review-order-table .variation dt');
+            orderDetails.forEach(function(dt) {
+                if (dt.textContent.includes(':')) {
+                    dt.textContent = dt.textContent.replace(':', '');
+                }
+            });
+            
+            // Also remove colons from cart item data
+            var cartItemData = document.querySelectorAll('.woocommerce-checkout-review-order-table .cart_item .variation dt');
+            cartItemData.forEach(function(dt) {
+                if (dt.textContent.includes(':')) {
+                    dt.textContent = dt.textContent.replace(':', '');
+                }
+            });
+        });
+        </script>
+        <?php
+    }
+}
+add_action( 'wp_footer', 'remove_checkout_colons' );
+
+// Add checkout page styling
+function add_checkout_styling() {
+    if ( is_checkout() ) {
+        ?>
+        <style>
+        /* Hide Stripe buttons at the top of checkout */
+        .woocommerce-checkout .woocommerce-before-checkout-form .wc-stripe-express-checkout-buttons,
+        .woocommerce-checkout .woocommerce-before-checkout-form .stripe-express-checkout-buttons {
+            display: none !important;
+        }
+        
+        /* Show Stripe buttons only in payment section */
+        .woocommerce-checkout-payment .wc-stripe-express-checkout-buttons,
+        .woocommerce-checkout-payment .stripe-express-checkout-buttons {
+            display: block !important;
+            margin-bottom: 20px !important;
+            padding: 15px !important;
+            background: #f9f9f9 !important;
+            border: 1px solid #ddd !important;
+            border-radius: 5px !important;
+        }
+        
+        /* Style the payment section better */
+        .woocommerce-checkout-payment {
+            background: #f9f9f9 !important;
+            padding: 20px !important;
+            border-radius: 8px !important;
+            margin-top: 20px !important;
+        }
+        
+        /* Remove colons from order details */
+        .woocommerce-checkout-review-order-table .variation dt:after {
+            content: '' !important;
+        }
+        
+        .woocommerce-checkout-review-order-table .variation dt {
+            display: none !important;
+        }
+        
+        .woocommerce-checkout-review-order-table .variation dd {
+            display: block !important;
+            margin: 0 !important;
+            padding: 0 !important;
+        }
+        </style>
+        <?php
+    }
+}
+add_action( 'wp_head', 'add_checkout_styling' );
