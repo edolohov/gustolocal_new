@@ -715,35 +715,48 @@ function move_stripe_buttons_to_payment_section() {
         ?>
         <script>
         document.addEventListener('DOMContentLoaded', function() {
-            // Find Stripe buttons at the top
-            var stripeButtons = document.querySelectorAll('.wc-stripe-express-checkout-buttons, .stripe-express-checkout-buttons');
-            
-            stripeButtons.forEach(function(buttonContainer) {
-                if (buttonContainer) {
-                    // Find the payment method radio buttons section
-                    var paymentMethods = document.querySelector('.woocommerce-checkout-payment .woocommerce-checkout-payment-methods');
-                    if (paymentMethods) {
-                        // Create a wrapper for Stripe buttons
-                        var stripeWrapper = document.createElement('div');
-                        stripeWrapper.className = 'stripe-payment-methods';
-                        stripeWrapper.innerHTML = '<h4 style="margin-bottom: 15px; font-size: 16px; font-weight: bold;">Экспресс-оплата:</h4>';
+            // Wait a bit for WooCommerce to load
+            setTimeout(function() {
+                // Find Stripe buttons at the top
+                var stripeButtons = document.querySelectorAll('.wc-stripe-express-checkout-buttons, .stripe-express-checkout-buttons');
+                
+                stripeButtons.forEach(function(buttonContainer) {
+                    if (buttonContainer) {
+                        // Try multiple selectors for payment section
+                        var paymentSection = document.querySelector('.woocommerce-checkout-payment') || 
+                                           document.querySelector('#order_review') ||
+                                           document.querySelector('.woocommerce-checkout-review-order');
                         
-                        // Move buttons to wrapper
-                        stripeWrapper.appendChild(buttonContainer);
-                        
-                        // Insert before payment methods
-                        paymentMethods.parentNode.insertBefore(stripeWrapper, paymentMethods);
-                        
-                        // Style the buttons
-                        var buttons = stripeWrapper.querySelectorAll('button');
-                        buttons.forEach(function(button) {
-                            button.style.marginBottom = '10px';
-                            button.style.width = '100%';
-                            button.style.maxWidth = '300px';
-                        });
+                        if (paymentSection) {
+                            // Create a wrapper for Stripe buttons
+                            var stripeWrapper = document.createElement('div');
+                            stripeWrapper.className = 'stripe-payment-methods';
+                            stripeWrapper.innerHTML = '<h4 style="margin-bottom: 15px; font-size: 16px; font-weight: bold; color: #495057;">Экспресс-оплата:</h4>';
+                            
+                            // Move buttons to wrapper
+                            stripeWrapper.appendChild(buttonContainer);
+                            
+                            // Insert at the beginning of payment section
+                            paymentSection.insertBefore(stripeWrapper, paymentSection.firstChild);
+                            
+                            // Style the buttons
+                            var buttons = stripeWrapper.querySelectorAll('button');
+                            buttons.forEach(function(button) {
+                                button.style.marginBottom = '10px';
+                                button.style.width = '100%';
+                                button.style.maxWidth = '300px';
+                                button.style.padding = '12px 20px';
+                                button.style.borderRadius = '6px';
+                                button.style.fontWeight = '500';
+                            });
+                            
+                            console.log('Stripe buttons moved to payment section');
+                        } else {
+                            console.log('Payment section not found');
+                        }
                     }
-                }
-            });
+                });
+            }, 1000); // Wait 1 second for WooCommerce to load
         });
         </script>
         <?php
@@ -784,10 +797,20 @@ function add_checkout_styling() {
     if ( is_checkout() ) {
         ?>
         <style>
-        /* Hide Stripe buttons at the top of checkout */
+        /* Hide Stripe buttons at the top of checkout - more aggressive */
         .woocommerce-checkout .woocommerce-before-checkout-form .wc-stripe-express-checkout-buttons,
-        .woocommerce-checkout .woocommerce-before-checkout-form .stripe-express-checkout-buttons {
+        .woocommerce-checkout .woocommerce-before-checkout-form .stripe-express-checkout-buttons,
+        .woocommerce-checkout .woocommerce-before-checkout-form .wc-stripe-express-checkout-buttons *,
+        .woocommerce-checkout .woocommerce-before-checkout-form .stripe-express-checkout-buttons *,
+        .woocommerce-checkout .woocommerce-before-checkout-form .wc-stripe-express-checkout-buttons button,
+        .woocommerce-checkout .woocommerce-before-checkout-form .stripe-express-checkout-buttons button {
             display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            height: 0 !important;
+            width: 0 !important;
+            margin: 0 !important;
+            padding: 0 !important;
         }
         
         /* Style Stripe buttons in payment section */
