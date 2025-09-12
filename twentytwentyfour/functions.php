@@ -817,6 +817,18 @@ function add_checkout_styling() {
         .woocommerce-checkout .entry-content {
             margin-top: 0 !important;
         }
+        
+        /* Hide duplicate site title on checkout */
+        .woocommerce-checkout .wp-block-site-title,
+        .woocommerce-checkout .site-title,
+        .woocommerce-checkout h1.wp-block-site-title {
+            display: none !important;
+        }
+        
+        /* Ensure proper header display */
+        .woocommerce-checkout .wp-block-template-part {
+            display: block !important;
+        }
         </style>
         <?php
     }
