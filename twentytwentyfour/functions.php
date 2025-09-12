@@ -835,66 +835,15 @@ function add_checkout_styling() {
 }
 add_action( 'wp_head', 'add_checkout_styling' );
 
-// Force header to show on checkout page
+// Simplified header function - just ensure no conflicts
 function force_header_on_checkout() {
     if ( is_checkout() ) {
         // Remove any actions that might hide the header
         remove_action( 'wp_head', 'hide_woocommerce_page_titles' );
-        
-        // Force header to load
-        if ( ! did_action( 'get_header' ) ) {
-            get_header();
-        }
     }
 }
 add_action( 'woocommerce_before_checkout_form', 'force_header_on_checkout', 1 );
 
-// Alternative approach - add header via wp_head
-function add_checkout_header_via_wp_head() {
-    if ( is_checkout() ) {
-        ?>
-        <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Check if header is missing
-            var header = document.querySelector('header, .site-header, .wp-block-group.alignwide');
-            if (!header) {
-                // Try to load header content
-                fetch('<?php echo home_url(); ?>')
-                .then(response => response.text())
-                .then(html => {
-                    var parser = new DOMParser();
-                    var doc = parser.parseFromString(html, 'text/html');
-                    var headerContent = doc.querySelector('header, .site-header, .wp-block-group.alignwide');
-                    if (headerContent) {
-                        document.body.insertBefore(headerContent, document.body.firstChild);
-                    }
-                });
-            }
-        });
-        </script>
-        <?php
-    }
-}
-add_action( 'wp_head', 'add_checkout_header_via_wp_head' );
+// Removed JavaScript header loading - main header now works properly
 
-// Most direct approach - inject header HTML
-function inject_checkout_header() {
-    if ( is_checkout() ) {
-        ?>
-        <div class="injected-header" style="background: #f9f9f9; padding: 20px; margin-bottom: 20px; border-bottom: 1px solid #ddd;">
-            <div style="max-width: 1200px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; gap: 20px;">
-                    <div style="font-size: 24px; font-weight: bold; color: #333;">
-                        <?php bloginfo('name'); ?>
-                    </div>
-                </div>
-                <div style="display: flex; gap: 20px;">
-                    <a href="<?php echo home_url(); ?>" style="text-decoration: none; color: #333;">Главная</a>
-                    <a href="<?php echo wc_get_cart_url(); ?>" style="text-decoration: none; color: #333;">Корзина</a>
-                </div>
-            </div>
-        </div>
-        <?php
-    }
-}
-add_action( 'woocommerce_before_checkout_form', 'inject_checkout_header', 0 );
+// Removed injected header - main header now works properly
