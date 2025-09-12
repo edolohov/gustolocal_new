@@ -649,7 +649,7 @@ add_action('woocommerce_before_calculate_totals', function($cart){
       }
       if ($lines){
         $html = implode('<br>', array_map('esc_html',$lines));
-        $item_data[] = ['name'=>'Состав','value'=>$html,'display'=>$html];
+        $item_data[] = ['name'=>'','value'=>$html,'display'=>$html];
       }
     }
     // Delivery info removed - no longer displaying in cart
