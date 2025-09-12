@@ -475,14 +475,18 @@ function hide_stripe_buttons_on_cart_css() {
                 width: 100% !important;
                 margin: 0 !important;
                 padding: 0 !important;
+                text-align: center !important;
+                display: block !important;
             }
             
             .woocommerce-cart .wc-proceed-to-checkout a {
                 width: 100% !important;
+                max-width: 100% !important;
                 text-align: center !important;
                 display: block !important;
-                margin: 0 !important;
+                margin: 0 auto !important;
                 padding: 12px 24px !important;
+                box-sizing: border-box !important;
             }
             
             /* Remove borders between cart sections */
@@ -504,15 +508,18 @@ function hide_stripe_buttons_on_cart_css() {
                 padding-right: 40px !important;
                 margin-bottom: 15px !important;
                 display: block !important;
+                position: relative !important;
             }
             
             .woocommerce-cart-form__contents .product-name br {
                 display: none !important;
             }
             
-            /* Better spacing for product details */
+            /* Better spacing for product details - make them full width */
             .woocommerce-cart-form__contents .product-name .variation {
                 margin-top: 8px !important;
+                width: 100% !important;
+                display: block !important;
             }
             
             .woocommerce-cart-form__contents .product-name .variation dd {
@@ -520,6 +527,17 @@ function hide_stripe_buttons_on_cart_css() {
                 padding: 0 !important;
                 display: block !important;
                 width: 100% !important;
+                max-width: 100% !important;
+                word-wrap: break-word !important;
+                white-space: normal !important;
+            }
+            
+            /* Force product details to use full width */
+            .woocommerce-cart-form__contents .product-name .variation dd p {
+                width: 100% !important;
+                max-width: 100% !important;
+                margin: 0 !important;
+                padding: 0 !important;
             }
         }
         
