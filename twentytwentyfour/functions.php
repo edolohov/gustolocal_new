@@ -610,3 +610,134 @@ function clear_cart_on_order_completion($order_id) {
 
 // Disable persistent cart completely
 add_filter('woocommerce_persistent_cart_enabled', '__return_false');
+
+// Contact Form 7 styling
+function contact_form_7_styling() {
+    ?>
+    <style>
+    /* Contact Form 7 styling to match site design */
+    .wpcf7-form {
+        max-width: 600px;
+        margin: 0 auto;
+        padding: 20px;
+    }
+    
+    .wpcf7-form .form-group {
+        margin-bottom: 20px;
+    }
+    
+    .wpcf7-form label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 8px;
+        color: #333;
+        font-size: 16px;
+    }
+    
+    .wpcf7-form input[type="text"],
+    .wpcf7-form input[type="email"],
+    .wpcf7-form input[type="tel"],
+    .wpcf7-form textarea,
+    .wpcf7-form select {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        font-size: 16px;
+        transition: border-color 0.3s ease;
+        box-sizing: border-box;
+    }
+    
+    .wpcf7-form input[type="text"]:focus,
+    .wpcf7-form input[type="email"]:focus,
+    .wpcf7-form input[type="tel"]:focus,
+    .wpcf7-form textarea:focus,
+    .wpcf7-form select:focus {
+        outline: none;
+        border-color: #6a5eb7;
+        box-shadow: 0 0 0 3px rgba(106, 94, 183, 0.1);
+    }
+    
+    .wpcf7-form textarea {
+        min-height: 120px;
+        resize: vertical;
+    }
+    
+    .wpcf7-form input[type="submit"] {
+        background-color: #6a5eb7;
+        color: white;
+        padding: 14px 32px;
+        border: none;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+        width: 100%;
+        margin-top: 10px;
+    }
+    
+    .wpcf7-form input[type="submit"]:hover {
+        background-color: #5a4ea6;
+    }
+    
+    .wpcf7-form input[type="submit"]:active {
+        transform: translateY(1px);
+    }
+    
+    /* Error and success messages */
+    .wpcf7-response-output {
+        margin-top: 20px;
+        padding: 12px 16px;
+        border-radius: 8px;
+        font-weight: 500;
+    }
+    
+    .wpcf7-mail-sent-ok {
+        background-color: #d4edda;
+        color: #155724;
+        border: 1px solid #c3e6cb;
+    }
+    
+    .wpcf7-validation-errors,
+    .wpcf7-spam-blocked {
+        background-color: #f8d7da;
+        color: #721c24;
+        border: 1px solid #f5c6cb;
+    }
+    
+    /* Checkbox and radio styling */
+    .wpcf7-form input[type="checkbox"],
+    .wpcf7-form input[type="radio"] {
+        margin-right: 8px;
+        transform: scale(1.2);
+    }
+    
+    .wpcf7-form .wpcf7-list-item {
+        margin-bottom: 10px;
+    }
+    
+    .wpcf7-form .wpcf7-list-item label {
+        font-weight: normal;
+        margin-bottom: 0;
+        cursor: pointer;
+    }
+    
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+        .wpcf7-form {
+            padding: 15px;
+        }
+        
+        .wpcf7-form input[type="text"],
+        .wpcf7-form input[type="email"],
+        .wpcf7-form input[type="tel"],
+        .wpcf7-form textarea,
+        .wpcf7-form select {
+            font-size: 16px; /* Prevents zoom on iOS */
+        }
+    }
+    </style>
+    <?php
+}
+add_action('wp_head', 'contact_form_7_styling');
