@@ -509,6 +509,60 @@ function add_valencia_delivery_fee($cart) {
     $cart->add_fee(__('Доставка до двери в Валенсии', 'woocommerce'), $delivery_fee);
 }
 
+// Set minimum order amount (60 euros without delivery fee)
+add_action('woocommerce_checkout_process', 'enforce_minimum_order_amount');
+add_action('woocommerce_before_cart', 'show_minimum_order_notice');
+add_action('woocommerce_before_checkout_form', 'show_minimum_order_notice');
+
+function enforce_minimum_order_amount() {
+    $minimum_amount = 60.00; // 60 euros without delivery fee
+    $cart_subtotal = WC()->cart->get_subtotal();
+    
+    if ($cart_subtotal < $minimum_amount) {
+        wc_add_notice(
+            sprintf(
+                'Минимальная сумма заказа: %s. Текущая сумма: %s. Добавьте товаров на %s.',
+                wc_price($minimum_amount),
+                wc_price($cart_subtotal),
+                wc_price($minimum_amount - $cart_subtotal)
+            ),
+            'error'
+        );
+    }
+}
+
+function show_minimum_order_notice() {
+    $minimum_amount = 60.00;
+    $cart_subtotal = WC()->cart->get_subtotal();
+    
+    if ($cart_subtotal < $minimum_amount && $cart_subtotal > 0) {
+        $remaining = $minimum_amount - $cart_subtotal;
+        ?>
+        <div class="woocommerce-minimum-order-notice" style="
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 8px;
+            padding: 15px 20px;
+            margin: 20px 0;
+            color: #856404;
+            font-weight: 500;
+        ">
+            <div style="display: flex; align-items: center; gap: 10px;">
+                <span style="font-size: 20px;">⚠️</span>
+                <div>
+                    <strong>Минимальная сумма заказа: <?php echo wc_price($minimum_amount); ?></strong><br>
+                    <span style="font-size: 14px; opacity: 0.8;">
+                        Текущая сумма: <?php echo wc_price($cart_subtotal); ?> 
+                        (без учета доставки)<br>
+                        Добавьте товаров на: <strong><?php echo wc_price($remaining); ?></strong>
+                    </span>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+}
+
 // Hide shipping fields on checkout since we're using fixed delivery
 add_filter('woocommerce_checkout_fields', 'hide_shipping_fields');
 function hide_shipping_fields($fields) {
