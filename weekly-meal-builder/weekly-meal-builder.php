@@ -640,9 +640,15 @@ add_action('woocommerce_before_calculate_totals', function($cart){
       $rows = $cart_item['wmb_payload']['items_list'];
       $lines = [];
       foreach($rows as $row){
-        $name = isset($row['name']) ? $row['name'] : '';
+        $name = isset($row['name']) ? trim($row['name']) : '';
         $qty  = isset($row['qty']) ? intval($row['qty']) : 0;
         $price= isset($row['price']) ? floatval($row['price']) : 0.0;
+        
+        // Skip empty or invalid items
+        if (empty($name) || $qty <= 0) {
+          continue;
+        }
+        
         $subtotal = $price * $qty;
         $line = sprintf('%s × %d — %s', $name, $qty, strip_tags(wc_price($subtotal)));
         $lines[] = $line;
@@ -650,7 +656,7 @@ add_action('woocommerce_before_calculate_totals', function($cart){
       if ($lines){
         $html = implode('<br>', array_map('esc_html',$lines));
         // Add as custom display without WooCommerce label
-        $item_data[] = ['name'=>'','value'=>$html,'display'=>$html];
+        $item_data[] = ['name'=>'Состав','value'=>$html,'display'=>$html];
       }
     }
     // Delivery info removed - no longer displaying in cart
@@ -688,9 +694,15 @@ add_action('woocommerce_order_item_meta_end', function($item_id, $item, $order, 
   if (!$payload || empty($payload['items_list'])) return;
   $lines = [];
   foreach($payload['items_list'] as $row){
-    $name = isset($row['name']) ? $row['name'] : '';
+    $name = isset($row['name']) ? trim($row['name']) : '';
     $qty  = isset($row['qty']) ? intval($row['qty']) : 0;
     $price= isset($row['price']) ? floatval($row['price']) : 0.0;
+    
+    // Skip empty or invalid items
+    if (empty($name) || $qty <= 0) {
+      continue;
+    }
+    
     $subtotal = $price * $qty;
     $lines[] = sprintf('%s × %d — %s', $name, $qty, strip_tags(wc_price($subtotal)));
   }
@@ -713,9 +725,15 @@ add_action('woocommerce_after_order_itemmeta', function($item_id, $item, $produc
   if (!$payload || empty($payload['items_list'])) return;
   $lines = [];
   foreach($payload['items_list'] as $row){
-    $name = isset($row['name']) ? $row['name'] : '';
+    $name = isset($row['name']) ? trim($row['name']) : '';
     $qty  = isset($row['qty']) ? intval($row['qty']) : 0;
     $price= isset($row['price']) ? floatval($row['price']) : 0.0;
+    
+    // Skip empty or invalid items
+    if (empty($name) || $qty <= 0) {
+      continue;
+    }
+    
     $subtotal = $price * $qty;
     $lines[] = sprintf('%s × %d — %s', $name, $qty, strip_tags(wc_price($subtotal)));
   }
