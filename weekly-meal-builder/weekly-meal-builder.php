@@ -576,6 +576,47 @@ add_shortcode('meal_builder', function(){
   return '<div id="meal-builder-root"></div>';
 });
 
+/* ---------- Shortcode: [wmb_lightbox urls="url1,url2,..." label="здесь"] ---------- */
+add_shortcode('wmb_lightbox', function($atts){
+  $atts = shortcode_atts([
+    'urls'  => '',
+    'label' => 'здесь',
+  ], $atts, 'wmb_lightbox');
+
+  $urls_raw = array_filter(array_map('trim', explode(',', (string)$atts['urls'])));
+  if (!$urls_raw) return '';
+
+  $elements = [];
+  foreach($urls_raw as $u){
+    $elements[] = ['href'=>$u, 'type'=>'image'];
+  }
+
+  $uid = 'wmb-gl-'.wp_generate_uuid4();
+
+  // Enqueue GLightbox assets from CDN
+  wp_enqueue_style(
+    'wmb-glightbox',
+    'https://cdn.jsdelivr.net/npm/glightbox/dist/css/glightbox.min.css',
+    [],
+    '3.3.0'
+  );
+  wp_enqueue_script(
+    'wmb-glightbox-js',
+    'https://cdn.jsdelivr.net/npm/glightbox/dist/js/glightbox.min.js',
+    [],
+    '3.3.0',
+    true
+  );
+
+  // Init script specific to this shortcode instance
+  $json = wp_json_encode($elements, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
+  $inline = "document.addEventListener('DOMContentLoaded',function(){var g=GLightbox({elements:".$json."});var a=document.getElementById('".$uid."');if(a){a.addEventListener('click',function(e){e.preventDefault();g.open();});}});";
+  wp_add_inline_script('wmb-glightbox-js', $inline, 'after');
+
+  $label = esc_html($atts['label']);
+  return '<a href="#" id="'.esc_attr($uid).'">'.$label.'</a>';
+});
+
 // Force-load Featherlight (lightbox) CSS/JS on frontend to ensure gallery works site-wide
 add_action('wp_enqueue_scripts', function(){
   if (is_admin()) return;
