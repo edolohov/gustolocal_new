@@ -576,6 +576,39 @@ add_shortcode('meal_builder', function(){
   return '<div id="meal-builder-root"></div>';
 });
 
+// Force-load Featherlight (lightbox) CSS/JS on frontend to ensure gallery works site-wide
+add_action('wp_enqueue_scripts', function(){
+  if (is_admin()) return;
+  // Only enqueue on the public site. Use CDN to avoid dependency on plugin settings.
+  wp_enqueue_style(
+    'wmb-featherlight',
+    'https://cdn.jsdelivr.net/npm/featherlight@1.7.14/release/featherlight.min.css',
+    [],
+    '1.7.14'
+  );
+  wp_enqueue_style(
+    'wmb-featherlight-gallery-css',
+    'https://cdn.jsdelivr.net/npm/featherlight@1.7.14/release/featherlight.gallery.min.css',
+    ['wmb-featherlight'],
+    '1.7.14'
+  );
+  wp_enqueue_script('jquery');
+  wp_enqueue_script(
+    'wmb-featherlight-js',
+    'https://cdn.jsdelivr.net/npm/featherlight@1.7.14/release/featherlight.min.js',
+    ['jquery'],
+    '1.7.14',
+    true
+  );
+  wp_enqueue_script(
+    'wmb-featherlight-gallery-js',
+    'https://cdn.jsdelivr.net/npm/featherlight@1.7.14/release/featherlight.gallery.min.js',
+    ['wmb-featherlight-js'],
+    '1.7.14',
+    true
+  );
+}, 20);
+
 // Global tweak for WooCommerce cart/checkout tables on mobile: avoid horizontal scroll
 add_action('wp_enqueue_scripts', function(){
   if (function_exists('is_cart') && (is_cart() || is_checkout())){
