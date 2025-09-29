@@ -18,7 +18,7 @@ jobs:
           password: ${{ secrets.SFTP_PASS }}
           sftp_only: true
           local_path: "twentytwentyfour/*"
-          remote_path: "/home/s1149026/gustolocal.es/sutherland/wp-content/themes/twentytwentyfour"
+          remote_path: "/home/s1149026/gustolocal.es/staging/wp-content/themes/twentytwentyfour"
           remove_extra_files: false
 
       - name: Deploy Plugin (weekly-meal-builder)
@@ -30,5 +30,5 @@ jobs:
           password: ${{ secrets.SFTP_PASS }}
           sftp_only: true
           local_path: "weekly-meal-builder/*"
-          remote_path: "/home/s1149026/gustolocal.es/sutherland/wp-content/plugins/weekly-meal-builder"
+          remote_path: "/home/s1149026/gustolocal.es/staging/wp-content/plugins/weekly-meal-builder"
           remove_extra_files: false
