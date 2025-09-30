@@ -22,7 +22,8 @@ function wmb_default_settings(){
   if (!$tz) { $offset = (float) get_option('gmt_offset'); $tz = $offset ? 'UTC'.($offset>=0?'+':'').$offset : 'UTC'; }
 
   return [
-    'description' => 'Выберите блюда, укажите количество — затем перейдите к оформлению заказа.',
+    // Поле description более не используется; текст добавляется через редактор страницы
+    'description' => '',
     'delivery' => [
       'tuesday' => [
         'enabled'  => true,
@@ -381,7 +382,6 @@ function wmb_page_settings(){
   $delivery = $settings['delivery'];
 
   if (!empty($_POST['wmb_settings_nonce']) && wp_verify_nonce($_POST['wmb_settings_nonce'],'wmb_settings_save')){
-    $desc  = isset($_POST['wmb_desc'])  ? wp_kses_post(wp_unslash($_POST['wmb_desc'])) : '';
 
     $delivery['tuesday']['enabled']  = !empty($_POST['wmb_del_tue_enabled']);
     $delivery['friday']['enabled']   = !empty($_POST['wmb_del_fri_enabled']);
@@ -397,7 +397,7 @@ function wmb_page_settings(){
     $blackout = trim((string)($_POST['wmb_del_blackout'] ?? ''));
     $delivery['blackout'] = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $blackout))));
 
-    $settings['description'] = $desc;
+    // description удалено из настроек, вводится через редактор страницы
     $settings['delivery'] = $delivery;
 
     update_option('wmb_menu_json', wp_json_encode($settings, JSON_UNESCAPED_UNICODE));
@@ -413,10 +413,7 @@ function wmb_page_settings(){
   echo '<form method="post" style="max-width:980px">';
   wp_nonce_field('wmb_settings_save','wmb_settings_nonce');
 
-  echo '<h2>Описание</h2>';
-  echo '<table class="form-table" role="presentation"><tbody>';
-  echo '<tr><th scope="row"><label for="wmb_desc">Описание</label></th><td><textarea id="wmb_desc" name="wmb_desc" rows="4" class="large-text">'.esc_textarea($settings['description']).'</textarea></td></tr>';
-  echo '</tbody></table>';
+  // Блок «Описание» удалён. Текст на странице добавляйте через редактор страницы.
 
   echo '<h2 style="margin-top:24px">Доставка</h2>';
   echo '<table class="form-table" role="presentation"><tbody>';
@@ -553,7 +550,8 @@ usort($out_sections, function($a, $b) use ($index) {
 
 
       return rest_ensure_response([
-        'description'     => $settings['description'],
+        // description исключён — текст выводится через редактор страницы
+        'description'     => '',
         'delivery_config' => $settings['delivery'],
         'delivery_slots'  => [],
         'limits'          => ['max_portions' => 0],

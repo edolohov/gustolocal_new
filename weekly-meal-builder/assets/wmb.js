@@ -300,7 +300,7 @@
       '<div class="wmb-wrapper">',
         '<div class="wmb-header">',
           '<div>',
-            (menu.description ? '<div class="wmb-sub">'+menu.description+'</div>' : ''),
+            // описание убрано — текст вводится на странице
             '<div id="wmb-banner" class="wmb-banner" aria-live="polite"></div>',
           '</div>',
         '</div>',
