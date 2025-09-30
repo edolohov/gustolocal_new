@@ -30,8 +30,28 @@ html,body{overflow:visible !important}
 #meal-builder-root + .wmb-wrapper, .wmb-wrapper{max-width:1200px}
 .wmb-page-intro{max-width:1200px;margin:0 auto;padding:0 12px}
 @supports(padding:max(0px)){.wmb-page-intro{padding-left:max(12px, env(safe-area-inset-left));padding-right:max(12px, env(safe-area-inset-right))}}
-.wmb-page-intro p{font-size:18px;color:#333;opacity:.9;margin:8px 0}
+.wmb-page-intro p{font-size:18px;color:#333;opacity:.9;margin:6px 0 10px}
 .wmb-page-intro a{color:#1976d2;text-decoration:underline}
+
+/* Унификация ширины и отступов текста страницы там, где есть билдер */
+body:has(#meal-builder-root) .wp-block-post-content{
+  max-width:1200px;
+  margin:0 auto;
+  padding-left:12px;
+  padding-right:12px;
+}
+@supports(padding:max(0px)){
+  body:has(#meal-builder-root) .wp-block-post-content{
+    padding-left:max(12px, env(safe-area-inset-left));
+    padding-right:max(12px, env(safe-area-inset-right));
+  }
+}
+body:has(#meal-builder-root) .wp-block-post-content p{
+  font-size:18px;
+  color:#333;
+  opacity:.9;
+  margin:6px 0 10px;
+}
 
 /* Filters */
 .wmb-filters{display:flex;gap:20px;flex-wrap:wrap;margin:10px 0 18px}
