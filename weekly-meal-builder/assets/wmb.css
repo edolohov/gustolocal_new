@@ -10,11 +10,16 @@ html,body{overflow:visible !important}
 /* Hard override against theme wrappers on small screens */
 @media (max-width:768px){
   body .wp-site-blocks #meal-builder-root,
-  body #meal-builder-root,
-  body .wp-site-blocks #meal-builder-root .wmb-wrapper{
+  body #meal-builder-root{
     padding-left:max(16px, env(safe-area-inset-left)) !important;
     padding-right:max(16px, env(safe-area-inset-right)) !important;
     margin-left:auto; margin-right:auto;
+  }
+  /* Убираем паддинги у wmb-wrapper на мобиле тоже */
+  body .wp-site-blocks #meal-builder-root .wmb-wrapper,
+  body #meal-builder-root .wmb-wrapper{
+    padding-left:0 !important;
+    padding-right:0 !important;
   }
 }
 #wmb *{box-sizing:border-box}
