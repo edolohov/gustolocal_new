@@ -134,7 +134,13 @@
       
       // Затем выделяем даты и время цветом
       text = text.replace(/(\d{4}-\d{2}-\d{2})/g, '<strong>$1</strong>'); // даты
-      text = text.replace(/(\d{1,2}:\d{2})/g, '<strong>$1</strong>'); // время
+      
+      // Выделяем время, но только если оно не внутри тега <em>
+      var parts = text.split(/(<em>.*?<\/em>)/);
+      for (var i = 0; i < parts.length; i += 2) { // обрабатываем только не-<em> части
+        parts[i] = parts[i].replace(/(\d{1,2}:\d{2})/g, '<strong>$1</strong>');
+      }
+      text = parts.join('');
       
       // Дни недели
       text = text.replace(/([А-Я][а-я]+)/g, function(match) {
