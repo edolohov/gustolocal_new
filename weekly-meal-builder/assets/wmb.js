@@ -129,10 +129,14 @@
         .replace('{deadline}', delivery.deadline_human)
         .replace('{countdown}', countdown || '');
       
-      // Выделяем даты и время цветом
+      // Сначала выделяем обратный отсчёт (чтобы не перехватывался другими правилами)
+      text = text.replace(/(\d+д \d{2}:\d{2})/g, '<em>$1</em>'); // обратный отсчёт
+      
+      // Затем выделяем даты и время цветом
       text = text.replace(/(\d{4}-\d{2}-\d{2})/g, '<strong>$1</strong>'); // даты
       text = text.replace(/(\d{1,2}:\d{2})/g, '<strong>$1</strong>'); // время
-      text = text.replace(/(\d+д \d{2}:\d{2})/g, '<em>$1</em>'); // обратный отсчёт
+      
+      // Дни недели
       text = text.replace(/([А-Я][а-я]+)/g, function(match) {
         if (['Вск', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'].includes(match)) {
           return '<strong>' + match + '</strong>';
