@@ -140,6 +140,9 @@
         return match;
       }); // дни недели
       
+      // Выделяем запятые после дат и дней недели
+      text = text.replace(/(<strong>[^<]+<\/strong>),/g, '$1<strong>,</strong>');
+      
       node.innerHTML = '<div class="wmb-delivery">'+text+'</div>';
     }
     function tick(){

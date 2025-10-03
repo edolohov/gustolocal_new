@@ -31,8 +31,8 @@ html,body{overflow:visible !important}
 .wmb-sub{display:none}
 .wmb-banner{margin-top:8px;color:#333;line-height:1.4}
 /* Выделение дат и времени в баннере доставки */
-.wmb-banner strong{color:#d8e4a0;font-weight:700}
-.wmb-banner em{color:#17815e;font-weight:700;font-style:normal}
+.wmb-banner strong{color:#2d5a3d;font-weight:700}
+.wmb-banner em{color:#e74c3c;font-weight:700;font-style:normal}
 
 /* Текст из редактора страницы (абзацы/заголовки) перед билдером */
 #meal-builder-root + .wmb-wrapper, .wmb-wrapper{max-width:1200px}
