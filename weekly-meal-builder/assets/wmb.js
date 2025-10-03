@@ -128,7 +128,19 @@
         .replace('{weekday_short}', delivery.weekday)
         .replace('{deadline}', delivery.deadline_human)
         .replace('{countdown}', countdown || '');
-      node.innerHTML = '<div class="wmb-delivery">'+escapeHtml(text)+'</div>';
+      
+      // Выделяем даты и время жирным и цветом
+      text = text.replace(/(\d{4}-\d{2}-\d{2})/g, '<strong>$1</strong>'); // даты
+      text = text.replace(/(\d{1,2}:\d{2})/g, '<strong>$1</strong>'); // время
+      text = text.replace(/(\d+д \d{2}:\d{2})/g, '<em>$1</em>'); // обратный отсчёт
+      text = text.replace(/([А-Я][а-я]+)/g, function(match) {
+        if (['Вск', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Воскресенье', 'Понедельник', 'Вторник', 'Среда', 'Четверг', 'Пятница', 'Суббота'].includes(match)) {
+          return '<strong>' + match + '</strong>';
+        }
+        return match;
+      }); // дни недели
+      
+      node.innerHTML = '<div class="wmb-delivery">'+text+'</div>';
     }
     function tick(){
       var now = new Date();
