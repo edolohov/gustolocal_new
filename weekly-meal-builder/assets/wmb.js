@@ -10,6 +10,11 @@
   function money(n){return (Math.round(n*100)/100).toFixed(2) + "€"}
   function escapeHtml(s){return String(s||"").replace(/[&<>"']/g, function(m){return({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[m])})}
   function pad2(n){ return (n<10?'0':'')+n; }
+  function formatFriendlyDate(d){ 
+    var months = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 
+                  'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+    return d.getDate() + ' ' + months[d.getMonth()];
+  }
 
   function normalizeTags(tags){
     if (!tags) return [];
@@ -110,7 +115,7 @@
     return {
       target: current.name,
       tz: tz,
-      date: formatISODate(current.deliver),
+      date: formatFriendlyDate(current.deliver),
       weekday: RU_WEEKDAYS[current.deliver.getDay()],
       weekday_full: RU_WEEKDAYS_FULL[current.deliver.getDay()],
       deadline_iso: current.deadline.toISOString(),
@@ -133,7 +138,7 @@
       text = text.replace(/(\d+д \d{2}:\d{2})/g, '<em>$1</em>'); // обратный отсчёт
       
       // Затем выделяем даты и время цветом
-      text = text.replace(/(\d{4}-\d{2}-\d{2})/g, '<strong>$1</strong>'); // даты
+      text = text.replace(/(\d{1,2} [а-я]+)/g, '<strong>$1</strong>'); // даты в формате "7 октября"
       
       // Выделяем время, но только если оно не внутри тега <em>
       var parts = text.split(/(<em>.*?<\/em>)/);
