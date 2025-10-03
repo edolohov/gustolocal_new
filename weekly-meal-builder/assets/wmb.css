@@ -18,9 +18,9 @@ html,body{overflow:visible !important}
   }
 }
 #wmb *{box-sizing:border-box}
-.wmb-wrapper{max-width:1200px;margin:0 auto;padding:12px}
+.wmb-wrapper{max-width:1200px;margin:0 auto;padding:16px}
 @supports(padding:max(0px)){
-  .wmb-wrapper{padding-left:max(12px, env(safe-area-inset-left));padding-right:max(12px, env(safe-area-inset-right))}
+  .wmb-wrapper{padding-left:max(16px, env(safe-area-inset-left));padding-right:max(16px, env(safe-area-inset-right))}
 }
 .wmb-header{margin:12px 0 16px}
 .wmb-sub{display:none}
@@ -28,8 +28,8 @@ html,body{overflow:visible !important}
 
 /* Текст из редактора страницы (абзацы/заголовки) перед билдером */
 #meal-builder-root + .wmb-wrapper, .wmb-wrapper{max-width:1200px}
-.wmb-page-intro{max-width:1200px;margin:0 auto;padding:0 12px}
-@supports(padding:max(0px)){.wmb-page-intro{padding-left:max(12px, env(safe-area-inset-left));padding-right:max(12px, env(safe-area-inset-right))}}
+.wmb-page-intro{max-width:1200px;margin:0 auto;padding:0 16px}
+@supports(padding:max(0px)){.wmb-page-intro{padding-left:max(16px, env(safe-area-inset-left));padding-right:max(16px, env(safe-area-inset-right))}}
 .wmb-page-intro p{font-size:18px;color:#333;opacity:.9;margin:6px 0 10px}
 .wmb-page-intro a{color:#1976d2;text-decoration:underline}
 
@@ -37,13 +37,13 @@ html,body{overflow:visible !important}
 body:has(#meal-builder-root) .wp-block-post-content{
   max-width:1200px;
   margin:0 auto !important;
-  padding-left:12px !important;
-  padding-right:12px !important;
+  padding-left:16px !important;
+  padding-right:16px !important;
 }
 @supports(padding:max(0px)){
   body:has(#meal-builder-root) .wp-block-post-content{
-    padding-left:max(12px, env(safe-area-inset-left));
-    padding-right:max(12px, env(safe-area-inset-right));
+    padding-left:max(16px, env(safe-area-inset-left));
+    padding-right:max(16px, env(safe-area-inset-right));
   }
 }
 body:has(#meal-builder-root) .wp-block-post-content p{
@@ -58,13 +58,13 @@ body:has(#meal-builder-root) .has-global-padding.is-layout-constrained{
   max-width:1200px !important;
   margin-left:auto !important;
   margin-right:auto !important;
-  padding-left:12px !important;
-  padding-right:12px !important;
+  padding-left:16px !important;
+  padding-right:16px !important;
 }
 @supports(padding:max(0px)){
   body:has(#meal-builder-root) .has-global-padding.is-layout-constrained{
-    padding-left:max(12px, env(safe-area-inset-left)) !important;
-    padding-right:max(12px, env(safe-area-inset-right)) !important;
+    padding-left:max(16px, env(safe-area-inset-left)) !important;
+    padding-right:max(16px, env(safe-area-inset-right)) !important;
   }
 }
 
@@ -73,13 +73,13 @@ body:has(#meal-builder-root) .wp-block-post-content > *:not(#meal-builder-root){
   max-width:1200px !important;
   margin-left:auto !important;
   margin-right:auto !important;
-  padding-left:12px !important;
-  padding-right:12px !important;
+  padding-left:16px !important;
+  padding-right:16px !important;
 }
 @supports(padding:max(0px)){
   body:has(#meal-builder-root) .wp-block-post-content > *:not(#meal-builder-root){
-    padding-left:max(12px, env(safe-area-inset-left)) !important;
-    padding-right:max(12px, env(safe-area-inset-right)) !important;
+    padding-left:max(16px, env(safe-area-inset-left)) !important;
+    padding-right:max(16px, env(safe-area-inset-right)) !important;
   }
 }
 
