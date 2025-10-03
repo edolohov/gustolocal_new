@@ -18,9 +18,9 @@ html,body{overflow:visible !important}
   }
 }
 #wmb *{box-sizing:border-box}
-.wmb-wrapper{max-width:1200px;margin:0 auto;padding:16px}
+.wmb-wrapper{max-width:1200px;margin:0 auto;padding:0}
 @supports(padding:max(0px)){
-  .wmb-wrapper{padding-left:max(16px, env(safe-area-inset-left));padding-right:max(16px, env(safe-area-inset-right))}
+  .wmb-wrapper{padding-left:0;padding-right:0}
 }
 .wmb-header{margin:12px 0 16px}
 .wmb-sub{display:none}
