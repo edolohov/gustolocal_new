@@ -129,7 +129,7 @@
         .replace('{deadline}', delivery.deadline_human)
         .replace('{countdown}', countdown || '');
       
-      // Выделяем даты и время жирным и цветом
+      // Выделяем даты и время цветом
       text = text.replace(/(\d{4}-\d{2}-\d{2})/g, '<strong>$1</strong>'); // даты
       text = text.replace(/(\d{1,2}:\d{2})/g, '<strong>$1</strong>'); // время
       text = text.replace(/(\d+д \d{2}:\d{2})/g, '<em>$1</em>'); // обратный отсчёт
