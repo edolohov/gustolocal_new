@@ -68,6 +68,25 @@ body:has(#meal-builder-root) .has-global-padding.is-layout-constrained{
   }
 }
 
+/* Принудительное выравнивание всех первых блоков контента относительно билдера */
+body:has(#meal-builder-root) .wp-block-post-content > *:not(#meal-builder-root){
+  max-width:1200px !important;
+  margin-left:auto !important;
+  margin-right:auto !important;
+  padding-left:12px !important;
+  padding-right:12px !important;
+}
+@supports(padding:max(0px)){
+  body:has(#meal-builder-root) .wp-block-post-content > *:not(#meal-builder-root){
+    padding-left:max(12px, env(safe-area-inset-left)) !important;
+    padding-right:max(12px, env(safe-area-inset-right)) !important;
+  }
+}
+
+/* Снижаем межабзацные отступы и убираем верхний отступ у первого абзаца */
+body:has(#meal-builder-root) .wp-block-post-content > p:first-of-type{ margin-top:0 !important; }
+body:has(#meal-builder-root) .wp-block-post-content > p{ margin:6px 0 10px !important; line-height:1.5; }
+
 /* Filters */
 .wmb-filters{display:flex;gap:20px;flex-wrap:wrap;margin:10px 0 18px}
 .wmb-filter-group{display:flex;flex-direction:column;gap:8px}
