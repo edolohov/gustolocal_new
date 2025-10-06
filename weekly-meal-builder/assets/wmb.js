@@ -53,6 +53,52 @@
     }catch(e){}
   }
 
+  // Функция для синхронизации с WooCommerce корзиной
+  async function syncWithCart(){
+    try{
+      // Получаем содержимое корзины через AJAX
+      var response = await fetch(CFG.ajax_url, {
+        method: 'POST',
+        headers: {'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},
+        body: 'action=wmb_get_cart_contents&nonce=' + CFG.nonce,
+        credentials: 'same-origin'
+      });
+      
+      if (!response.ok) return;
+      
+      var result = await response.json();
+      if (!result.success || !result.data) return;
+      
+      var cartItems = result.data.items || [];
+      var cartQty = {};
+      
+      // Собираем товары из корзины
+      cartItems.forEach(function(item){
+        if (item.wmb_payload) {
+          try{
+            var payload = JSON.parse(item.wmb_payload);
+            if (payload.items) {
+              Object.entries(payload.items).forEach(function([id, qty]){
+                if (qty > 0) {
+                  cartQty[id] = qty;
+                }
+              });
+            }
+          }catch(e){
+            console.error('Error parsing cart payload:', e);
+          }
+        }
+      });
+      
+      // ВСЕГДА синхронизируем с корзиной
+      state.qty = cartQty;
+      persist();
+      
+    }catch(e){
+      console.error('Error syncing with cart:', e);
+    }
+  }
+
   /* ======== DELIVERY ======== */
   var RU_WEEKDAYS = ['Вск','Пн','Вт','Ср','Чт','Пт','Сб'];
   var RU_WEEKDAYS_FULL = ['Воскресенье','Понедельник','Вторник','Среда','Четверг','Пятница','Суббота'];
@@ -452,11 +498,13 @@
     var allergens = Array.isArray(item.allergens) ? item.allergens : [];
     var hasIngredients = !!(item.ingredients && String(item.ingredients).trim().length);
     var hasAllergens = allergens.length > 0;
+    var inCart = q > 0; // Индикатор что товар уже в корзине
 
     return [
-      '<div class="wmb-card">',
+      '<div class="wmb-card' + (inCart ? ' wmb-card-in-cart' : '') + '">',
         '<div class="wmb-card-title">',
           escapeHtml(item.name),
+          (inCart ? '<span class="wmb-in-cart-badge">В корзине</span>' : ''),
           '<div class="wmb-card-buttons">',
             (hasIngredients ? '<button class="wmb-ing-btn" data-id="'+item.id+'" aria-label="Состав блюда '+escapeHtml(item.name)+'">Состав</button>' : ''),
             (hasAllergens ? '<button class="wmb-allergens-btn" data-id="'+item.id+'" aria-label="Аллергены блюда '+escapeHtml(item.name)+'">Аллергены</button>' : ''),
@@ -543,26 +591,65 @@
 
   async function onCheckout(deliveryInfo){
     try{
+      // Проверяем, что у нас есть товары для добавления
+      if (Object.keys(state.qty).length === 0) {
+        alert('Добавьте товары перед оформлением заказа');
+        return;
+      }
+      
       var payload = {
         week: state.week || "",
         items: Object.fromEntries(Object.entries(state.qty).map(function(kv){return [kv[0], Number(kv[1])]})),
         total_portions: totalPortions(),
         total_price: Number((Math.round(totalPrice()*100)/100).toFixed(2))
       };
-      // Delivery info removed - no longer adding to cart
-      // if (deliveryInfo){
-      //   payload.delivery = {
-      //     target: deliveryInfo.target,
-      //     tz: deliveryInfo.tz,
-      //     date: deliveryInfo.date,
-      //     weekday: deliveryInfo.weekday,
-      //     weekday_ru: deliveryInfo.weekday_full,
-      //     deadline_iso: deliveryInfo.deadline_iso,
-      //     deadline_human: deliveryInfo.deadline_human
-      //   };
-      // }
+      
+      // Проверяем, что payload корректный
+      if (payload.total_price <= 0) {
+        alert('Ошибка: некорректная сумма заказа');
+        return;
+      }
+      
+      // Сначала проверяем, есть ли уже набор в корзине
+      var cartResponse = await fetch(CFG.ajax_url, {
+        method: 'POST',
+        headers: {'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},
+        body: 'action=wmb_get_cart_contents&nonce=' + CFG.nonce,
+        credentials: 'same-origin'
+      });
+      
+      var existingCartItem = null;
+      if (cartResponse.ok) {
+        try {
+          var cartResult = await cartResponse.json();
+          if (cartResult.success && cartResult.data && cartResult.data.items) {
+            // Ищем существующий товар meal builder
+            existingCartItem = cartResult.data.items.find(function(item) {
+              return item.wmb_payload && item.product_id == CFG.product_id;
+            });
+          }
+        } catch (parseError) {
+          console.error('Ошибка парсинга ответа корзины:', parseError);
+        }
+      }
+      
+      // Если есть существующий товар, сначала удаляем его
+      if (existingCartItem) {
+        // Используем наш собственный AJAX для удаления товара
+        var removeResponse = await fetch(CFG.ajax_url, {
+          method: 'POST',
+          headers: {'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},
+          body: 'action=wmb_remove_cart_item&cart_item_key=' + existingCartItem.key + '&nonce=' + CFG.nonce,
+          credentials: 'same-origin'
+        });
+        
+        // Ждем немного, чтобы удаление завершилось
+        await new Promise(resolve => setTimeout(resolve, 200));
+      }
+      
+      // Добавляем новый товар
       var body = new URLSearchParams();
-      body.append('action','wmb_add_to_cart');
+      body.append('action', 'wmb_add_to_cart');
       body.append('nonce', CFG.nonce);
       body.append('product_id', String(CFG.product_id));
       body.append('payload', JSON.stringify(payload));
@@ -573,13 +660,28 @@
         body: body.toString(),
         credentials: 'same-origin'
       });
+      
+      if (!res.ok) {
+        throw new Error('HTTP ' + res.status + ': ' + res.statusText);
+      }
+      
       var json = await res.json();
-      if (!json || !json.success) throw new Error(json && json.data ? json.data : 'Ошибка AJAX');
-      if (json.data && json.data.redirect) window.location.href = json.data.redirect;
-      else alert('Добавлено в корзину, но ссылка на корзину не получена.');
+      
+      if (!json || !json.success) {
+        var errorMsg = json && json.data ? json.data : 'Неизвестная ошибка сервера';
+        throw new Error(errorMsg);
+      }
+      
+      // НЕ очищаем локальное состояние - оставляем синхронизированным с корзиной
+      
+      if (json.data && json.data.redirect) {
+        window.location.href = json.data.redirect;
+      } else {
+        alert('Обновлено в корзине, но ссылка на корзину не получена.');
+      }
     }catch(e){
-      console.error(e);
-      alert('Не удалось добавить в корзину.');
+      alert('ОШИБКА: ' + e.message);
+      console.error('Ошибка в onCheckout:', e);
     }
   }
 
@@ -596,10 +698,14 @@
       console.error('Не удалось загрузить меню из', MENU_URL, e);
       menu = { description:'', sections: [] };
     }
+    
+    // Сначала синхронизируем с корзиной, потом восстанавливаем локальное состояние
+    await syncWithCart();
     restore();
     render(root);
     setupDesktopSticky(root);
   }
+
 
   document.addEventListener('DOMContentLoaded', boot);
 })();

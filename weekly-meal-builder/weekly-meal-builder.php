@@ -65,10 +65,7 @@ add_action('admin_menu', function(){
 });
 function wmb_page_root(){ echo '<div class="wrap"><h1>Meal Builder</h1><p>Выберите раздел слева.</p></div>'; }
 
-// Добавляем страницу "Кухня" в меню WooCommerce
-add_action('admin_menu', function(){
-  add_submenu_page('woocommerce','Кухня','Кухня','manage_woocommerce','wmb_kitchen','wmb_page_kitchen');
-}, 99);
+// (Временно удалено) Страница "Кухня" будет добавлена в следующем релизе
 
 /* ---------- CPT + tax ---------- */
 add_action('init', function(){
@@ -587,8 +584,101 @@ add_action('wp_enqueue_scripts', function(){
 
 /* ---------- AJAX add to cart ---------- */
 add_action('wp_ajax_wmb_add_to_cart','wmb_ajax_add_to_cart');
+add_action('wp_ajax_wmb_get_cart_contents','wmb_ajax_get_cart_contents');
+add_action('wp_ajax_wmb_remove_cart_item','wmb_ajax_remove_cart_item');
 add_action('wp_ajax_nopriv_wmb_add_to_cart','wmb_ajax_add_to_cart');
+add_action('wp_ajax_nopriv_wmb_get_cart_contents','wmb_ajax_get_cart_contents');
+add_action('wp_ajax_nopriv_wmb_remove_cart_item','wmb_ajax_remove_cart_item');
+
+function wmb_ajax_get_cart_contents(){
+  if(!function_exists('WC')) wp_send_json_error('WooCommerce не активирован.');
+  check_ajax_referer('wmb','nonce');
+  
+  $cart = WC()->cart;
+  $items = [];
+  
+  foreach($cart->get_cart() as $cart_item_key => $cart_item) {
+    $product = $cart_item['data'];
+    $wmb_payload = isset($cart_item['wmb_payload']) ? $cart_item['wmb_payload'] : '';
+    
+    $items[] = [
+      'key' => $cart_item_key,
+      'product_id' => $product->get_id(),
+      'quantity' => $cart_item['quantity'],
+      'wmb_payload' => $wmb_payload
+    ];
+  }
+  
+  wp_send_json_success(['items' => $items]);
+}
+
+function wmb_ajax_remove_cart_item(){
+  if(!function_exists('WC')) wp_send_json_error('WooCommerce не активирован.');
+  check_ajax_referer('wmb','nonce');
+  
+  $cart_item_key = isset($_POST['cart_item_key']) ? sanitize_text_field($_POST['cart_item_key']) : '';
+  if(empty($cart_item_key)) wp_send_json_error('Неверные данные.');
+  
+  $removed = WC()->cart->remove_cart_item($cart_item_key);
+  if(!$removed) wp_send_json_error('Не удалось удалить товар из корзины.');
+  
+  wp_send_json_success(['message' => 'Товар удален из корзины']);
+}
+
+
+// Хук для отображения деталей товара в корзине с полной информацией
+add_filter('woocommerce_cart_item_name', 'wmb_display_cart_item_details', 10, 3);
+function wmb_display_cart_item_details($name, $cart_item, $cart_item_key) {
+  if (isset($cart_item['wmb_payload'])) {
+    $payload = json_decode($cart_item['wmb_payload'], true);
+    if ($payload && isset($payload['items_list']) && is_array($payload['items_list'])) {
+      $details = [];
+      foreach ($payload['items_list'] as $item) {
+        if (isset($item['qty']) && $item['qty'] > 0) {
+          $item_name = isset($item['name']) ? $item['name'] : 'Неизвестное блюдо';
+          $item_unit = isset($item['unit']) ? $item['unit'] : '';
+          $item_price = isset($item['price']) ? floatval($item['price']) : 0;
+          $item_qty = intval($item['qty']);
+          $total_price = $item_price * $item_qty;
+          
+          $details[] = $item_name . ($item_unit ? ' (' . $item_unit . ')' : '') . ' × ' . $item_qty . ' — ' . number_format($total_price, 2) . ' €';
+        }
+      }
+      if (!empty($details)) {
+        $name .= '<br><small style="color: #666; font-size: 0.9em;">' . implode('<br>', $details) . '</small>';
+      }
+    }
+  }
+  return $name;
+}
+
+// Безопасный способ обновления цены товара в корзине
+add_action('woocommerce_before_cart', 'wmb_update_cart_item_prices');
+function wmb_update_cart_item_prices() {
+  if (!function_exists('WC')) return;
+  
+  $cart = WC()->cart;
+  $updated = false;
+  
+  foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
+    if (isset($cart_item['wmb_payload'])) {
+      $payload = json_decode($cart_item['wmb_payload'], true);
+      if ($payload && isset($payload['total_price']) && $payload['total_price'] > 0) {
+        // Обновляем цену товара
+        $product = $cart_item['data'];
+        $product->set_price($payload['total_price']);
+        $updated = true;
+      }
+    }
+  }
+  
+  if ($updated) {
+    $cart->calculate_totals();
+  }
+}
+
 function wmb_ajax_add_to_cart(){
+  try {
   if(!function_exists('WC')) wp_send_json_error('WooCommerce не активирован.');
   check_ajax_referer('wmb','nonce');
 
@@ -621,10 +711,13 @@ function wmb_ajax_add_to_cart(){
   $payload['total_portions']=$total_portions;
   $payload['total_price']=round($total_price,2);
 
-  $added = WC()->cart->add_to_cart($product_id, 1, 0, [], ['wmb_payload'=>$payload,'wmb_uid'=>wp_generate_uuid4()]);
+    $added = WC()->cart->add_to_cart($product_id, 1, 0, [], ['wmb_payload'=>json_encode($payload),'wmb_uid'=>wp_generate_uuid4()]);
   if(!$added) wp_send_json_error('Не удалось добавить в корзину.');
   $redirect = function_exists('wc_get_cart_url') ? wc_get_cart_url() : wc_get_page_permalink('cart');
   wp_send_json_success(['redirect'=>$redirect]);
+  } catch (Exception $e) {
+    wp_send_json_error('Ошибка: ' . $e->getMessage());
+  }
 }
 
 /* ---------- Woo price/meta ---------- */
@@ -632,63 +725,55 @@ add_action('woocommerce_before_calculate_totals', function($cart){
   if (is_admin() && !defined('DOING_AJAX')) return;
   if (!$cart || is_a($cart,'WP_Error')) return;
   foreach($cart->get_cart() as $ci){
-    if (!empty($ci['wmb_payload']['total_price'])){
-      $ci['data']->set_price( floatval($ci['wmb_payload']['total_price']) );
+    if (!empty($ci['wmb_payload'])){
+      $payload = json_decode($ci['wmb_payload'], true);
+      if ($payload && isset($payload['total_price']) && $payload['total_price'] > 0){
+        $ci['data']->set_price( floatval($payload['total_price']) );
+      }
     }
   }
 },10,1);
 
 
-  add_filter('woocommerce_get_item_data', function($item_data, $cart_item){
-    if (!empty($cart_item['wmb_payload']['items_list'])){
-      $rows = $cart_item['wmb_payload']['items_list'];
-      $lines = [];
-      foreach($rows as $row){
-        $name = isset($row['name']) ? trim($row['name']) : '';
-        $qty  = isset($row['qty']) ? intval($row['qty']) : 0;
-        $price= isset($row['price']) ? floatval($row['price']) : 0.0;
-        $unit = isset($row['unit']) ? trim($row['unit']) : '';
-        
-        // Skip empty or invalid items
-        if (empty($name) || $qty <= 0) {
-          continue;
-        }
-        
-        $subtotal = $price * $qty;
-        // Добавляем единицу измерения в отображение
-        $unit_display = $unit ? " ({$unit})" : '';
-        $line = sprintf('%s%s × %d — %s', $name, $unit_display, $qty, strip_tags(wc_price($subtotal)));
-        $lines[] = $line;
-      }
-      if ($lines){
-        $html = implode('<br>', array_map('esc_html',$lines));
-        // Add as custom display without WooCommerce label
-        $item_data[] = ['name'=>'Состав','value'=>$html,'display'=>$html];
-      }
-    }
-    // Delivery info removed - no longer displaying in cart
-    // if (!empty($cart_item['wmb_payload']['delivery'])){
-    //   $d = $cart_item['wmb_payload']['delivery'];
-    //   $nice = sprintf('%s, %s', isset($d['weekday_ru'])?$d['weekday_ru']:$d['weekday'], $d['date'] ?? '');
-    //   $dl  = isset($d['deadline_human']) ? $d['deadline_human'] : '';
-    //   $html = esc_html($nice) . ($dl ? ' (дедлайн: '.esc_html($dl).')' : '');
-    //   $item_data[] = ['name'=>'Доставка','value'=>$html,'display'=>$html];
-    // }
-    return $item_data;
-  },10,2);
 
 
 add_action('woocommerce_checkout_create_order_line_item', function($item,$key,$values){
   if (!empty($values['wmb_payload'])){
-    $json = wp_json_encode($values['wmb_payload'], JSON_UNESCAPED_UNICODE);
-    // Сохраняем в скрытом ключе для аккуратного отображения
+    $payload = is_string($values['wmb_payload']) ? json_decode($values['wmb_payload'], true) : $values['wmb_payload'];
+    
+    if ($payload && isset($payload['items_list']) && is_array($payload['items_list'])) {
+      // Добавляем детальный состав блюд для кухни
+      $dishes_details = [];
+      foreach ($payload['items_list'] as $dish) {
+        if (isset($dish['qty']) && $dish['qty'] > 0) {
+          $name = isset($dish['name']) ? $dish['name'] : 'Неизвестное блюдо';
+          $unit = isset($dish['unit']) ? $dish['unit'] : '';
+          $qty = intval($dish['qty']);
+          $price = isset($dish['price']) ? floatval($dish['price']) : 0;
+          $total_price = $price * $qty;
+          
+          $dishes_details[] = $name . ($unit ? ' (' . $unit . ')' : '') . ' × ' . $qty . ' — ' . number_format($total_price, 2) . ' €';
+        }
+      }
+      
+      // Убираем добавление подписанного мета-поля ("Состав заказа") —
+      // это позволяет избежать некрасивой метки в таблице на thank-you странице.
+      // Отображение деталей остаётся через хук woocommerce_order_item_meta_end ниже.
+    }
+    
+    // Сохраняем payload единообразно как валидный JSON (без двойного кодирования)
+    $json = is_string($values['wmb_payload'])
+      ? $values['wmb_payload']
+      : wp_json_encode($values['wmb_payload'], JSON_UNESCAPED_UNICODE);
     $item->add_meta_data('_wmb_payload', $json, false);
+    
   }
 },10,3);
 
   add_filter('woocommerce_hidden_order_itemmeta', function($hidden){
     $hidden[] = 'Meal plan payload';
     $hidden[] = '_wmb_payload';
+    // НЕ скрываем "Состав заказа" - он должен быть виден в админке
     return $hidden;
   });
 
@@ -764,102 +849,5 @@ add_filter('woocommerce_product_is_in_stock', function($in_stock,$product){
 },10,2);
 
 
-// ---------- Admin: Kitchen aggregation ----------
-function wmb_page_kitchen(){
-  if (!current_user_can('manage_woocommerce')){ wp_die('Недостаточно прав'); }
-  $date = isset($_GET['date']) ? sanitize_text_field($_GET['date']) : date('Y-m-d');
-  $statuses = isset($_GET['st']) ? array_map('wc_clean', (array)$_GET['st']) : ['processing','on-hold'];
-  $download = isset($_GET['download']) && $_GET['download']=='1';
-
-  $query = new WC_Order_Query([
-    'limit' => -1,
-    'status' => $statuses,
-    'orderby' => 'date',
-    'order' => 'DESC',
-  ]);
-  $orders = $query->get_orders();
-
-  $agg = [];
-  $orderRows = [];
-  foreach($orders as $order){
-    foreach($order->get_items() as $item){
-      $meta = $item->get_meta('_wmb_payload', true);
-      if (!$meta) $meta = $item->get_meta('Meal plan payload', true);
-      if (!$meta) continue;
-      $payload = json_decode($meta, true);
-      if (!$payload || empty($payload['items_list'])) continue;
-      $delivery = isset($payload['delivery']) ? $payload['delivery'] : [];
-      $delDate = isset($delivery['date']) ? $delivery['date'] : '';
-      if ($date && $delDate !== $date) continue;
-      foreach($payload['items_list'] as $row){
-        $name = isset($row['name']) ? $row['name'] : '';
-        $qty  = isset($row['qty']) ? intval($row['qty']) : 0;
-        $rid  = isset($row['id']) ? (string)$row['id'] : '';
-        $post_id = 0;
-        if (strpos($rid,'dish-')===0) $post_id = intval(substr($rid,5));
-        $category = '';
-        if ($post_id){
-          $terms = get_the_terms($post_id, 'wmb_section');
-          if (is_array($terms) && !empty($terms)) $category = $terms[0]->name;
-        }
-        $unit = $post_id ? get_post_meta($post_id, 'wmb_unit', true) : '';
-        if (!$name || !$qty) continue;
-        $key = $post_id ? ('id-'.$post_id) : ('name-'.md5($name));
-        if (!isset($agg[$key])) $agg[$key] = ['name'=>$name,'category'=>$category,'unit'=>$unit,'qty'=>0];
-        $agg[$key]['qty'] += $qty;
-      }
-      $orderRows[] = [ 'order_id'=>$order->get_id(), 'customer'=>$order->get_billing_first_name().' '.$order->get_billing_last_name(), 'items'=>$payload['items_list'] ];
-    }
-  }
-
-  if ($download){
-    header('Content-Type: text/csv; charset=UTF-8');
-    header('Content-Disposition: attachment; filename="kitchen-'.date('Ymd').'.csv"');
-    $out = fopen('php://output','w');
-    fputcsv($out, ['Категория','Блюдо','Ед.изм','Кол-во']);
-    foreach($agg as $row){ fputcsv($out, [$row['category'],$row['name'],$row['unit'],$row['qty']]); }
-    fclose($out); exit;
-  }
-
-  echo '<div class="wrap"><h1>Кухня — агрегатор</h1>';
-  echo '<form method="get" style="margin-bottom:12px">';
-  echo '<input type="hidden" name="page" value="wmb_kitchen">';
-  echo '<label>Дата доставки: <input type="date" name="date" value="'.esc_attr($date).'"/></label> ';
-  echo '<label>Статусы: ';
-  foreach(['processing'=>'Обработка','on-hold'=>'Ожидает','pending'=>'Ожидает оплаты','completed'=>'Выполнен'] as $key=>$label){
-    $chk = in_array($key,$statuses)?'checked':''; echo '<label style="margin-right:8px"><input type="checkbox" name="st[]" value="'.esc_attr($key).'" '.$chk.'> '.esc_html($label).'</label>';
-  }
-  echo '</label> ';
-  echo '<button class="button">Показать</button> ';
-  echo '<a class="button button-primary" href="'.esc_url(add_query_arg(['page'=>'wmb_kitchen','date'=>$date,'st'=>$statuses,'download'=>1], admin_url('admin.php'))).'">Экспорт CSV</a>';
-  echo '</form>';
-
-  if (!$agg){ echo '<p>Нет данных по выбранным параметрам.</p>'; }
-  else {
-    $base = remove_query_arg(['sort','dir']);
-    $sort = isset($_GET['sort']) ? sanitize_text_field($_GET['sort']) : 'name';
-    $dir  = strtolower(isset($_GET['dir']) ? sanitize_text_field($_GET['dir']) : 'asc');
-    $dir  = ($dir==='desc') ? 'desc' : 'asc';
-    uasort($agg, function($a,$b) use ($sort,$dir){
-      $va = $a[$sort] ?? '';
-      $vb = $b[$sort] ?? '';
-      if ($sort==='qty'){ $va = intval($va); $vb = intval($vb); }
-      $cmp = ($va==$vb) ? 0 : (($va<$vb)?-1:1);
-      return $dir==='asc' ? $cmp : -$cmp;
-    });
-    $mk = function($s) use ($base,$sort,$dir){
-      $next = ($sort===$s && $dir==='asc') ? 'desc' : 'asc';
-      return esc_url(add_query_arg(['sort'=>$s,'dir'=>$next], $base));
-    };
-    echo '<h2>Сводка по блюдам</h2><table class="widefat"><thead><tr>';
-    echo '<th><a href="'.$mk('category').'">Категория</a></th>';
-    echo '<th><a href="'.$mk('name').'">Блюдо</a></th>';
-    echo '<th>Ед.изм</th>';
-    echo '<th><a href="'.$mk('qty').'">Кол-во</a></th>';
-    echo '</tr></thead><tbody>';
-    foreach($agg as $row){ echo '<tr><td>'.esc_html($row['category']).'</td><td>'.esc_html($row['name']).'</td><td>'.esc_html($row['unit']).'</td><td>'.intval($row['qty']).'</td></tr>'; }
-    echo '</tbody></table>';
-  }
-
-  echo '</div>';
-}
+// (Временно удалено) Реализация страницы агрегатора "Кухня" будет добавлена позже
+?>
