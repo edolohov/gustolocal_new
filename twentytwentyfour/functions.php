@@ -982,9 +982,19 @@ function delivery_options_styling() {
     }
     
     .delivery-option input[type="radio"] {
-        margin: 0 20px 0 0;
+        margin: 0;
         transform: scale(1.2);
         accent-color: #007cba;
+    }
+    
+    .delivery-label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        font-size: 14px;
+        line-height: 1.4;
+        margin-left: 20px;
     }
     
     .delivery-option input[type="radio"]:checked + .delivery-label {
@@ -997,14 +1007,6 @@ function delivery_options_styling() {
         box-shadow: 0 2px 8px rgba(0, 124, 186, 0.15);
     }
     
-    .delivery-label {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        width: 100%;
-        font-size: 14px;
-        line-height: 1.4;
-    }
     
     .delivery-label strong {
         font-weight: 600;
