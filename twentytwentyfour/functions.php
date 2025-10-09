@@ -551,10 +551,10 @@ function add_delivery_fee($cart) {
     if ($delivery_type === 'delivery') {
         // Add 10 euro delivery fee
         $delivery_fee = 10.00;
-        $cart->add_fee(__('Доставка до двери в Валенсии', 'woocommerce'), $delivery_fee);
+        $cart->add_fee(__('Доставка', 'woocommerce'), $delivery_fee);
     } else {
         // Add pickup option (free)
-        $cart->add_fee(__('Заберу самостоятельно (Amado Granell 40)', 'woocommerce'), 0);
+        $cart->add_fee(__('Самовывоз', 'woocommerce'), 0);
     }
 }
 
