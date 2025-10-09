@@ -982,7 +982,7 @@ function delivery_options_styling() {
     }
     
     .delivery-option input[type="radio"] {
-        margin: 0 16px 0 0;
+        margin: 0 20px 0 0;
         transform: scale(1.2);
         accent-color: #007cba;
     }
