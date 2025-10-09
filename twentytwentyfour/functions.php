@@ -554,7 +554,7 @@ function add_delivery_fee($cart) {
         $cart->add_fee(__('Доставка до двери в Валенсии', 'woocommerce'), $delivery_fee);
     } else {
         // Add pickup option (free)
-        $cart->add_fee(__('Самовывоз', 'woocommerce'), 0);
+        $cart->add_fee(__('Заберу самостоятельно (Amado Granell 40)', 'woocommerce'), 0);
     }
 }
 
@@ -982,7 +982,7 @@ function delivery_options_styling() {
     }
     
     .delivery-option input[type="radio"] {
-        margin: 0 12px 0 0;
+        margin: 0 16px 0 0;
         transform: scale(1.2);
         accent-color: #007cba;
     }

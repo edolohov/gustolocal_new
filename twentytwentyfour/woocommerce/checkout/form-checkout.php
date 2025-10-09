@@ -63,7 +63,7 @@ if ( ! $checkout->is_registration_enabled() && $checkout->is_registration_requir
 			<label class="delivery-option">
 				<input type="radio" name="delivery_type" value="pickup" <?php checked(WC()->session->get('delivery_type', 'delivery'), 'pickup'); ?>>
 				<span class="delivery-label">
-					<strong><?php esc_html_e( 'Самовывоз', 'woocommerce' ); ?></strong>
+					<strong><?php esc_html_e( 'Заберу самостоятельно (Amado Granell 40)', 'woocommerce' ); ?></strong>
 					<span class="delivery-price"><?php esc_html_e( 'Бесплатно', 'woocommerce' ); ?></span>
 				</span>
 			</label>
