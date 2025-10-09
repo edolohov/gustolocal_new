@@ -175,6 +175,47 @@ endif;
 add_action( 'init', 'twentytwentyfour_block_stylesheets' );
 
 /**
+ * Quick header navigation fix for production
+ */
+function quick_header_navigation_fix() {
+	?>
+	<style id="quick-header-fix">
+	/* Быстрое решение для header навигации */
+	.wp-block-group.is-nowrap.is-layout-flex.wp-container-core-group-is-layout-e088cbc5.wp-block-group-is-layout-flex {
+		width: 450px !important;
+		max-width: 450px !important;
+	}
+	
+	/* Убираем большой row-gap в навигации */
+	.wp-block-navigation__container {
+		row-gap: 8px !important;
+		column-gap: 8px !important;
+	}
+	
+	/* Исправляем мобильное меню */
+	@media (max-width: 768px) {
+		.wp-block-navigation__responsive-container .wp-block-navigation__container {
+			flex-direction: column !important;
+			align-items: flex-start !important;
+			gap: 8px !important;
+		}
+		
+		.wp-block-navigation__responsive-container .wp-block-navigation-item {
+			width: 100% !important;
+			text-align: left !important;
+		}
+		
+		.wp-block-group.is-nowrap.is-layout-flex.wp-container-core-group-is-layout-e088cbc5.wp-block-group-is-layout-flex {
+			width: auto !important;
+			max-width: none !important;
+		}
+	}
+	</style>
+	<?php
+}
+add_action( 'wp_head', 'quick_header_navigation_fix', 999 );
+
+/**
  * Register pattern categories.
  */
 

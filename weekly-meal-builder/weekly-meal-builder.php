@@ -9,6 +9,7 @@
 if (!defined('ABSPATH')) exit;
 
 define('WMB_VERSION', '1.8.0');
+// Restore stable product ID used in production
 if (!defined('WMB_PRODUCT_ID')) define('WMB_PRODUCT_ID', 299);
 
 /* ---------- assets ---------- */
@@ -524,16 +525,15 @@ add_action('rest_api_init', function () {
 
 // ЖЁСТКИЙ ПОРЯДОК СЕКЦИЙ (по названиям). Всё, что не попало — в конец, по алфавиту.
 $hard_order = [
-  'Паста',
-  'Основные мясные блюда',
-  'Основные блюда из птицы',
-  'Основные рыбные блюда',
-  'Гарниры и салаты',
-  'Завтраки',
-  'Суп',
-  'Салат',
-  'Заморозка',
+  'Паста ручной работы',
+  'Авторские сэндвичи',
+  'Основные блюда - мясо, птица, рыба (сувид)',
+  'Гарниры и зелень',
+  'Завтраки и сладкое',
+  'Супы и крем-супы',
+  'Для запаса / в морозильник',
 ];
+
 
 $index = array_map('mb_strtolower', $hard_order);
 usort($out_sections, function($a, $b) use ($index) {
@@ -847,6 +847,12 @@ add_filter('woocommerce_is_purchasable', function($purchasable,$product){
 add_filter('woocommerce_product_is_in_stock', function($in_stock,$product){
   if ($product && intval($product->get_id())===intval(WMB_PRODUCT_ID)) return true; return $in_stock;
 },10,2);
+
+// Emails: hide product thumbnails to avoid showing placeholder alt text ("Заполнитель")
+add_filter('woocommerce_email_order_items_args', function($args){
+  $args['show_image'] = false;
+  return $args;
+}, 10, 1);
 
 
 // (Временно удалено) Реализация страницы агрегатора "Кухня" будет добавлена позже
