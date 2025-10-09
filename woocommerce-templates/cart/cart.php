@@ -177,6 +177,26 @@ do_action( 'woocommerce_before_cart' ); ?>
 						</div>
 					<?php } ?>
 
+					<div class="delivery-options">
+						<h4><?php esc_html_e( 'Способ получения заказа', 'woocommerce' ); ?></h4>
+						<div class="delivery-radio-group">
+							<label class="delivery-option">
+								<input type="radio" name="delivery_type" value="delivery" <?php checked(WC()->session->get('delivery_type', 'delivery'), 'delivery'); ?>>
+								<span class="delivery-label">
+									<strong><?php esc_html_e( 'Доставка до двери в Валенсии', 'woocommerce' ); ?></strong>
+									<span class="delivery-price"><?php echo wc_price(10.00); ?></span>
+								</span>
+							</label>
+							<label class="delivery-option">
+								<input type="radio" name="delivery_type" value="pickup" <?php checked(WC()->session->get('delivery_type', 'delivery'), 'pickup'); ?>>
+								<span class="delivery-label">
+									<strong><?php esc_html_e( 'Самовывоз', 'woocommerce' ); ?></strong>
+									<span class="delivery-price"><?php esc_html_e( 'Бесплатно', 'woocommerce' ); ?></span>
+								</span>
+							</label>
+						</div>
+					</div>
+
 					<button type="submit" class="button<?php echo esc_attr( wc_wp_theme_get_element_class_name( 'button' ) ? ' ' . wc_wp_theme_get_element_class_name( 'button' ) : '' ); ?>" name="update_cart" value="<?php esc_attr_e( 'Update cart', 'woocommerce' ); ?>"><?php esc_html_e( 'Update cart', 'woocommerce' ); ?></button>
 
 					<?php do_action( 'woocommerce_cart_actions' ); ?>

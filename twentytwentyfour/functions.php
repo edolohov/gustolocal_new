@@ -538,16 +538,24 @@ function remove_delivery_from_cart_item_data( $item_data, $cart_item ) {
 }
 add_filter( 'woocommerce_get_item_data', 'remove_delivery_from_cart_item_data', 10, 2 );
 
-// Add automatic delivery fee for Valencia
-add_action('woocommerce_cart_calculate_fees', 'add_valencia_delivery_fee');
-function add_valencia_delivery_fee($cart) {
+// Add delivery fee based on user selection
+add_action('woocommerce_cart_calculate_fees', 'add_delivery_fee');
+function add_delivery_fee($cart) {
     if (is_admin() && !defined('DOING_AJAX')) {
         return;
     }
     
-    // Add 10 euro delivery fee
-    $delivery_fee = 10.00;
-    $cart->add_fee(__('Доставка до двери в Валенсии', 'woocommerce'), $delivery_fee);
+    // Get delivery type from session or default to delivery
+    $delivery_type = WC()->session->get('delivery_type', 'delivery');
+    
+    if ($delivery_type === 'delivery') {
+        // Add 10 euro delivery fee
+        $delivery_fee = 10.00;
+        $cart->add_fee(__('Доставка до двери в Валенсии', 'woocommerce'), $delivery_fee);
+    } else {
+        // Add pickup option (free)
+        $cart->add_fee(__('Самовывоз', 'woocommerce'), 0);
+    }
 }
 
 // Set minimum order amount (60 euros without delivery fee)
@@ -926,3 +934,174 @@ function contact_form_7_styling() {
     <?php
 }
 add_action('wp_head', 'contact_form_7_styling');
+
+// Add delivery options styling
+add_action('wp_head', 'delivery_options_styling');
+function delivery_options_styling() {
+    if (is_cart() || is_checkout()) {
+    ?>
+    <style>
+    .delivery-options,
+    .delivery-options-checkout {
+        margin: 20px 0;
+        padding: 20px;
+        background: #f8f9fa;
+        border-radius: 8px;
+        border: 1px solid #e9ecef;
+    }
+    
+    .delivery-options h4,
+    .delivery-options-checkout h3 {
+        margin: 0 0 15px 0;
+        font-size: 16px;
+        font-weight: 600;
+        color: #333;
+    }
+    
+    .delivery-radio-group {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+    
+    .delivery-option {
+        display: flex;
+        align-items: center;
+        padding: 15px;
+        background: white;
+        border: 2px solid #e9ecef;
+        border-radius: 6px;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        position: relative;
+    }
+    
+    .delivery-option:hover {
+        border-color: #007cba;
+        box-shadow: 0 2px 8px rgba(0, 124, 186, 0.1);
+    }
+    
+    .delivery-option input[type="radio"] {
+        margin: 0 12px 0 0;
+        transform: scale(1.2);
+        accent-color: #007cba;
+    }
+    
+    .delivery-option input[type="radio"]:checked + .delivery-label {
+        color: #007cba;
+    }
+    
+    .delivery-option:has(input[type="radio"]:checked) {
+        border-color: #007cba;
+        background: #f0f8ff;
+        box-shadow: 0 2px 8px rgba(0, 124, 186, 0.15);
+    }
+    
+    .delivery-label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        width: 100%;
+        font-size: 14px;
+        line-height: 1.4;
+    }
+    
+    .delivery-label strong {
+        font-weight: 600;
+    }
+    
+    .delivery-price {
+        font-weight: 600;
+        color: #28a745;
+    }
+    
+    .delivery-options.loading {
+        opacity: 0.7;
+        pointer-events: none;
+    }
+    
+    .delivery-options.loading::after {
+        content: '';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 20px;
+        height: 20px;
+        margin: -10px 0 0 -10px;
+        border: 2px solid #f3f3f3;
+        border-top: 2px solid #007cba;
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+    }
+    
+    @keyframes spin {
+        0% { transform: rotate(0deg); }
+        100% { transform: rotate(360deg); }
+    }
+    
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+        .delivery-options {
+            margin: 15px 0;
+            padding: 15px;
+        }
+        
+        .delivery-option {
+            padding: 12px;
+        }
+        
+        .delivery-label {
+            font-size: 13px;
+        }
+        
+        .delivery-label strong {
+            margin-right: 10px;
+        }
+    }
+    </style>
+    <?php
+    }
+}
+
+// AJAX handler for delivery type change
+add_action('wp_ajax_update_delivery_type', 'update_delivery_type');
+add_action('wp_ajax_nopriv_update_delivery_type', 'update_delivery_type');
+function update_delivery_type() {
+    if (!wp_verify_nonce($_POST['nonce'], 'delivery_type_nonce')) {
+        wp_die('Security check failed');
+    }
+    
+    $delivery_type = sanitize_text_field($_POST['delivery_type']);
+    
+    if (in_array($delivery_type, ['delivery', 'pickup'])) {
+        WC()->session->set('delivery_type', $delivery_type);
+        WC()->cart->calculate_totals();
+        
+        wp_send_json_success([
+            'delivery_type' => $delivery_type,
+            'cart_total' => WC()->cart->get_total()
+        ]);
+    } else {
+        wp_send_json_error('Invalid delivery type');
+    }
+}
+
+// Enqueue delivery options script
+add_action('wp_enqueue_scripts', 'enqueue_delivery_options_script');
+function enqueue_delivery_options_script() {
+    if (is_cart() || is_checkout()) {
+        wp_enqueue_script(
+            'delivery-options',
+            get_template_directory_uri() . '/assets/js/delivery-options.js',
+            array('jquery'),
+            '1.0.0',
+            true
+        );
+        
+        // Localize script for AJAX
+        wp_localize_script('delivery-options', 'wc_cart_params', array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'delivery_nonce' => wp_create_nonce('delivery_type_nonce')
+        ));
+    }
+}
