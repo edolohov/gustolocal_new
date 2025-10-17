@@ -13,6 +13,11 @@ if (!defined('ABSPATH')) {
 class GustoLocal_MealBuilder {
     
     public function __construct() {
+        // Check if Meal Builder plugin is active
+        if (!function_exists('wmb_assets_url')) {
+            return;
+        }
+        
         if (!gustolocal_is_enabled('meal_builder') || !gustolocal_mb_setting('multilang_support', true)) {
             return;
         }
@@ -428,5 +433,5 @@ class GustoLocal_MealBuilder {
     }
 }
 
-// Initialize Meal Builder module
-new GustoLocal_MealBuilder();
+// Initialize Meal Builder module (called from main functions.php)
+// new GustoLocal_MealBuilder();

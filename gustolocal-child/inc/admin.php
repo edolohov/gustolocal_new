@@ -385,5 +385,5 @@ class GustoLocal_Admin {
     }
 }
 
-// Initialize admin module
-new GustoLocal_Admin();
+// Initialize admin module (called from main functions.php)
+// new GustoLocal_Admin();

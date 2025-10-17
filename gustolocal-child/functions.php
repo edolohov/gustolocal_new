@@ -16,14 +16,48 @@ define('GUSTOLOCAL_VERSION', '1.0.0');
 define('GUSTOLOCAL_PATH', get_stylesheet_directory());
 define('GUSTOLOCAL_URL', get_stylesheet_directory_uri());
 
-// Load configuration
+// Load configuration first
 require_once GUSTOLOCAL_PATH . '/inc/config.php';
 
-// Load core modules
-require_once GUSTOLOCAL_PATH . '/inc/multilang.php';
-require_once GUSTOLOCAL_PATH . '/inc/woocommerce.php';
-require_once GUSTOLOCAL_PATH . '/inc/meal-builder.php';
-require_once GUSTOLOCAL_PATH . '/inc/admin.php';
+// Load core modules only if configuration loaded successfully
+if (class_exists('GustoLocal_Config')) {
+    // Load multilanguage module (always safe)
+    require_once GUSTOLOCAL_PATH . '/inc/multilang.php';
+    if (class_exists('GustoLocal_Multilang')) {
+        new GustoLocal_Multilang();
+    }
+    
+    // Load other modules with error handling
+    try {
+        require_once GUSTOLOCAL_PATH . '/inc/woocommerce.php';
+        if (class_exists('GustoLocal_WooCommerce')) {
+            new GustoLocal_WooCommerce();
+        }
+    } catch (Exception $e) {
+        // Log error but don't break the site
+        error_log('GustoLocal WooCommerce module error: ' . $e->getMessage());
+    }
+    
+    try {
+        require_once GUSTOLOCAL_PATH . '/inc/meal-builder.php';
+        if (class_exists('GustoLocal_MealBuilder')) {
+            new GustoLocal_MealBuilder();
+        }
+    } catch (Exception $e) {
+        // Log error but don't break the site
+        error_log('GustoLocal Meal Builder module error: ' . $e->getMessage());
+    }
+    
+    try {
+        require_once GUSTOLOCAL_PATH . '/inc/admin.php';
+        if (class_exists('GustoLocal_Admin')) {
+            new GustoLocal_Admin();
+        }
+    } catch (Exception $e) {
+        // Log error but don't break the site
+        error_log('GustoLocal Admin module error: ' . $e->getMessage());
+    }
+}
 
 // Initialize theme
 add_action('after_setup_theme', 'gustolocal_init');

@@ -539,5 +539,5 @@ class GustoLocal_Multilang {
     }
 }
 
-// Initialize multilanguage module
-new GustoLocal_Multilang();
+// Initialize multilanguage module (called from main functions.php)
+// new GustoLocal_Multilang();

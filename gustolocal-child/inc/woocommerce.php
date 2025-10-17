@@ -13,6 +13,11 @@ if (!defined('ABSPATH')) {
 class GustoLocal_WooCommerce {
     
     public function __construct() {
+        // Check if WooCommerce is active
+        if (!class_exists('WooCommerce')) {
+            return;
+        }
+        
         if (!gustolocal_is_enabled('woocommerce')) {
             return;
         }
@@ -287,5 +292,5 @@ class GustoLocal_WooCommerce {
     }
 }
 
-// Initialize WooCommerce module
-new GustoLocal_WooCommerce();
+// Initialize WooCommerce module (called from main functions.php)
+// new GustoLocal_WooCommerce();
