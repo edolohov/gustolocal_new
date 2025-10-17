@@ -10,9 +10,9 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Load translations (only if constant is defined)
-if (defined('GUSTOLOCAL_PATH')) {
-    require_once GUSTOLOCAL_PATH . '/inc/translations.php';
+// Load translations from parent theme (avoid conflicts)
+if (file_exists(get_template_directory() . '/translations.php')) {
+    require_once get_template_directory() . '/translations.php';
 }
 
 class GustoLocal_Multilang {

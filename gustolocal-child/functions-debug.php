@@ -95,6 +95,14 @@ function gustolocal_test_multilang() {
         } else {
             error_log('GustoLocal: Multilang file NOT found at: ' . GUSTOLOCAL_PATH . '/inc/multilang.php');
         }
+        
+        // Test if parent theme translations exist
+        if (file_exists(get_template_directory() . '/translations.php')) {
+            error_log('GustoLocal: Parent theme translations.php exists');
+        } else {
+            error_log('GustoLocal: Parent theme translations.php NOT found');
+        }
+        
     } catch (Exception $e) {
         error_log('GustoLocal: Error loading multilang: ' . $e->getMessage());
     }
