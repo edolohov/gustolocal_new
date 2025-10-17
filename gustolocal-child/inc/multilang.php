@@ -10,8 +10,10 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Load translations
-require_once GUSTOLOCAL_PATH . '/inc/translations.php';
+// Load translations (only if constant is defined)
+if (defined('GUSTOLOCAL_PATH')) {
+    require_once GUSTOLOCAL_PATH . '/inc/translations.php';
+}
 
 class GustoLocal_Multilang {
     

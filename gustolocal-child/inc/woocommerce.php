@@ -10,6 +10,11 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+// Check if required constants are defined
+if (!defined('GUSTOLOCAL_PATH')) {
+    return;
+}
+
 class GustoLocal_WooCommerce {
     
     public function __construct() {
