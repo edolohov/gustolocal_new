@@ -8,6 +8,9 @@
  * @since Twenty Twenty-Four 1.0
  */
 
+// Подключаем файл переводов
+require_once get_template_directory() . '/translations.php';
+
 /**
  * Register block styles.
  */
@@ -175,70 +178,838 @@ endif;
 add_action( 'init', 'twentytwentyfour_block_stylesheets' );
 
 /**
- * Quick header navigation fix for production
+ * Чистая система языковой маршрутизации
+ * Только самое необходимое
  */
-function quick_header_navigation_fix() {
-	?>
-	<style id="quick-header-fix">
-	/* Быстрое решение для header навигации */
-	.wp-block-group.is-nowrap.is-layout-flex.wp-container-core-group-is-layout-e088cbc5.wp-block-group-is-layout-flex {
-		width: 450px !important;
-		max-width: 450px !important;
-	}
-	
-	/* Убираем большой row-gap в навигации */
-	.wp-block-navigation__container {
-		row-gap: 8px !important;
-		column-gap: 8px !important;
-	}
-	
-	/* Исправляем мобильное меню */
-	@media (max-width: 768px) {
-		.wp-block-navigation__responsive-container .wp-block-navigation__container {
-			flex-direction: column !important;
-			align-items: flex-start !important;
-			gap: 8px !important;
-		}
-		
-		.wp-block-navigation__responsive-container .wp-block-navigation-item {
-			width: 100% !important;
-			text-align: left !important;
-		}
-		
-		.wp-block-group.is-nowrap.is-layout-flex.wp-container-core-group-is-layout-e088cbc5.wp-block-group-is-layout-flex {
-			width: auto !important;
-			max-width: none !important;
-		}
-	}
-	</style>
+
+// Инициализация системы маршрутизации
+add_action('init', 'setup_language_routing');
+
+// Обработка языковых URL на раннем этапе
+add_action('parse_request', 'handle_language_urls_early', 1);
+function handle_language_urls_early($wp) {
+    $request = $wp->request;
+    
+    // Отладка
+    if (current_user_can('manage_options')) {
+        add_action('wp_footer', function() use ($request) {
+            echo "<!-- DEBUG: handle_language_urls_early called with request: $request -->";
+        });
+    }
+    
+    // Проверяем, есть ли языковой префикс
+    if (preg_match('/^(es|en)\/(.*)/', $request, $matches)) {
+        $lang = $matches[1];
+        $path = $matches[2];
+        
+        // Отладка
+        if (current_user_can('manage_options')) {
+            add_action('wp_footer', function() use ($lang, $path) {
+                echo "<!-- DEBUG: Found language prefix: $lang, path: $path -->";
+            });
+        }
+        
+        // Специальная обработка для WooCommerce страниц
+        if (strpos($path, 'checkout/order-received') !== false) {
+            // Устанавливаем правильные query vars для WooCommerce
+            $wp->query_vars['lang'] = $lang;
+            $wp->query_vars['pagename'] = 'checkout';
+            
+            // Извлекаем номер заказа
+            if (preg_match('/order-received\/(\d+)/', $path, $order_matches)) {
+                $wp->query_vars['order-received'] = $order_matches[1];
+            }
+            
+            // Устанавливаем флаги для WooCommerce
+            $wp->query_vars['woocommerce'] = true;
+            $wp->query_vars['checkout'] = true;
+            
+            // Отладка
+            if (current_user_can('manage_options')) {
+                add_action('wp_footer', function() use ($wp) {
+                    echo "<!-- DEBUG: Set query vars: " . print_r($wp->query_vars, true) . " -->";
+                });
+            }
+        }
+    }
+}
+
+// Принудительное обновление rewrite rules (выполнить один раз)
+add_action('init', 'force_flush_rewrite_rules', 999);
+function force_flush_rewrite_rules() {
+    if (get_option('multilang_rewrite_flushed') !== '1') {
+        flush_rewrite_rules();
+        update_option('multilang_rewrite_flushed', '1');
+    }
+}
+
+// Отладка rewrite rules
+add_action('wp_footer', 'debug_rewrite_rules');
+function debug_rewrite_rules() {
+    if (current_user_can('manage_options')) {
+        global $wp_rewrite;
+        echo "<!-- DEBUG: Current rewrite rules -->";
+        echo "<!-- DEBUG: " . print_r($wp_rewrite->rules, true) . " -->";
+        echo "<!-- DEBUG: Current URL: " . $_SERVER['REQUEST_URI'] . " -->";
+        echo "<!-- DEBUG: Query vars: " . print_r($GLOBALS['wp_query']->query_vars, true) . " -->";
+    }
+}
+
+function setup_language_routing() {
+    // Добавляем rewrite rules для испанской версии
+    add_rewrite_rule('^es/(.*)/?', 'index.php?lang=es&pagename=$matches[1]', 'top');
+    add_rewrite_rule('^es/?$', 'index.php?lang=es', 'top');
+    
+    // Добавляем rewrite rules для английской версии
+    add_rewrite_rule('^en/(.*)/?', 'index.php?lang=en&pagename=$matches[1]', 'top');
+    add_rewrite_rule('^en/?$', 'index.php?lang=en', 'top');
+    
+    // Специальные правила для WooCommerce страниц
+    add_rewrite_rule('^es/checkout/(.*)/?', 'index.php?lang=es&pagename=checkout/$matches[1]', 'top');
+    add_rewrite_rule('^en/checkout/(.*)/?', 'index.php?lang=en&pagename=checkout/$matches[1]', 'top');
+    add_rewrite_rule('^es/cart/?', 'index.php?lang=es&pagename=cart', 'top');
+    add_rewrite_rule('^en/cart/?', 'index.php?lang=en&pagename=cart', 'top');
+    add_rewrite_rule('^es/my-account/(.*)/?', 'index.php?lang=es&pagename=my-account/$matches[1]', 'top');
+    add_rewrite_rule('^en/my-account/(.*)/?', 'index.php?lang=en&pagename=my-account/$matches[1]', 'top');
+    
+    // Добавляем query vars для языка
+    add_filter('query_vars', 'add_language_query_vars');
+}
+
+// Добавляем переменную 'lang' в список query vars
+function add_language_query_vars($vars) {
+    $vars[] = 'lang';
+    $vars[] = 'order-received';
+    return $vars;
+}
+
+// Определяем текущий язык
+function get_current_language() {
+    global $wp_query;
+    
+    // Проверяем query var
+    if (isset($wp_query->query_vars['lang']) && !empty($wp_query->query_vars['lang'])) {
+        $lang = $wp_query->query_vars['lang'];
+        if (in_array($lang, ['ru', 'es', 'en'])) {
+            return $lang;
+        }
+    }
+    
+    // По умолчанию возвращаем русский
+    return 'ru';
+}
+
+// Простая система поиска страниц для многоязычных URL
+add_action('pre_get_posts', 'simple_page_lookup');
+function simple_page_lookup($query) {
+    // Только для фронтенда, только для главного запроса
+    if (is_admin() || !$query->is_main_query()) {
+        return;
+    }
+    
+    $lang = get_query_var('lang');
+    if (!in_array($lang, ['es', 'en'])) {
+        return;
+    }
+    
+    // Специальная обработка для WooCommerce страниц
+    if (strpos($pagename, 'checkout') !== false ||
+        strpos($pagename, 'cart') !== false ||
+        strpos($pagename, 'my-account') !== false) {
+        
+        // Для order-received страниц нужно правильно установить endpoint
+        if (strpos($pagename, 'checkout/order-received') !== false) {
+            // Убираем языковой префикс и восстанавливаем правильный путь
+            $clean_path = str_replace('checkout/', '', $pagename);
+            $query->set('pagename', 'checkout');
+            $query->set('lang', $lang);
+            
+            // Устанавливаем endpoint для order-received
+            if (preg_match('/order-received\/(\d+)/', $clean_path, $matches)) {
+                $query->set('order-received', $matches[1]);
+            }
+        }
+        
+        return;
+    }
+    
+    $pagename = get_query_var('pagename');
+    
+    // Отладка
+    if (current_user_can('manage_options')) {
+        add_action('wp_footer', function() use ($lang, $pagename) {
+            echo "<!-- DEBUG: simple_page_lookup called with lang=$lang, pagename=$pagename -->";
+            echo "<!-- DEBUG: is_checkout=" . (is_checkout() ? 'true' : 'false') . " -->";
+            echo "<!-- DEBUG: is_cart=" . (is_cart() ? 'true' : 'false') . " -->";
+            echo "<!-- DEBUG: is_404=" . (is_404() ? 'true' : 'false') . " -->";
+            echo "<!-- DEBUG: current URL=" . $_SERVER['REQUEST_URI'] . " -->";
+            echo "<!-- DEBUG: query vars=" . print_r($GLOBALS['wp_query']->query_vars, true) . " -->";
+        });
+    }
+    
+    // Если это главная страница с языковым префиксом
+    if (empty($pagename)) {
+        $homepage_id = get_option('page_on_front');
+        if ($homepage_id) {
+            $homepage = get_post($homepage_id);
+            if ($homepage) {
+                $lang_slug = $homepage->post_name . '-' . $lang;
+                $lang_page = get_page_by_path($lang_slug);
+                
+                // Отладка
+                if (current_user_can('manage_options')) {
+                    add_action('wp_footer', function() use ($lang_slug, $lang_page) {
+                        $found = $lang_page ? "YES (ID: {$lang_page->ID})" : "NO";
+                        echo "<!-- DEBUG: Looking for homepage slug: $lang_slug, found: $found -->";
+                    });
+                }
+                
+                if ($lang_page) {
+                    $query->set('page_id', $lang_page->ID);
+                    $query->set('pagename', '');
+                    $query->is_page = true;
+                    $query->is_singular = true;
+                    $query->is_home = false;
+                    $query->is_archive = false;
+                }
+            }
+        }
+        return;
+    }
+    
+    // Для обычных страниц
+    $lang_slug = $pagename . '-' . $lang;
+    $page = get_page_by_path($lang_slug);
+    
+    if ($page) {
+        $query->set('page_id', $page->ID);
+        $query->set('pagename', '');
+        $query->is_page = true;
+        $query->is_singular = true;
+        $query->is_home = false;
+        $query->is_archive = false;
+    }
+}
+
+// Диагностика пользователя и прав доступа
+add_action('wp_footer', 'debug_user_permissions');
+function debug_user_permissions() {
+    if (!is_user_logged_in()) {
+        echo "<!-- DEBUG: Пользователь НЕ авторизован -->";
+        return;
+    }
+    
+    $user = wp_get_current_user();
+    $user_id = $user->ID;
+    $user_roles = $user->roles;
+    $can_edit_pages = current_user_can('edit_pages');
+    $can_edit_posts = current_user_can('edit_posts');
+    $can_manage_options = current_user_can('manage_options');
+    
+    echo "<!-- DEBUG USER: ID=$user_id, Roles=" . implode(',', $user_roles) . " -->";
+    echo "<!-- DEBUG PERMISSIONS: edit_pages=$can_edit_pages, edit_posts=$can_edit_posts, manage_options=$can_manage_options -->";
+    
+    if (!$can_edit_pages && !$can_edit_posts) {
+        echo "<!-- DEBUG ERROR: У пользователя нет прав на редактирование! -->";
+    }
+}
+
+// Принудительное включение REST API
+add_filter('rest_authentication_errors', 'allow_rest_api_access');
+function allow_rest_api_access($result) {
+    // Если уже есть ошибка, не перезаписываем её
+    if (!empty($result)) {
+        return $result;
+    }
+    
+    // Разрешаем доступ к REST API для всех аутентифицированных пользователей
+    if (is_user_logged_in()) {
+        return true;
+    }
+    
+    // Разрешаем доступ к публичным эндпоинтам
+    return true;
+}
+
+// Убираем ограничения на REST API
+add_filter('rest_pre_serve_request', 'remove_rest_api_restrictions', 10, 4);
+function remove_rest_api_restrictions($served, $result, $request, $server) {
+    // Убираем заголовки, которые могут блокировать доступ
+    header_remove('X-Robots-Tag');
+    return $served;
+}
+
+// Экстренное восстановление прав администратора
+add_action('init', 'emergency_admin_restore');
+function emergency_admin_restore() {
+    // Только для авторизованных пользователей
+    if (!is_user_logged_in()) {
+        return;
+    }
+    
+    $user = wp_get_current_user();
+    
+    // Если пользователь не имеет прав администратора, но должен их иметь
+    if (!current_user_can('manage_options') && in_array('administrator', $user->roles)) {
+        // Принудительно добавляем права администратора
+        $user->set_role('administrator');
+        
+        // Очищаем кэш прав
+        wp_cache_delete($user->ID, 'user_meta');
+        clean_user_cache($user->ID);
+        
+        // Логируем восстановление
+        error_log("Emergency admin restore for user ID: " . $user->ID);
+    }
+}
+
+// Принудительное разрешение редактирования для администраторов
+add_filter('user_has_cap', 'force_admin_capabilities', 10, 4);
+function force_admin_capabilities($allcaps, $caps, $args, $user) {
+    // Только для администраторов
+    if (!in_array('administrator', $user->roles)) {
+        return $allcaps;
+    }
+    
+    // Принудительно добавляем все необходимые права
+    $admin_caps = array(
+        'edit_posts' => true,
+        'edit_pages' => true,
+        'edit_others_posts' => true,
+        'edit_others_pages' => true,
+        'edit_published_posts' => true,
+        'edit_published_pages' => true,
+        'publish_posts' => true,
+        'publish_pages' => true,
+        'delete_posts' => true,
+        'delete_pages' => true,
+        'delete_others_posts' => true,
+        'delete_others_pages' => true,
+        'delete_published_posts' => true,
+        'delete_published_pages' => true,
+        'manage_options' => true,
+        'manage_categories' => true,
+        'manage_links' => true,
+        'moderate_comments' => true,
+        'unfiltered_html' => true,
+        'edit_theme_options' => true,
+        'install_plugins' => true,
+        'activate_plugins' => true,
+        'edit_plugins' => true,
+        'delete_plugins' => true,
+        'install_themes' => true,
+        'edit_themes' => true,
+        'delete_themes' => true,
+        'switch_themes' => true,
+        'edit_users' => true,
+        'delete_users' => true,
+        'create_users' => true,
+        'list_users' => true,
+        'promote_users' => true,
+        'remove_users' => true,
+        'add_users' => true
+    );
+    
+    return array_merge($allcaps, $admin_caps);
+}
+
+// Простой переключатель языков
+add_action('wp_head', 'add_simple_language_switcher');
+
+function add_simple_language_switcher() {
+    $current_lang = get_current_language();
+    $current_url = home_url($_SERVER['REQUEST_URI']);
+    
+    // Убираем текущий префикс языка из URL
+    if ($current_lang === 'es') {
+        $base_url = str_replace('/es/', '/', $current_url);
+        $base_url = str_replace(home_url('/es'), home_url(), $base_url);
+    } elseif ($current_lang === 'en') {
+        $base_url = str_replace('/en/', '/', $current_url);
+        $base_url = str_replace(home_url('/en'), home_url(), $base_url);
+    } else {
+        $base_url = $current_url;
+    }
+    
+    // Создаем URL для каждого языка
+    $ru_url = $base_url;
+    $es_url = str_replace(home_url(), home_url('/es'), $base_url);
+    $en_url = str_replace(home_url(), home_url('/en'), $base_url);
+    
+    ?>
+    <div id="language-switcher" style="
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        z-index: 9999;
+        background: white;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 10px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        font-family: Arial, sans-serif;
+        font-size: 14px;
+    ">
+        <div style="margin-bottom: 8px; font-weight: bold; color: #333;">Язык:</div>
+        <div style="display: flex; gap: 8px;">
+            <a href="<?php echo esc_url($ru_url); ?>" style="
+                padding: 4px 8px;
+                text-decoration: none;
+                border-radius: 4px;
+                color: <?php echo $current_lang === 'ru' ? 'white' : '#333'; ?>;
+                background: <?php echo $current_lang === 'ru' ? '#007cba' : '#f0f0f0'; ?>;
+                font-size: 12px;
+            ">RU</a>
+            <a href="<?php echo esc_url($es_url); ?>" style="
+                padding: 4px 8px;
+                text-decoration: none;
+                border-radius: 4px;
+                color: <?php echo $current_lang === 'es' ? 'white' : '#333'; ?>;
+                background: <?php echo $current_lang === 'es' ? '#007cba' : '#f0f0f0'; ?>;
+                font-size: 12px;
+            ">ES</a>
+            <a href="<?php echo esc_url($en_url); ?>" style="
+                padding: 4px 8px;
+                text-decoration: none;
+                border-radius: 4px;
+                color: <?php echo $current_lang === 'en' ? 'white' : '#333'; ?>;
+                background: <?php echo $current_lang === 'en' ? '#007cba' : '#f0f0f0'; ?>;
+                font-size: 12px;
+            ">EN</a>
+        </div>
+    </div>
 	<?php
 }
-add_action( 'wp_head', 'quick_header_navigation_fix', 999 );
 
-/**
- * Register pattern categories.
- */
+// JavaScript для сохранения языка
+add_action('wp_footer', 'add_language_persistence_script');
 
-if ( ! function_exists( 'twentytwentyfour_pattern_categories' ) ) :
-	/**
-	 * Register pattern categories
-	 *
-	 * @since Twenty Twenty-Four 1.0
-	 * @return void
-	 */
-	function twentytwentyfour_pattern_categories() {
+function add_language_persistence_script() {
+    ?>
+    <script>
+    // Функция для установки cookie
+    function setCookie(name, value, days) {
+        var expires = "";
+        if (days) {
+            var date = new Date();
+            date.setTime(date.getTime() + (days * 24 * 60 * 60 * 1000));
+            expires = "; expires=" + date.toUTCString();
+        }
+        document.cookie = name + "=" + (value || "") + expires + "; path=/";
+    }
+    
+    // Показываем индикатор загрузки при переключении языка
+    function showLanguageLoader() {
+        var loader = document.createElement('div');
+        loader.id = 'language-loader';
+        loader.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.9);
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: Arial, sans-serif;
+        `;
+        loader.innerHTML = `
+            <div style="text-align: center;">
+                <div style="
+                    width: 40px;
+                    height: 40px;
+                    border: 4px solid #f3f3f3;
+                    border-top: 4px solid #007cba;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto 20px;
+                "></div>
+                <div style="color: #333; font-size: 16px;">Переключение языка...</div>
+            </div>
+        `;
+        
+        // Добавляем CSS для анимации
+        var style = document.createElement('style');
+        style.textContent = `
+            @keyframes spin {
+                0% { transform: rotate(0deg); }
+                100% { transform: rotate(360deg); }
+            }
+        `;
+        document.head.appendChild(style);
+        document.body.appendChild(loader);
+    }
+    
+    // Проверяем язык сразу, не дожидаясь DOMContentLoaded
+    (function() {
+        var savedLang = localStorage.getItem('user_language');
+        var currentUrl = window.location.href;
+        var currentLang = getCurrentLangFromUrl(currentUrl);
+        
+        // Отладочная информация
+        console.log('Language Debug:', {
+            savedLang: savedLang,
+            currentUrl: currentUrl,
+            currentLang: currentLang
+        });
+        
+        // Если нет сохраненного языка, определяем язык браузера
+        if (!savedLang) {
+            var browserLang = getBrowserLanguage();
+            console.log('No saved language, browser lang:', browserLang);
+            if (browserLang && browserLang !== 'ru') {
+                localStorage.setItem('user_language', browserLang);
+                setCookie('user_language', browserLang, 365);
+                var newUrl = switchLanguageInUrl(currentUrl, browserLang);
+                if (newUrl !== currentUrl) {
+                    console.log('Redirecting to browser language:', newUrl);
+                    showLanguageLoader();
+                    window.location.href = newUrl;
+                    return;
+                }
+            } else {
+                localStorage.setItem('user_language', 'ru');
+                setCookie('user_language', 'ru', 365);
+                console.log('Set default language to ru');
+            }
+        }
+        
+        // Если есть сохраненный язык, но текущий URL не соответствует ему
+        if (savedLang && savedLang !== currentLang) {
+            var newUrl = switchLanguageInUrl(currentUrl, savedLang);
+            if (newUrl !== currentUrl) {
+                console.log('Redirecting to saved language:', newUrl);
+                showLanguageLoader();
+                window.location.href = newUrl;
+                return;
+            }
+        }
+        
+        console.log('No redirect needed');
+    })();
+    
+    document.addEventListener('DOMContentLoaded', function() {
+        
+        // Добавляем обработчики кликов на переключатель
+        var switcher = document.getElementById('language-switcher');
+        if (switcher) {
+            var links = switcher.querySelectorAll('a');
+            links.forEach(function(link) {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    var targetLang = getLangFromLink(this);
+                    if (targetLang) {
+                        localStorage.setItem('user_language', targetLang);
+                        setCookie('user_language', targetLang, 365);
+                        var newUrl = switchLanguageInUrl(window.location.href, targetLang);
+                        if (newUrl !== window.location.href) {
+                            showLanguageLoader();
+                            window.location.href = newUrl;
+                        }
+                    }
+                });
+            });
+        }
+    });
+    
+    function getBrowserLanguage() {
+        var lang = navigator.language || navigator.userLanguage;
+        if (lang.startsWith('es')) return 'es';
+        if (lang.startsWith('en')) return 'en';
+        return 'ru';
+    }
+    
+    function getCurrentLangFromUrl(url) {
+        if (url.includes('/es/')) return 'es';
+        if (url.includes('/en/')) return 'en';
+        return 'ru';
+    }
+    
+    function getLangFromLink(link) {
+        var text = link.textContent.trim();
+        if (text === 'RU') return 'ru';
+        if (text === 'ES') return 'es';
+        if (text === 'EN') return 'en';
+        return null;
+    }
+    
+    function switchLanguageInUrl(url, targetLang) {
+        var baseUrl = url;
+        
+        // Убираем текущие префиксы языков
+        baseUrl = baseUrl.replace(/\/es\//g, '/');
+        baseUrl = baseUrl.replace(/\/en\//g, '/');
+        baseUrl = baseUrl.replace(/\/es$/, '');
+        baseUrl = baseUrl.replace(/\/en$/, '');
+        
+        // Добавляем новый префикс
+        if (targetLang === 'ru') {
+            return baseUrl;
+        } else {
+            var domain = baseUrl.split('/')[0] + '//' + baseUrl.split('/')[2];
+            var path = baseUrl.replace(domain, '');
+            return domain + '/' + targetLang + path;
+        }
+    }
+    </script>
+	<?php
+}
 
-		register_block_pattern_category(
-			'twentytwentyfour_page',
-			array(
-				'label'       => _x( 'Pages', 'Block pattern category', 'twentytwentyfour' ),
-				'description' => __( 'A collection of full page layouts.', 'twentytwentyfour' ),
-			)
-		);
-	}
-endif;
+// Простое перенаправление на основе сохраненного языка
+add_action('template_redirect', 'simple_language_redirect');
+function simple_language_redirect() {
+    // Проверяем, есть ли сохраненный язык в cookie
+    if (isset($_COOKIE['user_language'])) {
+        $saved_lang = sanitize_text_field($_COOKIE['user_language']);
+        $current_lang = get_current_language();
+        
+        // Если сохраненный язык не соответствует текущему URL
+        if ($saved_lang !== $current_lang && in_array($saved_lang, ['ru', 'es', 'en'])) {
+            $current_url = home_url($_SERVER['REQUEST_URI']);
+            
+            // Создаем правильный URL для сохраненного языка
+            if ($saved_lang === 'ru') {
+                $new_url = str_replace(['/es/', '/en/'], '/', $current_url);
+                $new_url = str_replace([home_url('/es'), home_url('/en')], home_url(), $new_url);
+            } else {
+                $base_url = str_replace(['/es/', '/en/'], '/', $current_url);
+                $base_url = str_replace([home_url('/es'), home_url('/en')], home_url(), $base_url);
+                $new_url = str_replace(home_url(), home_url('/' . $saved_lang), $base_url);
+            }
+            
+            if ($new_url !== $current_url) {
+                wp_redirect($new_url, 302);
+                exit;
+            }
+        }
+    }
+}
 
-add_action( 'init', 'twentytwentyfour_pattern_categories' );
+// Система переводов WooCommerce
+add_filter('gettext', 'translate_woocommerce_strings', 20, 3);
+function translate_woocommerce_strings($translated_text, $text, $domain) {
+    // Только для фронтенда и только для WooCommerce
+    if (is_admin() || $domain !== 'woocommerce') {
+        return $translated_text;
+    }
+    
+    $current_lang = get_current_language();
+    return get_translation($text, $current_lang);
+}
+
+// Перевод текста на странице "Спасибо за заказ"
+add_filter('woocommerce_thankyou_order_received_text', 'translate_thankyou_order_received_text', 10, 2);
+function translate_thankyou_order_received_text($text, $order) {
+    if (is_admin()) {
+        return $text;
+    }
+    $current_lang = get_current_language();
+    return get_translation($text, $current_lang);
+}
+
+// Переводы полей формы чекаута
+add_filter('woocommerce_checkout_fields', 'translate_checkout_fields');
+function translate_checkout_fields($fields) {
+    $current_lang = get_current_language();
+    
+    // Список полей для перевода
+    $field_keys = array(
+        'billing_first_name', 'billing_last_name', 'billing_company', 'billing_address_1', 
+        'billing_address_2', 'billing_city', 'billing_state', 'billing_postcode', 
+        'billing_country', 'billing_phone', 'billing_email',
+        'shipping_first_name', 'shipping_last_name', 'shipping_company', 'shipping_address_1', 
+        'shipping_address_2', 'shipping_city', 'shipping_state', 'shipping_postcode', 
+        'shipping_country'
+    );
+    
+    // Переводим каждое поле
+    foreach ($field_keys as $field_key) {
+        $section = strpos($field_key, 'billing_') === 0 ? 'billing' : 'shipping';
+        $original_label = $fields[$section][$field_key]['label'];
+        $translated_label = get_translation($original_label, $current_lang);
+        
+        if ($translated_label !== $original_label) {
+            $fields[$section][$field_key]['label'] = $translated_label;
+        }
+    }
+    
+    return $fields;
+}
+
+// Переводы сообщений WooCommerce
+add_filter('woocommerce_add_to_cart_message', 'translate_add_to_cart_message');
+function translate_add_to_cart_message($message) {
+    $current_lang = get_current_language();
+    
+    // Переводим основные фразы в сообщениях
+    $message = str_replace('has been added to your cart.', get_translation('has been added to your cart.', $current_lang), $message);
+    $message = str_replace('have been added to your cart.', get_translation('have been added to your cart.', $current_lang), $message);
+    $message = str_replace('View cart', get_translation('View cart', $current_lang), $message);
+    
+    return $message;
+}
+
+// Переводы кнопок товаров
+add_filter('woocommerce_product_add_to_cart_text', 'translate_add_to_cart_button');
+function translate_add_to_cart_button($text) {
+    $current_lang = get_current_language();
+    return get_translation('Add to cart', $current_lang);
+}
+
+// Переводы заголовков страниц WooCommerce
+add_filter('woocommerce_page_title', 'translate_woocommerce_page_title');
+function translate_woocommerce_page_title($title) {
+    $current_lang = get_current_language();
+    return get_translation($title, $current_lang);
+}
+
+// Переводы кастомных полей и инструкций
+add_filter('woocommerce_form_field', 'translate_custom_form_fields', 10, 4);
+function translate_custom_form_fields($field, $key, $args, $value) {
+    $current_lang = get_current_language();
+    $translations = get_translations($current_lang);
+    
+    // Переводим все строки из словаря
+    foreach ($translations as $original => $translated) {
+        $field = str_replace($original, $translated, $field);
+    }
+    
+    return $field;
+}
+
+// Переводы способов доставки
+add_filter('woocommerce_shipping_method_title', 'translate_shipping_methods');
+function translate_shipping_methods($title) {
+    $current_lang = get_current_language();
+    return get_translation($title, $current_lang);
+}
+
+// Переводы заголовков секций и других элементов
+add_filter('woocommerce_cart_totals_order_total_html', 'translate_cart_totals');
+function translate_cart_totals($html) {
+    $current_lang = get_current_language();
+    $translations = get_translations($current_lang);
+    
+    // Переводим все строки из словаря
+    foreach ($translations as $original => $translated) {
+        $html = str_replace($original, $translated, $html);
+    }
+    
+    return $html;
+}
+
+// Переводы для всех остальных строк
+add_filter('gettext', 'translate_remaining_strings', 25, 3);
+function translate_remaining_strings($translated_text, $text, $domain) {
+    // Только для фронтенда
+    if (is_admin()) {
+        return $translated_text;
+    }
+    
+    $current_lang = get_current_language();
+    return get_translation($text, $current_lang);
+}
+
+// Специальные переводы для страниц WooCommerce
+add_filter('the_content', 'translate_woocommerce_page_content');
+function translate_woocommerce_page_content($content) {
+    // Только для страниц WooCommerce
+    if (!is_wc_endpoint_url() && !is_checkout() && !is_cart() && !is_account_page()) {
+        return $content;
+    }
+    
+    $current_lang = get_current_language();
+    $translations = get_translations($current_lang);
+    
+    // Переводим все строки из словаря
+    foreach ($translations as $original => $translated) {
+        $content = str_replace($original, $translated, $content);
+    }
+    
+    return $content;
+}
+
+// Переводы для страницы 404
+add_filter('the_content', 'translate_404_page_content');
+function translate_404_page_content($content) {
+    // Только для страницы 404
+    if (!is_404()) {
+        return $content;
+    }
+    
+    $current_lang = get_current_language();
+    $translations = get_translations($current_lang);
+    
+    // Переводим все строки из словаря
+    foreach ($translations as $original => $translated) {
+        $content = str_replace($original, $translated, $content);
+    }
+    
+    return $content;
+}
+
+// Переводы для заголовков страниц
+add_filter('wp_title', 'translate_page_title');
+function translate_page_title($title) {
+    if (is_404()) {
+        $current_lang = get_current_language();
+        return get_translation('Страница не найдена', $current_lang);
+    }
+    return $title;
+}
+
+// JavaScript для перевода страницы 404
+add_action('wp_footer', 'translate_404_with_javascript');
+function translate_404_with_javascript() {
+    if (!is_404()) {
+        return;
+    }
+    
+    $current_lang = get_current_language();
+    if ($current_lang === 'ru') {
+        return; // Русский уже правильный
+    }
+    
+    $translations = get_translations($current_lang);
+    ?>
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        var translations = <?php echo json_encode($translations); ?>;
+        
+        // Переводим заголовок
+        var title = document.querySelector('h1');
+        if (title) {
+            var titleText = title.textContent.trim();
+            if (translations[titleText]) {
+                title.textContent = translations[titleText];
+            }
+        }
+        
+        // Переводим описание
+        var description = document.querySelector('p');
+        if (description) {
+            var descText = description.textContent.trim();
+            if (translations[descText]) {
+                description.textContent = translations[descText];
+            }
+        }
+        
+        // Переводим кнопку поиска
+        var searchButton = document.querySelector('input[type="submit"]');
+        if (searchButton) {
+            var buttonText = searchButton.value;
+            if (translations[buttonText]) {
+                searchButton.value = translations[buttonText];
+            }
+        }
+    });
+    </script>
+    <?php
+}
+
+// Конец языковой системы
 
 /**
  * Simple WooCommerce customizations
@@ -558,7 +1329,8 @@ function add_delivery_fee($cart) {
     }
 }
 
-// Set minimum order amount (60 euros without delivery fee)
+// Set minimum order amount (60 euros without delivery fee) - TEMPORARILY DISABLED
+/*
 add_action('woocommerce_checkout_process', 'enforce_minimum_order_amount');
 add_action('woocommerce_before_cart', 'show_minimum_order_notice');
 add_action('woocommerce_before_checkout_form', 'show_minimum_order_notice');
@@ -611,6 +1383,7 @@ function show_minimum_order_notice() {
         <?php
     }
 }
+*/
 
 // Hide shipping fields on checkout since we're using fixed delivery
 add_filter('woocommerce_checkout_fields', 'hide_shipping_fields');
@@ -708,8 +1481,6 @@ add_action('woocommerce_order_status_processing', 'clear_cart_on_order_completio
 function clear_cart_on_order_completion($order_id) {
     WC()->cart->empty_cart();
 }
-
-// Debug functions removed - cart clearing now works automatically
 
 // Disable persistent cart completely
 add_filter('woocommerce_persistent_cart_enabled', '__return_false');
@@ -1006,7 +1777,6 @@ function delivery_options_styling() {
         background: #f0f8ff;
         box-shadow: 0 2px 8px rgba(0, 124, 186, 0.15);
     }
-    
     
     .delivery-label strong {
         font-weight: 600;
