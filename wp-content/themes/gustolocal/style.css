@@ -1708,3 +1708,8 @@ main.gl-container > .wp-block-group {
   border-radius: 999px;
   padding: 6px 12px;
 }
+
+/* Hide automatic page title on all pages - use title from content instead */
+.wp-block-post-title {
+  display: none !important;
+}

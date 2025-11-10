@@ -4,7 +4,7 @@
  */
 
 if ( ! defined( 'GUSTOLOCAL_VERSION' ) ) {
-    define( 'GUSTOLOCAL_VERSION', '0.5.2' );
+    define( 'GUSTOLOCAL_VERSION', '0.5.3' );
 }
 
 add_action( 'after_setup_theme', function () {
