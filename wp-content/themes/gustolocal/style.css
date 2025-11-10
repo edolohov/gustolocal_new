@@ -623,8 +623,8 @@ main.gl-container > .wp-block-group {
     grid-column: 2;
     flex-shrink: 1; /* Allow it to shrink if needed */
     align-items: center;
-    justify-content: flex-start !important;
-    padding-left: 12px !important; /* Increased padding to detach from logo */
+    justify-content: center !important; /* Center the title in its column */
+    padding: 0 !important; /* Remove padding to allow proper centering */
     min-width: 0; /* Allow text truncation if needed */
     white-space: nowrap; /* Prevent title from wrapping */
     overflow: hidden; /* Hide overflow if too long */
