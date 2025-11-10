@@ -833,6 +833,27 @@ main.gl-container > .wp-block-group {
     opacity: 1 !important;
     width: 100% !important;
     height: 100% !important;
+    min-height: 100vh !important;
+  }
+
+  /* Force all list items to be visible and have proper dimensions */
+  .gl-navigation.is-open .wp-block-navigation-item {
+    width: 100% !important;
+    min-width: 100% !important;
+    display: list-item !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    height: auto !important;
+    min-height: 44px !important;
+  }
+
+  /* Ensure links are visible */
+  .gl-navigation.is-open .wp-block-navigation-item a {
+    display: block !important;
+    width: 100% !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    color: var(--gl-color-text) !important;
   }
 
   /* Prevent body scroll when menu is open */
@@ -844,9 +865,15 @@ main.gl-container > .wp-block-group {
     display: flex !important;
     flex-direction: column !important;
     gap: 0 !important;
-    list-style: none;
-    padding: 0;
-    margin: 0;
+    list-style: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    min-width: 200px !important;
+    height: auto !important;
+    min-height: 200px !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
 
   .gl-navigation.is-open .wp-block-navigation-item {
@@ -859,11 +886,20 @@ main.gl-container > .wp-block-group {
   }
 
   .gl-navigation.is-open .wp-block-navigation-item__content {
-    display: block;
-    padding: var(--gl-spacing-md) 0;
-    font-size: 1rem;
-    color: var(--gl-color-text);
-    text-decoration: none;
+    display: block !important;
+    padding: var(--gl-spacing-md) 0 !important;
+    font-size: 1rem !important;
+    color: var(--gl-color-text) !important;
+    text-decoration: none !important;
+    width: 100% !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+
+  .gl-navigation.is-open .wp-block-navigation-item__label {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
 
   .gl-navigation ul {
