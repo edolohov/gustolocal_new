@@ -600,7 +600,7 @@ main.gl-container > .wp-block-group {
   .gl-navbar,
   .gl-navbar.is-layout-flex {
     display: grid !important;
-    grid-template-columns: 56px 1fr 40px 40px !important; /* Logo, spacer, toggle, cart */
+    grid-template-columns: 56px auto 1fr 40px 40px !important; /* Logo, title, spacer, toggle, cart */
     grid-auto-flow: row !important;
     padding: var(--gl-spacing-xs) 0;
     min-height: 64px;
@@ -619,17 +619,17 @@ main.gl-container > .wp-block-group {
   }
 
   .gl-navbar__title {
-    display: none !important;
-    grid-column: none !important;
-    grid-row: none !important;
-    position: absolute !important;
-    width: 0 !important;
-    height: 0 !important;
-    opacity: 0;
+    display: flex !important;
+    grid-column: 2;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: flex-start;
+    padding-left: 8px;
+    min-width: 0; /* Allow text truncation if needed */
   }
 
   .gl-mobile-toggle {
-    grid-column: 3;
+    grid-column: 4;
     flex-shrink: 0;
     width: 40px !important;
     min-width: 40px !important;
@@ -637,7 +637,7 @@ main.gl-container > .wp-block-group {
   }
 
   .gl-navbar__actions {
-    grid-column: 4;
+    grid-column: 5;
     flex-shrink: 0;
     width: 40px !important;
     min-width: 40px !important;
