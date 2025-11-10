@@ -72,6 +72,9 @@
     
     // Force show/hide WordPress navigation container
     const wpContainer = target.querySelector('.wp-block-navigation__responsive-container');
+    const wpDialog = target.querySelector('.wp-block-navigation__responsive-dialog');
+    const wpContent = target.querySelector('.wp-block-navigation__responsive-container-content');
+    
     if (wpContainer) {
       if (isNowOpen) {
         // Force show container when menu is open
@@ -79,12 +82,35 @@
         wpContainer.style.visibility = 'visible';
         wpContainer.style.opacity = '1';
         wpContainer.classList.add('is-menu-open', 'has-modal-open');
+        
+        // Also show dialog and content
+        if (wpDialog) {
+          wpDialog.style.display = 'block';
+          wpDialog.style.visibility = 'visible';
+          wpDialog.style.opacity = '1';
+        }
+        if (wpContent) {
+          wpContent.style.display = 'block';
+          wpContent.style.visibility = 'visible';
+          wpContent.style.opacity = '1';
+        }
       } else {
         // Force hide container when menu is closed
         wpContainer.style.display = 'none';
         wpContainer.style.visibility = 'hidden';
         wpContainer.style.opacity = '0';
         wpContainer.classList.remove('is-menu-open', 'has-modal-open');
+        
+        if (wpDialog) {
+          wpDialog.style.display = 'none';
+          wpDialog.style.visibility = 'hidden';
+          wpDialog.style.opacity = '0';
+        }
+        if (wpContent) {
+          wpContent.style.display = 'none';
+          wpContent.style.visibility = 'hidden';
+          wpContent.style.opacity = '0';
+        }
       }
     }
     

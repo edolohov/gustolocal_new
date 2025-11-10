@@ -805,6 +805,19 @@ main.gl-container > .wp-block-group {
     padding: var(--gl-spacing-lg) var(--gl-spacing-md) !important;
     box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1) !important;
     overflow-y: auto !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 1001 !important;
+  }
+
+  /* Ensure content inside dialog is visible */
+  .gl-navigation.is-open .wp-block-navigation__responsive-container-content {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 100% !important;
+    height: 100% !important;
   }
 
   /* Prevent body scroll when menu is open */
