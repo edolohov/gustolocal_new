@@ -31,10 +31,12 @@
 
   // Mobile navigation toggle - use event delegation for reliability
   function handleToggleClick(event) {
+    console.log('Toggle clicked!', event);
     event.preventDefault();
     event.stopPropagation();
     
     const toggle = event.currentTarget;
+    console.log('Toggle element:', toggle);
     
     // Try to find navigation by class first (more reliable)
     let target = document.querySelector('.gl-navigation');
@@ -104,12 +106,15 @@
 
   // Attach event listeners when DOM is ready
   function initNavigation() {
+    console.log('Initializing navigation...');
     const toggles = document.querySelectorAll('[data-gl-mobile-toggle]');
+    console.log('Found toggles:', toggles.length);
     
     toggles.forEach(function(toggle) {
+      console.log('Attaching listener to toggle:', toggle);
       // Remove any existing listeners
       toggle.removeEventListener('click', handleToggleClick);
-      // Add new listener
+      // Add new listener with capture phase
       toggle.addEventListener('click', handleToggleClick, true);
     });
   }
@@ -123,6 +128,8 @@
 
   // Also initialize after a short delay to catch dynamically added elements
   setTimeout(initNavigation, 100);
+  setTimeout(initNavigation, 500);
+  setTimeout(initNavigation, 1000);
 
   // Close navigation when clicking outside or on overlay
   document.addEventListener('click', function(event) {
