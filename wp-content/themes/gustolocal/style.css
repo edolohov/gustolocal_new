@@ -790,8 +790,10 @@ main.gl-container > .wp-block-group {
     bottom: 0 !important;
     z-index: 1000 !important;
     background: rgba(0, 0, 0, 0.5) !important;
-    width: 100% !important;
-    height: 100% !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    min-width: 100vw !important;
+    min-height: 100vh !important;
   }
 
   .gl-navigation.is-open .wp-block-navigation__responsive-dialog {
@@ -809,10 +811,23 @@ main.gl-container > .wp-block-group {
     visibility: visible !important;
     opacity: 1 !important;
     z-index: 1001 !important;
+    min-width: 200px !important;
+    min-height: 100vh !important;
   }
 
   /* Ensure content inside dialog is visible */
   .gl-navigation.is-open .wp-block-navigation__responsive-container-content {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    width: 100% !important;
+    height: auto !important;
+    min-height: 200px !important;
+  }
+
+  /* Ensure responsive-close container doesn't hide content */
+  .gl-navigation.is-open .wp-block-navigation__responsive-close {
+    position: relative !important;
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
