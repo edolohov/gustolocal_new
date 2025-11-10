@@ -68,19 +68,29 @@
     console.log('Menu toggled. is-open:', isNowOpen, 'Navigation element:', target);
     toggle.setAttribute('aria-expanded', isNowOpen);
     
+    // Force show/hide WordPress navigation container
+    const wpContainer = target.querySelector('.wp-block-navigation__responsive-container');
+    if (wpContainer) {
+      if (isNowOpen) {
+        // Force show container when menu is open
+        wpContainer.style.display = 'block';
+        wpContainer.style.visibility = 'visible';
+        wpContainer.style.opacity = '1';
+        wpContainer.classList.add('is-menu-open', 'has-modal-open');
+      } else {
+        // Force hide container when menu is closed
+        wpContainer.style.display = 'none';
+        wpContainer.style.visibility = 'hidden';
+        wpContainer.style.opacity = '0';
+        wpContainer.classList.remove('is-menu-open', 'has-modal-open');
+      }
+    }
+    
     // Prevent body scroll when menu is open
-    if (!isExpanded) {
+    if (isNowOpen) {
       document.body.style.overflow = 'hidden';
     } else {
       document.body.style.overflow = '';
-    }
-    
-    // Close WordPress navigation block's own menu state when closing
-    if (isExpanded) {
-      const wpContainer = target.querySelector('.wp-block-navigation__responsive-container');
-      if (wpContainer) {
-        wpContainer.classList.remove('is-menu-open', 'has-modal-open');
-      }
     }
     
     // Update button icon
