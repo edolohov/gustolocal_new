@@ -408,34 +408,29 @@
       });
     });
 
-    // qty - используем делегирование событий для лучшей производительности
-    root.addEventListener('click', function(e){
-      var t = e.target;
-      if (t.classList.contains('wmb-qty-inc')) {
-        e.preventDefault();
-        changeQty(t.dataset.id, +1, root);
-        updateSummary();
-      } else if (t.classList.contains('wmb-qty-dec')) {
-        e.preventDefault();
-        changeQty(t.dataset.id, -1, root);
-        updateSummary();
-      }
-    });
+    // Используем один глобальный обработчик для всех кликов (делегирование событий)
+    // Это предотвращает дублирование обработчиков при каждом render()
 
-    // состав и аллергены - делегирование событий
-    root.addEventListener('click', function(e){
-      var t = e.target;
-      if (t.classList.contains('wmb-ing-btn')) {
+    // Кнопки checkout - используем делегирование через глобальный обработчик
+    // delivery передается через замыкание в onCheckout
+    var checkoutBtn = el('#wmb-checkout', root);
+    var checkoutBtnMobile = el('#wmb-checkout-mobile', document);
+    if (checkoutBtn) {
+      checkoutBtn.setAttribute('data-delivery', JSON.stringify(delivery));
+      checkoutBtn.addEventListener('click', function(e){
         e.preventDefault();
-        openIngredientsFor(t.getAttribute('data-id'));
-      } else if (t.classList.contains('wmb-allergens-btn')) {
+        e.stopPropagation();
+        onCheckout(delivery);
+      });
+    }
+    if (checkoutBtnMobile) {
+      checkoutBtnMobile.setAttribute('data-delivery', JSON.stringify(delivery));
+      checkoutBtnMobile.addEventListener('click', function(e){
         e.preventDefault();
-        openAllergensFor(t.getAttribute('data-id'));
-      }
-    });
-
-    var btn = el('#wmb-checkout', root); if (btn) btn.addEventListener('click', function(){ onCheckout(delivery); });
-    var btnm = el('#wmb-checkout-mobile', document); if (btnm) btnm.addEventListener('click', function(){ onCheckout(delivery); });
+        e.stopPropagation();
+        onCheckout(delivery);
+      });
+    }
   }
 
   function renderSection(section){
@@ -674,6 +669,39 @@
     render(root);
     setupDesktopSticky(root);
   }
+
+  // Глобальный обработчик событий для делегирования (один раз, не дублируется)
+  var globalClickHandler = function(e){
+    var t = e.target;
+    var root = document.getElementById('meal-builder-root');
+    if (!root) return;
+    
+    // Кнопки количества
+    if (t.classList.contains('wmb-qty-inc')) {
+      e.preventDefault();
+      e.stopPropagation();
+      changeQty(t.dataset.id, +1, root);
+      updateSummary();
+    } else if (t.classList.contains('wmb-qty-dec')) {
+      e.preventDefault();
+      e.stopPropagation();
+      changeQty(t.dataset.id, -1, root);
+      updateSummary();
+    }
+    // Кнопки состава и аллергенов
+    else if (t.classList.contains('wmb-ing-btn')) {
+      e.preventDefault();
+      e.stopPropagation();
+      openIngredientsFor(t.getAttribute('data-id'));
+    } else if (t.classList.contains('wmb-allergens-btn')) {
+      e.preventDefault();
+      e.stopPropagation();
+      openAllergensFor(t.getAttribute('data-id'));
+    }
+  };
+  
+  // Добавляем обработчик один раз на document
+  document.addEventListener('click', globalClickHandler, true);
 
   // Запускаем сразу, если DOM уже готов, иначе ждем DOMContentLoaded
   if (document.readyState === 'loading') {
