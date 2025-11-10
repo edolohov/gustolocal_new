@@ -64,7 +64,7 @@ canvas {
 }
 
 .wp-site-blocks > * + * {
-  margin-top: var(--gl-spacing-xl);
+  margin-top: var(--gl-spacing-md); /* Reduced from xl to md for tighter spacing */
 }
 
 .gl-container {
@@ -846,14 +846,14 @@ main.gl-container > .wp-block-group {
 
 /* Homepage specific styles */
 .gl-home-section {
-  padding: var(--gl-spacing-2xl) 0;
+  padding: var(--gl-spacing-lg) 0 var(--gl-spacing-xl) 0; /* Reduced top padding, keep bottom */
 }
 
 .gl-home-section h1 {
   font-size: clamp(2rem, 1.5rem + 2vw, 2.75rem);
   line-height: 1.12;
   letter-spacing: 0.01em;
-  margin: 0 0 var(--gl-spacing-md);
+  margin: 0 0 var(--gl-spacing-sm); /* Reduced bottom margin */
   font-weight: 700;
 }
 
@@ -866,7 +866,7 @@ main.gl-container > .wp-block-group {
 .gl-home-section h2 {
   font-size: clamp(1.5rem, 1.3rem + 1vw, 1.75rem);
   line-height: 1.25;
-  margin: var(--gl-spacing-xl) 0 var(--gl-spacing-lg);
+  margin: var(--gl-spacing-lg) 0 var(--gl-spacing-md); /* Reduced top and bottom margins */
   font-weight: 700;
   letter-spacing: 0.01em;
 }
@@ -874,7 +874,7 @@ main.gl-container > .wp-block-group {
 .gl-home-section .gl-lead {
   font-size: clamp(1rem, 0.95rem + 0.3vw, 1.125rem);
   color: #1f2937;
-  margin: var(--gl-spacing-sm) 0 var(--gl-spacing-lg);
+  margin: var(--gl-spacing-xs) 0 var(--gl-spacing-md); /* Reduced margins */
   line-height: 1.6;
 }
 
@@ -882,7 +882,7 @@ main.gl-container > .wp-block-group {
   display: flex;
   flex-wrap: wrap;
   gap: var(--gl-spacing-sm);
-  margin: var(--gl-spacing-md) 0;
+  margin: var(--gl-spacing-sm) 0; /* Reduced margin */
 }
 
 .gl-badge {
@@ -906,7 +906,7 @@ main.gl-container > .wp-block-group {
   display: flex;
   gap: var(--gl-spacing-sm);
   flex-wrap: wrap;
-  margin: var(--gl-spacing-lg) 0;
+  margin: var(--gl-spacing-md) 0; /* Reduced margin */
 }
 
 .gl-button {
