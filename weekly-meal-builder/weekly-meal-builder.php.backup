@@ -2,13 +2,14 @@
 /**
  * Plugin Name: Weekly Meal Builder
  * Description: Конструктор рационов для WooCommerce: админка (быстрый ввод, инлайн-редактирование, массовые действия, импорт CSV) + фронт с дедлайнами доставки (Вт/Пт), модалкой «Состав» и аллергенами.
- * Version: 2.0.0
+ * Version: 1.8.0
  * Author: Vikey
  */
 
 if (!defined('ABSPATH')) exit;
 
-define('WMB_VERSION', '2.0.0');
+define('WMB_VERSION', '1.8.0');
+// Restore stable product ID used in production
 if (!defined('WMB_PRODUCT_ID')) define('WMB_PRODUCT_ID', 299);
 
 /* ---------- assets ---------- */
@@ -22,15 +23,16 @@ function wmb_default_settings(){
   if (!$tz) { $offset = (float) get_option('gmt_offset'); $tz = $offset ? 'UTC'.($offset>=0?'+':'').$offset : 'UTC'; }
 
   return [
+    // Поле description более не используется; текст добавляется через редактор страницы
     'description' => '',
     'delivery' => [
       'tuesday' => [
         'enabled'  => true,
-        'deadline' => ['dow' => 0, 'time' => '14:00'],
+        'deadline' => ['dow' => 0, 'time' => '14:00'], // Вс 14:00
       ],
       'friday' => [
         'enabled'  => true,
-        'deadline' => ['dow' => 3, 'time' => '14:00'],
+        'deadline' => ['dow' => 3, 'time' => '14:00'], // Ср 14:00
       ],
       'timezone' => $tz,
       'blackout' => [],
@@ -63,6 +65,8 @@ add_action('admin_menu', function(){
   add_submenu_page('wmb_root','Очистить блюда (hard delete)','Очистить блюда (hard delete)','manage_options','wmb_purge','wmb_page_purge');
 });
 function wmb_page_root(){ echo '<div class="wrap"><h1>Meal Builder</h1><p>Выберите раздел слева.</p></div>'; }
+
+// (Временно удалено) Страница "Кухня" будет добавлена в следующем релизе
 
 /* ---------- CPT + tax ---------- */
 add_action('init', function(){
@@ -121,7 +125,7 @@ function wmb_page_items(){
       $ids = array_map('intval', $_POST['ids']);
       if ($_POST['bulk_action']==='activate'){ foreach($ids as $id) update_post_meta($id,'wmb_active','1'); }
       elseif ($_POST['bulk_action']==='deactivate'){ foreach($ids as $id) update_post_meta($id,'wmb_active','0'); }
-      elseif ($_POST['bulk_action']==='delete'){ foreach($ids as $id) wp_delete_post($id, true); }
+      elseif ($_POST['bulk_action']==='delete'){ foreach($ids as $id) wp_delete_post($id, true); } // жесткое удаление
       echo '<div class="updated notice"><p>Массовое действие выполнено.</p></div>';
     }
     if (!empty($_POST['row']) && is_array($_POST['row'])){
@@ -216,6 +220,8 @@ function wmb_page_items(){
   echo '<button class="button">Применить</button>';
   echo '</div>';
 
+  
+  /* --- компактная таблица со складным блоком --- */
   echo '<style>
     .wmb-admin .more-cell{ width:70px; text-align:center }
     .wmb-admin .more-btn{ padding:4px 10px; border:1px solid #dcdcde; background:#fff; border-radius:6px; cursor:pointer }
@@ -252,6 +258,7 @@ function wmb_page_items(){
       echo '<td class="more-cell"><button type="button" class="more-btn" data-target="wmb-more-'.$id.'">✎</button></td>';
     echo '</tr>';
 
+    // складной блок на всю ширину
     echo '<tr id="wmb-more-'.$id.'" class="wmb-more-row" style="display:none">';
       echo '<td colspan="8">';
         echo '<div class="more-grid">';
@@ -264,6 +271,7 @@ function wmb_page_items(){
 
   echo '</tbody></table>';
 
+  // JS: раскрытие + авто-высота текстовых областей
   echo '<script>
     (function(){
       const $ = document.querySelector.bind(document);
@@ -286,11 +294,13 @@ function wmb_page_items(){
     })();
   </script>';
 
+
+
   echo '<p><button class="button button-primary">Сохранить изменения</button></p>';
   echo '</form></div>';
 }
 
-/* ---------- Import CSV ---------- */
+/* ---------- Import CSV (Название,Цена,Единица,Категория,Теги,Состав,Аллергены,Активно) ---------- */
 function wmb_page_import(){
   if (!current_user_can('manage_options')) return;
 
@@ -362,7 +372,7 @@ function wmb_page_import(){
   echo '</form></div>';
 }
 
-/* ---------- Settings page ---------- */
+/* ---------- Settings page (описание + доставка) ---------- */
 function wmb_page_settings(){
   if (!current_user_can('manage_options')) return;
 
@@ -370,31 +380,43 @@ function wmb_page_settings(){
   $delivery = $settings['delivery'];
 
   if (!empty($_POST['wmb_settings_nonce']) && wp_verify_nonce($_POST['wmb_settings_nonce'],'wmb_settings_save')){
+
     $delivery['tuesday']['enabled']  = !empty($_POST['wmb_del_tue_enabled']);
     $delivery['friday']['enabled']   = !empty($_POST['wmb_del_fri_enabled']);
+
     $delivery['tuesday']['deadline']['dow']  = intval($_POST['wmb_del_tue_dow'] ?? 0);
     $delivery['tuesday']['deadline']['time'] = sanitize_text_field($_POST['wmb_del_tue_time'] ?? '14:00');
     $delivery['friday']['deadline']['dow']   = intval($_POST['wmb_del_fri_dow'] ?? 3);
     $delivery['friday']['deadline']['time']  = sanitize_text_field($_POST['wmb_del_fri_time'] ?? '14:00');
+
     $delivery['timezone'] = sanitize_text_field($_POST['wmb_del_tz'] ?? $delivery['timezone']);
     $delivery['banner']   = sanitize_text_field($_POST['wmb_del_banner'] ?? $delivery['banner']);
+
     $blackout = trim((string)($_POST['wmb_del_blackout'] ?? ''));
     $delivery['blackout'] = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $blackout))));
+
+    // description удалено из настроек, вводится через редактор страницы
     $settings['delivery'] = $delivery;
+
     update_option('wmb_menu_json', wp_json_encode($settings, JSON_UNESCAPED_UNICODE));
     $saved=true;
   }
 
-  $dow_opts = [0=>'Воскресенье',1=>'Понедельник',2=>'Вторник',3=>'Среда',4=>'Четверг',5=>'Пятница',6=>'Суббота'];
+  $dow_opts = [
+    0=>'Воскресенье',1=>'Понедельник',2=>'Вторник',3=>'Среда',4=>'Четверг',5=>'Пятница',6=>'Суббота'
+  ];
 
   echo '<div class="wrap"><h1>Настройки конструктора</h1>';
   if ($saved) echo '<div class="updated notice"><p>Сохранено.</p></div>';
   echo '<form method="post" style="max-width:980px">';
   wp_nonce_field('wmb_settings_save','wmb_settings_nonce');
 
+  // Блок «Описание» удалён. Текст на странице добавляйте через редактор страницы.
+
   echo '<h2 style="margin-top:24px">Доставка</h2>';
   echo '<table class="form-table" role="presentation"><tbody>';
 
+  // Tuesday
   echo '<tr><th scope="row">Вторник</th><td>';
     echo '<label><input type="checkbox" name="wmb_del_tue_enabled" value="1" '.checked(!empty($delivery['tuesday']['enabled']),true,false).'> включено</label><br>';
     echo '<label>Дедлайн (день недели + время): ';
@@ -408,6 +430,7 @@ function wmb_page_settings(){
     echo '</label>';
   echo '</td></tr>';
 
+  // Friday
   echo '<tr><th scope="row">Пятница</th><td>';
     echo '<label><input type="checkbox" name="wmb_del_fri_enabled" value="1" '.checked(!empty($delivery['friday']['enabled']),true,false).'> включено</label><br>';
     echo '<label>Дедлайн (день недели + время): ';
@@ -421,16 +444,18 @@ function wmb_page_settings(){
     echo '</label>';
   echo '</td></tr>';
 
+  // TZ + banner + blackout
   echo '<tr><th scope="row"><label for="wmb_del_tz">Часовой пояс</label></th><td><input type="text" id="wmb_del_tz" name="wmb_del_tz" class="regular-text" value="'.esc_attr($delivery['timezone']).'"> <span class="description">По умолчанию берётся из настроек WordPress</span></td></tr>';
   echo '<tr><th scope="row"><label for="wmb_del_banner">Текст баннера</label></th><td><input type="text" id="wmb_del_banner" name="wmb_del_banner" class="regular-text" style="width:100%" value="'.esc_attr($delivery['banner']).'"><p class="description">Плейсхолдеры: {delivery_date}, {weekday}, {weekday_short}, {deadline}, {countdown}</p></td></tr>';
   echo '<tr><th scope="row"><label for="wmb_del_blackout">Нерабочие даты</label></th><td><textarea id="wmb_del_blackout" name="wmb_del_blackout" rows="4" class="large-text" placeholder="YYYY-MM-DD по одной на строку">'.esc_textarea(implode("\n",$delivery['blackout'])).'</textarea></td></tr>';
 
   echo '</tbody></table>';
+
   echo '<p><button class="button button-primary">Сохранить</button></p>';
   echo '</form></div>';
 }
 
-/* ---------- ПУРЖ ---------- */
+/* ---------- ПУРЖ: жестко удалить все блюда ---------- */
 function wmb_page_purge(){
   if (!current_user_can('manage_options')) return;
   $deleted = null;
@@ -450,13 +475,15 @@ function wmb_page_purge(){
   echo '</form></div>';
 }
 
-/* ---------- REST: /wmb/v1/menu ---------- */
+/* ---------- REST: /wmb/v1/menu (ingredients + allergens) ---------- */
 add_action('rest_api_init', function () {
   register_rest_route('wmb/v1', '/menu', [
     'methods'             => 'GET',
     'permission_callback' => '__return_true',
     'callback'            => function () {
+
       $settings = wmb_get_settings();
+
       $posts = get_posts([
         'post_type'   => 'wmb_dish',
         'numberposts' => -1,
@@ -495,27 +522,32 @@ add_action('rest_api_init', function () {
         $out_sections[] = ['title' => $title, 'items' => $items];
       }
 
-      $hard_order = [
-        'Паста ручной работы',
-        'Авторские сэндвичи',
-        'Основные блюда - мясо, птица, рыба (сувид)',
-        'Гарниры и зелень',
-        'Завтраки и сладкое',
-        'Супы и крем-супы',
-        'Для запаса / в морозильник',
-      ];
 
-      $index = array_map('mb_strtolower', $hard_order);
-      usort($out_sections, function($a, $b) use ($index) {
-        $ai = array_search(mb_strtolower($a['title']), $index);
-        $bi = array_search(mb_strtolower($b['title']), $index);
-        $ai = ($ai === false) ? PHP_INT_MAX : $ai;
-        $bi = ($bi === false) ? PHP_INT_MAX : $bi;
-        if ($ai === $bi) return strcmp($a['title'], $b['title']);
-        return $ai - $bi;
-      });
+// ЖЁСТКИЙ ПОРЯДОК СЕКЦИЙ (по названиям). Всё, что не попало — в конец, по алфавиту.
+$hard_order = [
+  'Паста ручной работы',
+  'Авторские сэндвичи',
+  'Основные блюда - мясо, птица, рыба (сувид)',
+  'Гарниры и зелень',
+  'Завтраки и сладкое',
+  'Супы и крем-супы',
+  'Для запаса / в морозильник',
+];
+
+
+$index = array_map('mb_strtolower', $hard_order);
+usort($out_sections, function($a, $b) use ($index) {
+  $ai = array_search(mb_strtolower($a['title']), $index);
+  $bi = array_search(mb_strtolower($b['title']), $index);
+  $ai = ($ai === false) ? PHP_INT_MAX : $ai;
+  $bi = ($bi === false) ? PHP_INT_MAX : $bi;
+  if ($ai === $bi) return strcmp($a['title'], $b['title']); // одинаковый приоритет — по алфавиту
+  return $ai - $bi;
+});
+
 
       return rest_ensure_response([
+        // description исключён — текст выводится через редактор страницы
         'description'     => '',
         'delivery_config' => $settings['delivery'],
         'delivery_slots'  => [],
@@ -526,33 +558,31 @@ add_action('rest_api_init', function () {
   ]);
 });
 
-/* ---------- Shortcode с оптимизацией производительности ---------- */
+/* ---------- Shortcode ---------- */
 add_shortcode('meal_builder', function(){
-  $menu_url = esc_url_raw(rest_url('wmb/v1/menu'));
-  $ajax_url = admin_url('admin-ajax.php');
-  $nonce = wp_create_nonce('wmb');
-  $product_id = (int)WMB_PRODUCT_ID;
-  
-  // Предзагрузка данных через <link rel="preload">
-  add_action('wp_head', function() use ($menu_url) {
-    echo '<link rel="preload" as="fetch" href="'.esc_url($menu_url).'" crossorigin="anonymous">'."\n";
-  }, 1);
-  
-  // Загружаем CSS и JS
   wp_enqueue_style('wmb-style', wmb_assets_url('wmb.css'), [], wmb_file_ver('wmb.css'));
   wp_register_script('wmb-app', wmb_assets_url('wmb.js'), [], wmb_file_ver('wmb.js'), true);
   wp_localize_script('wmb-app','WMB',[
-    'ajax_url'=>$ajax_url,
-    'nonce'=>$nonce,
-    'product_id'=>$product_id,
-    'menu_url'=>$menu_url,
+    'ajax_url'=>admin_url('admin-ajax.php'),
+    'nonce'=>wp_create_nonce('wmb'),
+    'product_id'=>(int)WMB_PRODUCT_ID,
+    'menu_url'=>esc_url_raw(rest_url('wmb/v1/menu')),
   ]);
   wp_enqueue_script('wmb-app');
-  
-  return '<div id="meal-builder-root"><div class="wmb-loading">Загрузка меню…</div></div>';
+  return '<div id="meal-builder-root"></div>';
 });
 
-/* ---------- AJAX handlers ---------- */
+// Global tweak for WooCommerce cart/checkout tables on mobile: avoid horizontal scroll
+add_action('wp_enqueue_scripts', function(){
+  if (function_exists('is_cart') && (is_cart() || is_checkout())){
+    $css = 'html,body{overflow-x:hidden} .woocommerce .cart, .woocommerce table.shop_table{table-layout:fixed; width:100%} .woocommerce table.shop_table td, .woocommerce table.shop_table th{word-wrap:break-word;white-space:normal}';
+    wp_register_style('wmb-cart-fix', false);
+    wp_enqueue_style('wmb-cart-fix');
+    wp_add_inline_style('wmb-cart-fix', $css);
+  }
+}, 100);
+
+/* ---------- AJAX add to cart ---------- */
 add_action('wp_ajax_wmb_add_to_cart','wmb_ajax_add_to_cart');
 add_action('wp_ajax_wmb_get_cart_contents','wmb_ajax_get_cart_contents');
 add_action('wp_ajax_wmb_remove_cart_item','wmb_ajax_remove_cart_item');
@@ -563,11 +593,14 @@ add_action('wp_ajax_nopriv_wmb_remove_cart_item','wmb_ajax_remove_cart_item');
 function wmb_ajax_get_cart_contents(){
   if(!function_exists('WC')) wp_send_json_error('WooCommerce не активирован.');
   check_ajax_referer('wmb','nonce');
+  
   $cart = WC()->cart;
   $items = [];
+  
   foreach($cart->get_cart() as $cart_item_key => $cart_item) {
     $product = $cart_item['data'];
     $wmb_payload = isset($cart_item['wmb_payload']) ? $cart_item['wmb_payload'] : '';
+    
     $items[] = [
       'key' => $cart_item_key,
       'product_id' => $product->get_id(),
@@ -575,30 +608,90 @@ function wmb_ajax_get_cart_contents(){
       'wmb_payload' => $wmb_payload
     ];
   }
+  
   wp_send_json_success(['items' => $items]);
 }
 
 function wmb_ajax_remove_cart_item(){
   if(!function_exists('WC')) wp_send_json_error('WooCommerce не активирован.');
   check_ajax_referer('wmb','nonce');
+  
   $cart_item_key = isset($_POST['cart_item_key']) ? sanitize_text_field($_POST['cart_item_key']) : '';
   if(empty($cart_item_key)) wp_send_json_error('Неверные данные.');
+  
   $removed = WC()->cart->remove_cart_item($cart_item_key);
   if(!$removed) wp_send_json_error('Не удалось удалить товар из корзины.');
+  
   wp_send_json_success(['message' => 'Товар удален из корзины']);
+}
+
+
+// Хук для отображения деталей товара в корзине с полной информацией
+add_filter('woocommerce_cart_item_name', 'wmb_display_cart_item_details', 10, 3);
+function wmb_display_cart_item_details($name, $cart_item, $cart_item_key) {
+  if (isset($cart_item['wmb_payload'])) {
+    $payload = json_decode($cart_item['wmb_payload'], true);
+    if ($payload && isset($payload['items_list']) && is_array($payload['items_list'])) {
+      $details = [];
+      foreach ($payload['items_list'] as $item) {
+        if (isset($item['qty']) && $item['qty'] > 0) {
+          $item_name = isset($item['name']) ? $item['name'] : 'Неизвестное блюдо';
+          $item_unit = isset($item['unit']) ? $item['unit'] : '';
+          $item_price = isset($item['price']) ? floatval($item['price']) : 0;
+          $item_qty = intval($item['qty']);
+          $total_price = $item_price * $item_qty;
+          
+          $details[] = $item_name . ($item_unit ? ' (' . $item_unit . ')' : '') . ' × ' . $item_qty . ' — ' . number_format($total_price, 2) . ' €';
+        }
+      }
+      if (!empty($details)) {
+        $name .= '<br><small style="color: #666; font-size: 0.9em;">' . implode('<br>', $details) . '</small>';
+      }
+    }
+  }
+  return $name;
+}
+
+// Безопасный способ обновления цены товара в корзине
+add_action('woocommerce_before_cart', 'wmb_update_cart_item_prices');
+function wmb_update_cart_item_prices() {
+  if (!function_exists('WC')) return;
+  
+  $cart = WC()->cart;
+  $updated = false;
+  
+  foreach ($cart->get_cart() as $cart_item_key => $cart_item) {
+    if (isset($cart_item['wmb_payload'])) {
+      $payload = json_decode($cart_item['wmb_payload'], true);
+      if ($payload && isset($payload['total_price']) && $payload['total_price'] > 0) {
+        // Обновляем цену товара
+        $product = $cart_item['data'];
+        $product->set_price($payload['total_price']);
+        $updated = true;
+      }
+    }
+  }
+  
+  if ($updated) {
+    $cart->calculate_totals();
+  }
 }
 
 function wmb_ajax_add_to_cart(){
   try {
   if(!function_exists('WC')) wp_send_json_error('WooCommerce не активирован.');
   check_ajax_referer('wmb','nonce');
+
   $product_id   = isset($_POST['product_id'])?absint($_POST['product_id']):0;
   $payload_json = isset($_POST['payload'])?wp_unslash($_POST['payload']):'';
   if(!$product_id || !$payload_json) wp_send_json_error('Неверные данные.');
+
   $payload = json_decode($payload_json,true);
   if(!is_array($payload)) wp_send_json_error('Невалидный JSON.');
+
   $items = isset($payload['items']) && is_array($payload['items']) ? $payload['items'] : [];
   $total_price=0.0; $total_portions=0; $items_list=[];
+
   foreach($items as $id=>$qty){
     $qty = max(0, intval($qty)); if(!$qty) continue;
     $total_portions += $qty;
@@ -613,10 +706,12 @@ function wmb_ajax_add_to_cart(){
     $total_price += $price*$qty;
     $items_list[] = ['id'=>$id,'name'=>$name,'unit'=>$unit,'kcal'=>$kcal,'price'=>$price,'qty'=>$qty];
   }
+
   $payload['items_list']=$items_list;
   $payload['total_portions']=$total_portions;
   $payload['total_price']=round($total_price,2);
-  $added = WC()->cart->add_to_cart($product_id, 1, 0, [], ['wmb_payload'=>json_encode($payload),'wmb_uid'=>wp_generate_uuid4()]);
+
+    $added = WC()->cart->add_to_cart($product_id, 1, 0, [], ['wmb_payload'=>json_encode($payload),'wmb_uid'=>wp_generate_uuid4()]);
   if(!$added) wp_send_json_error('Не удалось добавить в корзину.');
   $redirect = function_exists('wc_get_cart_url') ? wc_get_cart_url() : wc_get_page_permalink('cart');
   wp_send_json_success(['redirect'=>$redirect]);
@@ -625,31 +720,7 @@ function wmb_ajax_add_to_cart(){
   }
 }
 
-/* ---------- WooCommerce integration ---------- */
-add_filter('woocommerce_cart_item_name', 'wmb_display_cart_item_details', 10, 3);
-function wmb_display_cart_item_details($name, $cart_item, $cart_item_key) {
-  if (isset($cart_item['wmb_payload'])) {
-    $payload = json_decode($cart_item['wmb_payload'], true);
-    if ($payload && isset($payload['items_list']) && is_array($payload['items_list'])) {
-      $details = [];
-      foreach ($payload['items_list'] as $item) {
-        if (isset($item['qty']) && $item['qty'] > 0) {
-          $item_name = isset($item['name']) ? $item['name'] : 'Неизвестное блюдо';
-          $item_unit = isset($item['unit']) ? $item['unit'] : '';
-          $item_price = isset($item['price']) ? floatval($item['price']) : 0;
-          $item_qty = intval($item['qty']);
-          $total_price = $item_price * $item_qty;
-          $details[] = $item_name . ($item_unit ? ' (' . $item_unit . ')' : '') . ' × ' . $item_qty . ' — ' . number_format($total_price, 2) . ' €';
-        }
-      }
-      if (!empty($details)) {
-        $name .= '<br><small style="color: #666; font-size: 0.9em;">' . implode('<br>', $details) . '</small>';
-      }
-    }
-  }
-  return $name;
-}
-
+/* ---------- Woo price/meta ---------- */
 add_action('woocommerce_before_calculate_totals', function($cart){
   if (is_admin() && !defined('DOING_AJAX')) return;
   if (!$cart || is_a($cart,'WP_Error')) return;
@@ -663,22 +734,50 @@ add_action('woocommerce_before_calculate_totals', function($cart){
   }
 },10,1);
 
+
+
+
 add_action('woocommerce_checkout_create_order_line_item', function($item,$key,$values){
   if (!empty($values['wmb_payload'])){
     $payload = is_string($values['wmb_payload']) ? json_decode($values['wmb_payload'], true) : $values['wmb_payload'];
+    
+    if ($payload && isset($payload['items_list']) && is_array($payload['items_list'])) {
+      // Добавляем детальный состав блюд для кухни
+      $dishes_details = [];
+      foreach ($payload['items_list'] as $dish) {
+        if (isset($dish['qty']) && $dish['qty'] > 0) {
+          $name = isset($dish['name']) ? $dish['name'] : 'Неизвестное блюдо';
+          $unit = isset($dish['unit']) ? $dish['unit'] : '';
+          $qty = intval($dish['qty']);
+          $price = isset($dish['price']) ? floatval($dish['price']) : 0;
+          $total_price = $price * $qty;
+          
+          $dishes_details[] = $name . ($unit ? ' (' . $unit . ')' : '') . ' × ' . $qty . ' — ' . number_format($total_price, 2) . ' €';
+        }
+      }
+      
+      // Убираем добавление подписанного мета-поля ("Состав заказа") —
+      // это позволяет избежать некрасивой метки в таблице на thank-you странице.
+      // Отображение деталей остаётся через хук woocommerce_order_item_meta_end ниже.
+    }
+    
+    // Сохраняем payload единообразно как валидный JSON (без двойного кодирования)
     $json = is_string($values['wmb_payload'])
       ? $values['wmb_payload']
       : wp_json_encode($values['wmb_payload'], JSON_UNESCAPED_UNICODE);
     $item->add_meta_data('_wmb_payload', $json, false);
+    
   }
 },10,3);
 
-add_filter('woocommerce_hidden_order_itemmeta', function($hidden){
-  $hidden[] = 'Meal plan payload';
-  $hidden[] = '_wmb_payload';
-  return $hidden;
-});
+  add_filter('woocommerce_hidden_order_itemmeta', function($hidden){
+    $hidden[] = 'Meal plan payload';
+    $hidden[] = '_wmb_payload';
+    // НЕ скрываем "Состав заказа" - он должен быть виден в админке
+    return $hidden;
+  });
 
+// Красивый вывод состава набора в деталях заказа и письмах
 add_action('woocommerce_order_item_meta_end', function($item_id, $item, $order, $plain_text){
   $meta = $item->get_meta('_wmb_payload', true);
   if (!$meta) $meta = $item->get_meta('Meal plan payload', true);
@@ -691,8 +790,14 @@ add_action('woocommerce_order_item_meta_end', function($item_id, $item, $order, 
     $qty  = isset($row['qty']) ? intval($row['qty']) : 0;
     $price= isset($row['price']) ? floatval($row['price']) : 0.0;
     $unit = isset($row['unit']) ? trim($row['unit']) : '';
-    if (empty($name) || $qty <= 0) continue;
+    
+    // Skip empty or invalid items
+    if (empty($name) || $qty <= 0) {
+      continue;
+    }
+    
     $subtotal = $price * $qty;
+    // Добавляем единицу измерения в отображение
     $unit_display = $unit ? " ({$unit})" : '';
     $lines[] = sprintf('%s%s × %d — %s', $name, $unit_display, $qty, strip_tags(wc_price($subtotal)));
   }
@@ -705,6 +810,7 @@ add_action('woocommerce_order_item_meta_end', function($item_id, $item, $order, 
   }
 }, 10, 4);
 
+// Отображаем состав набора в админке (страница редактирования заказа)
 add_action('woocommerce_after_order_itemmeta', function($item_id, $item, $product){
   if (!is_admin()) return;
   $meta = $item->get_meta('_wmb_payload', true);
@@ -718,8 +824,14 @@ add_action('woocommerce_after_order_itemmeta', function($item_id, $item, $produc
     $qty  = isset($row['qty']) ? intval($row['qty']) : 0;
     $price= isset($row['price']) ? floatval($row['price']) : 0.0;
     $unit = isset($row['unit']) ? trim($row['unit']) : '';
-    if (empty($name) || $qty <= 0) continue;
+    
+    // Skip empty or invalid items
+    if (empty($name) || $qty <= 0) {
+      continue;
+    }
+    
     $subtotal = $price * $qty;
+    // Добавляем единицу измерения в отображение
     $unit_display = $unit ? " ({$unit})" : '';
     $lines[] = sprintf('%s%s × %d — %s', $name, $unit_display, $qty, strip_tags(wc_price($subtotal)));
   }
@@ -728,6 +840,7 @@ add_action('woocommerce_after_order_itemmeta', function($item_id, $item, $produc
   echo '<div class="wmb-order-breakdown" style="margin-top:6px;">'.$html.'</div>';
 }, 10, 3);
 
+
 add_filter('woocommerce_is_purchasable', function($purchasable,$product){
   if ($product && intval($product->get_id())===intval(WMB_PRODUCT_ID)) return true; return $purchasable;
 },10,2);
@@ -735,19 +848,12 @@ add_filter('woocommerce_product_is_in_stock', function($in_stock,$product){
   if ($product && intval($product->get_id())===intval(WMB_PRODUCT_ID)) return true; return $in_stock;
 },10,2);
 
+// Emails: hide product thumbnails to avoid showing placeholder alt text ("Заполнитель")
 add_filter('woocommerce_email_order_items_args', function($args){
   $args['show_image'] = false;
   return $args;
 }, 10, 1);
 
-// Global tweak for WooCommerce cart/checkout tables on mobile
-add_action('wp_enqueue_scripts', function(){
-  if (function_exists('is_cart') && (is_cart() || is_checkout())){
-    $css = 'html,body{overflow-x:hidden} .woocommerce .cart, .woocommerce table.shop_table{table-layout:fixed; width:100%} .woocommerce table.shop_table td, .woocommerce table.shop_table th{word-wrap:break-word;white-space:normal}';
-    wp_register_style('wmb-cart-fix', false);
-    wp_enqueue_style('wmb-cart-fix');
-    wp_add_inline_style('wmb-cart-fix', $css);
-  }
-}, 100);
-?>
 
+// (Временно удалено) Реализация страницы агрегатора "Кухня" будет добавлена позже
+?>

@@ -264,7 +264,7 @@
   function openIngredientsFor(id){
     var item = byId(id);
     if (!item) return;
-    ensureIngredientsModal(); // Создаем модальное окно при первом использовании
+    ensureIngredientsModal();
     var modal = el('#wmb-ing-modal');
     el('#wmb-ing-title').textContent = item.name || 'Состав';
     el('#wmb-ing-text').textContent  = (item.ingredients || '').trim();
@@ -275,7 +275,7 @@
   function openAllergensFor(id){
     var item = byId(id);
     if (!item) return;
-    ensureAllergensModal(); // Создаем модальное окно при первом использовании
+    ensureAllergensModal();
     var modal = el('#wmb-allergens-modal');
     el('#wmb-allergens-title').textContent = item.name || 'Аллергены';
     
@@ -315,8 +315,57 @@
   function render(root){
     if (!menu) { root.innerHTML = '<div class="wmb-loading">Загрузка меню…</div>'; return; }
 
-    // Модальные окна создаем лениво (только при первом использовании)
-    // ensureIngredientsModal() вызывается при первом клике
+    ensureIngredientsModal();
+    
+    // Принудительно применяем sticky стили сразу после рендера
+    setTimeout(function(){
+      if (window.innerWidth >= 769) {
+        var sidebar = root.querySelector('.wmb-sidebar');
+        if (sidebar) {
+          // Агрессивно применяем sticky стили
+          sidebar.style.position = 'sticky';
+          sidebar.style.top = '24px';
+          sidebar.style.zIndex = '999';
+          sidebar.style.alignSelf = 'start';
+          sidebar.style.height = 'max-content';
+          sidebar.style.display = 'block';
+          sidebar.style.visibility = 'visible';
+          
+          // Убираем все возможные ограничения
+          var allElements = [
+            document.documentElement,
+            document.body,
+            root,
+            root.querySelector('.wmb-wrapper'),
+            root.querySelector('.wmb-body'),
+            root.querySelector('.wmb-catalog')
+          ];
+          
+          allElements.forEach(function(el){
+            if (el) {
+              el.style.overflow = 'visible';
+              el.style.overflowX = 'visible';
+              el.style.overflowY = 'visible';
+              el.style.transform = 'none';
+              el.style.contain = 'none';
+              el.style.isolation = 'auto';
+            }
+          });
+        }
+      }
+    }, 100);
+    
+    // Дополнительная проверка через 500мс
+    setTimeout(function(){
+      if (window.innerWidth >= 769) {
+        var sidebar = root.querySelector('.wmb-sidebar');
+        if (sidebar) {
+          sidebar.style.position = 'sticky';
+          sidebar.style.top = '24px';
+          sidebar.style.zIndex = '999';
+        }
+      }
+    }, 500);
 
     var secTitles = allSectionTitles();
     var tags = allTags();
@@ -408,30 +457,18 @@
       });
     });
 
-    // qty - используем делегирование событий для лучшей производительности
-    root.addEventListener('click', function(e){
-      var t = e.target;
-      if (t.classList.contains('wmb-qty-inc')) {
-        e.preventDefault();
-        changeQty(t.dataset.id, +1, root);
-        updateSummary();
-      } else if (t.classList.contains('wmb-qty-dec')) {
-        e.preventDefault();
-        changeQty(t.dataset.id, -1, root);
-        updateSummary();
-      }
+    // qty
+    els('.wmb-qty-inc', root).forEach(function(b){ b.addEventListener('click', function(){ changeQty(b.dataset.id, +1, root); var p=el('#wmb-total-price'); var pm=el('#wmb-total-price-mobile'); if(p) p.textContent=money(totalPrice()); if(pm) pm.textContent=money(totalPrice()); var pp=el('#wmb-total-portions'); if(pp) pp.textContent=totalPortions(); }); });
+    els('.wmb-qty-dec', root).forEach(function(b){ b.addEventListener('click', function(){ changeQty(b.dataset.id, -1, root); var p=el('#wmb-total-price'); var pm=el('#wmb-total-price-mobile'); if(p) p.textContent=money(totalPrice()); if(pm) pm.textContent=money(totalPrice()); var pp=el('#wmb-total-portions'); if(pp) pp.textContent=totalPortions(); }); });
+
+    // состав
+    els('.wmb-ing-btn', root).forEach(function(b){
+      b.addEventListener('click', function(){ openIngredientsFor(b.getAttribute('data-id')); });
     });
 
-    // состав и аллергены - делегирование событий
-    root.addEventListener('click', function(e){
-      var t = e.target;
-      if (t.classList.contains('wmb-ing-btn')) {
-        e.preventDefault();
-        openIngredientsFor(t.getAttribute('data-id'));
-      } else if (t.classList.contains('wmb-allergens-btn')) {
-        e.preventDefault();
-        openAllergensFor(t.getAttribute('data-id'));
-      }
+    // аллергены
+    els('.wmb-allergens-btn', root).forEach(function(b){
+      b.addEventListener('click', function(){ openAllergensFor(b.getAttribute('data-id')); });
     });
 
     var btn = el('#wmb-checkout', root); if (btn) btn.addEventListener('click', function(){ onCheckout(delivery); });
@@ -464,7 +501,7 @@
     var inCart = q > 0; // Индикатор что товар уже в корзине
 
     return [
-      '<div class="wmb-card' + (inCart ? ' wmb-card-in-cart' : '') + '" data-item-id="' + escapeHtml(item.id) + '">',
+      '<div class="wmb-card' + (inCart ? ' wmb-card-in-cart' : '') + '">',
         '<div class="wmb-card-title">',
           escapeHtml(item.name),
           (inCart ? '<span class="wmb-in-cart-badge">В корзине</span>' : ''),
@@ -487,45 +524,6 @@
     ].join('');
   }
 
-  // Оптимизированное обновление UI без полного перерендера
-  function updateSummary(){
-    var p = el('#wmb-total-price');
-    var pm = el('#wmb-total-price-mobile');
-    var pp = el('#wmb-total-portions');
-    if(p) p.textContent = money(totalPrice());
-    if(pm) pm.textContent = money(totalPrice());
-    if(pp) pp.textContent = totalPortions();
-    
-    var checkout = el('#wmb-checkout');
-    var checkoutMobile = el('#wmb-checkout-mobile');
-    var hasItems = totalPortions() > 0;
-    if(checkout) checkout.disabled = !hasItems;
-    if(checkoutMobile) checkoutMobile.disabled = !hasItems;
-  }
-
-  function updateCardQty(cardEl, id, qty){
-    var qtyValue = cardEl.querySelector('.wmb-qty-value');
-    var qtyDec = cardEl.querySelector('.wmb-qty-dec');
-    var inCartBadge = cardEl.querySelector('.wmb-in-cart-badge');
-    
-    if(qtyValue) qtyValue.textContent = qty;
-    if(qtyDec) qtyDec.disabled = qty === 0;
-    
-    if(qty > 0) {
-      cardEl.classList.add('wmb-card-in-cart');
-      if(!inCartBadge) {
-        var badge = document.createElement('span');
-        badge.className = 'wmb-in-cart-badge';
-        badge.textContent = 'В корзине';
-        var title = cardEl.querySelector('.wmb-card-title');
-        if(title) title.appendChild(badge);
-      }
-    } else {
-      cardEl.classList.remove('wmb-card-in-cart');
-      if(inCartBadge) inCartBadge.remove();
-    }
-  }
-
   function changeQty(id, delta, root){
     var cur = state.qty[id] || 0;
     var next = cur + delta;
@@ -534,25 +532,61 @@
       state.qty[id] = next;
       if (next === 0) delete state.qty[id];
       persist();
-      
-      // Обновляем только нужную карточку и summary, без полного перерендера
-      var cardEl = root.querySelector('[data-item-id="' + id + '"]');
-      if(cardEl) {
-        updateCardQty(cardEl, id, next);
-      } else {
-        // Если карточка не найдена, делаем полный перерендер
-        render(root);
-        return;
-      }
-      updateSummary();
+      render(root);
     }
   }
 
-  /* ======== DESKTOP STICKY ======== */
-  // Убрано - CSS должен справиться сам через media queries
+  /* ======== DESKTOP STICKY (fallback) ======== */
   function setupDesktopSticky(root){
-    // Sticky теперь полностью управляется через CSS
-    // Никаких JavaScript манипуляций не требуется
+    try{
+      if (window.innerWidth < 769) return;
+      
+      var sidebar = root.querySelector('.wmb-sidebar');
+      if (!sidebar) return;
+      
+      // Принудительно применяем sticky стили через JavaScript
+      function forceSticky(){
+        if (window.innerWidth < 769) return;
+        
+        sidebar.style.position = 'sticky';
+        sidebar.style.top = '24px';
+        sidebar.style.zIndex = '999';
+        sidebar.style.alignSelf = 'start';
+        sidebar.style.height = 'max-content';
+        
+        // Убираем ограничения от родительских элементов
+        var parents = [
+          root,
+          root.querySelector('.wmb-wrapper'),
+          root.querySelector('.wmb-body'),
+          root.querySelector('.wmb-catalog')
+        ];
+        
+        parents.forEach(function(parent){
+          if (parent) {
+            parent.style.overflow = 'visible';
+            parent.style.transform = 'none';
+            parent.style.contain = 'none';
+          }
+        });
+      }
+      
+      // Применяем сразу
+      forceSticky();
+      
+      // Применяем при изменении размера окна
+      window.addEventListener('resize', forceSticky);
+      
+      // Применяем при прокрутке (на случай конфликтов)
+      var scrollTimeout;
+      window.addEventListener('scroll', function(){
+        clearTimeout(scrollTimeout);
+        scrollTimeout = setTimeout(forceSticky, 100);
+      });
+      
+    }catch(e){
+      console.error('Sticky setup error:', e);
+    }
   }
 
   async function onCheckout(deliveryInfo){
@@ -654,31 +688,24 @@
   async function boot(){
     var root = document.getElementById('meal-builder-root');
     if (!root) return;
+    try{ root.style.paddingLeft='16px'; root.style.paddingRight='16px'; }catch(e){}
 
-    // Параллельно загружаем меню и синхронизируемся с корзиной
-    var menuPromise = fetch(MENU_URL, {credentials:'same-origin'}).then(function(res){
+    try{
+      var res = await fetch(MENU_URL, {credentials:'same-origin'});
       if (!res.ok) throw new Error('HTTP '+res.status);
-      return res.json();
-    }).catch(function(e){
+      menu = await res.json();
+    }catch(e){
       console.error('Не удалось загрузить меню из', MENU_URL, e);
-      return { description:'', sections: [] };
-    });
+      menu = { description:'', sections: [] };
+    }
     
-    var cartPromise = syncWithCart();
-    
-    // Ждем оба запроса параллельно
-    menu = await menuPromise;
-    await cartPromise;
-    
+    // Сначала синхронизируем с корзиной, потом восстанавливаем локальное состояние
+    await syncWithCart();
     restore();
     render(root);
     setupDesktopSticky(root);
   }
 
-  // Запускаем сразу, если DOM уже готов, иначе ждем DOMContentLoaded
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
-  } else {
-    boot();
-  }
+
+  document.addEventListener('DOMContentLoaded', boot);
 })();
