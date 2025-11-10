@@ -544,10 +544,86 @@
   }
 
   /* ======== DESKTOP STICKY ======== */
-  // Убрано - CSS должен справиться сам через media queries
+  // Принудительное применение sticky через JavaScript для надежности
   function setupDesktopSticky(root){
-    // Sticky теперь полностью управляется через CSS
-    // Никаких JavaScript манипуляций не требуется
+    if (window.innerWidth < 769) return;
+    
+    var sidebar = root.querySelector('.wmb-sidebar');
+    if (!sidebar) return;
+    
+    // Принудительно применяем sticky стили
+    function applySticky(){
+      if (window.innerWidth < 769) return;
+      
+      // Убираем ограничения от всех родителей
+      var parents = [
+        root,
+        root.querySelector('.wmb-wrapper'),
+        root.querySelector('.wmb-body'),
+        root.querySelector('.wmb-catalog'),
+        document.body,
+        document.documentElement
+      ];
+      
+      parents.forEach(function(parent){
+        if (parent) {
+          parent.style.overflow = 'visible';
+          parent.style.overflowX = 'visible';
+          parent.style.overflowY = 'visible';
+          parent.style.transform = 'none';
+          parent.style.contain = 'none';
+          parent.style.isolation = 'auto';
+        }
+      });
+      
+      // Принудительно применяем sticky к sidebar
+      if (sidebar) {
+        sidebar.style.position = 'sticky';
+        sidebar.style.top = '24px';
+        sidebar.style.zIndex = '100';
+        sidebar.style.alignSelf = 'start';
+        sidebar.style.height = 'fit-content';
+        sidebar.style.maxHeight = 'calc(100vh - 48px)'; // Исправлен синтаксис calc
+        sidebar.style.overflowY = 'auto';
+        sidebar.style.display = 'block';
+        sidebar.style.visibility = 'visible';
+        sidebar.style.willChange = 'transform'; // Оптимизация для браузера
+      }
+      
+      // КРИТИЧНО: Убеждаемся что родительский grid контейнер имеет достаточную высоту
+      var bodyEl = root.querySelector('.wmb-body');
+      if (bodyEl) {
+        bodyEl.style.minHeight = '100vh'; // Минимальная высота для работы sticky
+        bodyEl.style.display = 'grid';
+        bodyEl.style.gridTemplateColumns = '1fr 320px';
+        bodyEl.style.alignItems = 'start';
+        bodyEl.style.gap = '24px';
+      }
+      
+      // Убеждаемся что wrapper тоже не ограничивает
+      var wrapperEl = root.querySelector('.wmb-wrapper');
+      if (wrapperEl) {
+        wrapperEl.style.minHeight = '100vh';
+        wrapperEl.style.position = 'relative';
+      }
+    }
+    
+    // Применяем сразу
+    applySticky();
+    
+    // Применяем при изменении размера окна
+    var resizeTimeout;
+    window.addEventListener('resize', function(){
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(applySticky, 100);
+    });
+    
+    // Применяем при прокрутке (на случай если что-то сбрасывает стили)
+    var scrollTimeout;
+    window.addEventListener('scroll', function(){
+      clearTimeout(scrollTimeout);
+      scrollTimeout = setTimeout(applySticky, 50);
+    });
   }
 
   async function onCheckout(deliveryInfo){

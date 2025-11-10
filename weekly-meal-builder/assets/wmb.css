@@ -23,7 +23,14 @@ html,body{overflow:visible !important}
   }
 }
 #wmb *{box-sizing:border-box}
-.wmb-wrapper{max-width:1200px;margin:0 auto;padding:0}
+.wmb-wrapper{
+  max-width:1200px;
+  margin:0 auto;
+  padding:0;
+  overflow: visible !important;
+  position: relative !important;
+  min-height: 100vh !important; /* КРИТИЧНО для работы sticky */
+}
 @supports(padding:max(0px)){
   .wmb-wrapper{padding-left:0;padding-right:0}
 }
@@ -130,11 +137,14 @@ body:has(#meal-builder-root) .wp-block-post-content > p{ margin:6px 0 10px !impo
   gap:24px;
   align-items:start;
   overflow: visible !important;
+  min-height: 100vh !important; /* КРИТИЧНО для работы sticky */
+  position: relative !important;
 }
 @media (max-width: 980px){ 
   .wmb-body{
     grid-template-columns:1fr;
     overflow: visible !important;
+    min-height: auto !important;
   } 
 }
 
@@ -366,5 +376,13 @@ aside.wmb-sidebar{
   .wmb-wrapper {
     overflow: visible !important;
     position: relative !important;
+    min-height: 100vh !important; /* КРИТИЧНО для работы sticky */
+  }
+  
+  /* Убеждаемся что root тоже не ограничивает */
+  #meal-builder-root {
+    overflow: visible !important;
+    position: relative !important;
+    min-height: 100vh !important;
   }
 }
