@@ -733,45 +733,50 @@ main.gl-container > .wp-block-group {
   }
 
   /* Hide navigation container by default on mobile */
-  .gl-navigation .wp-block-navigation__responsive-container {
-    display: none !important;
-  }
-
-  /* Only show overlay when menu is explicitly opened */
-  .gl-navigation.is-open {
-    position: fixed !important;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.5);
-    z-index: 999;
-    display: block;
-    margin: 0;
-    padding: 0;
-    overflow-y: auto;
-    width: 100% !important;
-    height: 100% !important;
-    opacity: 1;
-    grid-column: none !important;
-    grid-row: none !important;
-  }
-
-  /* Force close WordPress navigation block's own state - override all WordPress classes */
-  .gl-navigation .wp-block-navigation__responsive-container,
-  .gl-navigation .wp-block-navigation__responsive-container.is-menu-open,
-  .gl-navigation .wp-block-navigation__responsive-container.has-modal-open,
-  .gl-navigation .wp-block-navigation__responsive-container[data-wp-class--is-menu-open] {
+  .gl-navigation:not(.is-open) .wp-block-navigation__responsive-container {
     display: none !important;
     visibility: hidden !important;
     opacity: 0 !important;
     pointer-events: none !important;
   }
 
-  /* Only show when explicitly opened via our toggle */
+  /* Only show overlay when menu is explicitly opened */
+  .gl-navigation.is-open {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    background: rgba(0, 0, 0, 0.5) !important;
+    z-index: 999 !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow-y: auto !important;
+    width: 100% !important;
+    height: 100% !important;
+    opacity: 1 !important;
+    grid-column: none !important;
+    grid-row: none !important;
+    pointer-events: auto !important;
+  }
+
+  /* Force close WordPress navigation block's own state - override all WordPress classes */
+  .gl-navigation:not(.is-open) .wp-block-navigation__responsive-container,
+  .gl-navigation:not(.is-open) .wp-block-navigation__responsive-container.is-menu-open,
+  .gl-navigation:not(.is-open) .wp-block-navigation__responsive-container.has-modal-open,
+  .gl-navigation:not(.is-open) .wp-block-navigation__responsive-container[data-wp-class--is-menu-open] {
+    display: none !important;
+    visibility: hidden !important;
+    opacity: 0 !important;
+    pointer-events: none !important;
+  }
+
+  /* Only show when explicitly opened via our toggle - HIGHEST SPECIFICITY */
   .gl-navigation.is-open .wp-block-navigation__responsive-container,
   .gl-navigation.is-open .wp-block-navigation__responsive-container.is-menu-open,
-  .gl-navigation.is-open .wp-block-navigation__responsive-container.has-modal-open {
+  .gl-navigation.is-open .wp-block-navigation__responsive-container.has-modal-open,
+  .gl-navigation.is-open .wp-block-navigation__responsive-container[data-wp-class--is-menu-open] {
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
@@ -783,6 +788,8 @@ main.gl-container > .wp-block-group {
     bottom: 0 !important;
     z-index: 1000 !important;
     background: rgba(0, 0, 0, 0.5) !important;
+    width: 100% !important;
+    height: 100% !important;
   }
 
   .gl-navigation.is-open .wp-block-navigation__responsive-dialog {
