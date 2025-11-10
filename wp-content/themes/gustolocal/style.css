@@ -730,6 +730,8 @@ main.gl-container > .wp-block-group {
 
   .gl-navigation.is-open {
     pointer-events: auto;
+    width: 100% !important; /* Override width: 0 when open */
+    height: 100% !important; /* Override height: 0 when open */
   }
 
   /* Hide navigation container by default on mobile */
