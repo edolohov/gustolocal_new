@@ -334,6 +334,20 @@ aside.wmb-sidebar{
     overflow-y: auto !important;
   }
   
+  /* Убираем ограничения от WordPress контейнеров */
+  .wp-site-blocks,
+  main,
+  .gl-container,
+  .wp-block-group,
+  .wp-block-post-content {
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+    transform: none !important;
+    contain: none !important;
+    isolation: auto !important;
+  }
+  
   #meal-builder-root, 
   .wmb-wrapper, 
   .wmb-body, 
@@ -361,6 +375,7 @@ aside.wmb-sidebar{
     overflow-y: auto !important;
     display: block !important;
     visibility: visible !important;
+    will-change: transform !important;
   }
   
   /* Убираем возможные ограничения от grid */
@@ -370,6 +385,8 @@ aside.wmb-sidebar{
     align-items: start !important;
     gap: 24px !important;
     overflow: visible !important;
+    position: relative !important;
+    min-height: 100vh !important; /* КРИТИЧНО для работы sticky */
   }
   
   /* Убеждаемся что wrapper не ограничивает */
@@ -383,6 +400,21 @@ aside.wmb-sidebar{
   #meal-builder-root {
     overflow: visible !important;
     position: relative !important;
+    min-height: 100vh !important;
+  }
+  
+  /* Убеждаемся что WordPress контейнеры тоже имеют достаточную высоту */
+  body:has(#meal-builder-root) main,
+  body:has(#meal-builder-root) .wp-site-blocks,
+  body:has(#meal-builder-root) .wp-block-post-content {
+    overflow: visible !important;
+    min-height: 100vh !important;
+  }
+  
+  /* Fallback для браузеров без поддержки :has() */
+  main .wmb-wrapper,
+  .wp-site-blocks .wmb-wrapper,
+  .wp-block-post-content .wmb-wrapper {
     min-height: 100vh !important;
   }
 }

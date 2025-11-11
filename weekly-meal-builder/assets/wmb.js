@@ -551,19 +551,34 @@
     var sidebar = root.querySelector('.wmb-sidebar');
     if (!sidebar) return;
     
+    var bodyEl = root.querySelector('.wmb-body');
+    if (!bodyEl) return;
+    
     // Принудительно применяем sticky стили
     function applySticky(){
       if (window.innerWidth < 769) return;
       
-      // Убираем ограничения от всех родителей
+      // Убираем ограничения от всех родителей, включая WordPress контейнеры
       var parents = [
         root,
         root.querySelector('.wmb-wrapper'),
-        root.querySelector('.wmb-body'),
+        bodyEl,
         root.querySelector('.wmb-catalog'),
         document.body,
         document.documentElement
       ];
+      
+      // Также проверяем WordPress контейнеры
+      var wpContainers = [
+        document.querySelector('.wp-site-blocks'),
+        document.querySelector('main'),
+        document.querySelector('.gl-container'),
+        root.closest('.wp-block-group'),
+        root.closest('.wp-block-post-content'),
+        root.closest('main')
+      ];
+      
+      parents = parents.concat(wpContainers);
       
       parents.forEach(function(parent){
         if (parent) {
@@ -573,8 +588,29 @@
           parent.style.transform = 'none';
           parent.style.contain = 'none';
           parent.style.isolation = 'auto';
+          // Убеждаемся что нет height: 100% или других ограничений
+          if (parent.style.height && parent.style.height === '100%') {
+            parent.style.height = 'auto';
+          }
         }
       });
+      
+      // КРИТИЧНО: Убеждаемся что родительский grid контейнер имеет достаточную высоту
+      // Высота должна быть больше высоты viewport для работы sticky
+      var bodyHeight = bodyEl.scrollHeight;
+      var viewportHeight = window.innerHeight;
+      if (bodyHeight < viewportHeight) {
+        // Если контент короче экрана, увеличиваем min-height
+        bodyEl.style.minHeight = (viewportHeight + 100) + 'px';
+      } else {
+        bodyEl.style.minHeight = '100vh';
+      }
+      
+      bodyEl.style.display = 'grid';
+      bodyEl.style.gridTemplateColumns = '1fr 320px';
+      bodyEl.style.alignItems = 'start';
+      bodyEl.style.gap = '24px';
+      bodyEl.style.position = 'relative'; // Важно для sticky
       
       // Принудительно применяем sticky к sidebar
       if (sidebar) {
@@ -583,21 +619,11 @@
         sidebar.style.zIndex = '100';
         sidebar.style.alignSelf = 'start';
         sidebar.style.height = 'fit-content';
-        sidebar.style.maxHeight = 'calc(100vh - 48px)'; // Исправлен синтаксис calc
+        sidebar.style.maxHeight = 'calc(100vh - 48px)';
         sidebar.style.overflowY = 'auto';
         sidebar.style.display = 'block';
         sidebar.style.visibility = 'visible';
-        sidebar.style.willChange = 'transform'; // Оптимизация для браузера
-      }
-      
-      // КРИТИЧНО: Убеждаемся что родительский grid контейнер имеет достаточную высоту
-      var bodyEl = root.querySelector('.wmb-body');
-      if (bodyEl) {
-        bodyEl.style.minHeight = '100vh'; // Минимальная высота для работы sticky
-        bodyEl.style.display = 'grid';
-        bodyEl.style.gridTemplateColumns = '1fr 320px';
-        bodyEl.style.alignItems = 'start';
-        bodyEl.style.gap = '24px';
+        sidebar.style.willChange = 'transform';
       }
       
       // Убеждаемся что wrapper тоже не ограничивает
@@ -606,10 +632,33 @@
         wrapperEl.style.minHeight = '100vh';
         wrapperEl.style.position = 'relative';
       }
+      
+      // КРИТИЧНО: Проверяем все WordPress контейнеры до body
+      var wpMain = root.closest('main');
+      if (wpMain) {
+        wpMain.style.overflow = 'visible';
+        wpMain.style.minHeight = '100vh';
+      }
+      
+      var wpSiteBlocks = document.querySelector('.wp-site-blocks');
+      if (wpSiteBlocks) {
+        wpSiteBlocks.style.overflow = 'visible';
+        wpSiteBlocks.style.minHeight = '100vh';
+      }
+      
+      // Убеждаемся что body и html не ограничивают
+      document.body.style.overflowY = 'auto';
+      document.body.style.overflowX = 'hidden';
+      document.documentElement.style.overflowY = 'auto';
+      document.documentElement.style.overflowX = 'hidden';
     }
     
     // Применяем сразу
     applySticky();
+    
+    // Применяем после небольшой задержки (когда контент загрузится)
+    setTimeout(applySticky, 100);
+    setTimeout(applySticky, 500);
     
     // Применяем при изменении размера окна
     var resizeTimeout;
@@ -624,6 +673,79 @@
       clearTimeout(scrollTimeout);
       scrollTimeout = setTimeout(applySticky, 50);
     });
+    
+    // ДОПОЛНИТЕЛЬНО: Fallback с position: fixed если sticky не работает
+    var fixedFallback = false;
+    var sidebarRect = null;
+    var bodyElRect = null;
+    
+    function checkAndApplyFixedFallback(){
+      if (window.innerWidth < 769) return;
+      if (!sidebar || !bodyEl) return;
+      
+      var computed = window.getComputedStyle(sidebar);
+      if (computed.position === 'sticky') {
+        // Sticky работает, проверяем что он действительно "прилипает"
+        var currentRect = sidebar.getBoundingClientRect();
+        if (!sidebarRect) {
+          sidebarRect = currentRect;
+          bodyElRect = bodyEl.getBoundingClientRect();
+        }
+        
+        // Если sidebar не двигается при прокрутке, значит sticky не работает
+        window.addEventListener('scroll', function checkSticky(){
+          var newRect = sidebar.getBoundingClientRect();
+          var scrollY = window.scrollY || window.pageYOffset;
+          
+          // Если sidebar не "прилипает" (его top меняется при прокрутке), используем fixed
+          if (scrollY > 100 && newRect.top > 50) {
+            // Sticky не работает, переключаемся на fixed
+            if (!fixedFallback) {
+              fixedFallback = true;
+              console.log('Sticky не работает, переключаемся на position: fixed');
+              
+              var initialTop = bodyEl.getBoundingClientRect().top + window.scrollY;
+              var sidebarWidth = sidebar.offsetWidth;
+              
+              function updateFixedPosition(){
+                if (window.innerWidth < 769) return;
+                var scrollTop = window.scrollY || window.pageYOffset;
+                var bodyTop = bodyEl.getBoundingClientRect().top + scrollTop;
+                var bodyBottom = bodyTop + bodyEl.offsetHeight;
+                var viewportBottom = scrollTop + window.innerHeight;
+                
+                // Вычисляем позицию для fixed
+                if (scrollTop < initialTop) {
+                  // Еще не дошли до начала body
+                  sidebar.style.position = 'absolute';
+                  sidebar.style.top = 'auto';
+                } else if (viewportBottom > bodyBottom - sidebar.offsetHeight) {
+                  // Дошли до конца body
+                  sidebar.style.position = 'absolute';
+                  sidebar.style.top = (bodyBottom - sidebar.offsetHeight - bodyTop) + 'px';
+                } else {
+                  // В середине - используем fixed
+                  sidebar.style.position = 'fixed';
+                  sidebar.style.top = '24px';
+                  sidebar.style.width = sidebarWidth + 'px';
+                  sidebar.style.right = 'auto';
+                  // Вычисляем left на основе позиции body
+                  var bodyLeft = bodyEl.getBoundingClientRect().left;
+                  var bodyWidth = bodyEl.offsetWidth;
+                  sidebar.style.left = (bodyLeft + bodyWidth - sidebarWidth - 24) + 'px';
+                }
+              }
+              
+              window.addEventListener('scroll', updateFixedPosition);
+              window.addEventListener('resize', updateFixedPosition);
+              updateFixedPosition();
+            }
+          }
+        }, { once: true, passive: true });
+      }
+    }
+    
+    setTimeout(checkAndApplyFixedFallback, 1000);
   }
 
   async function onCheckout(deliveryInfo){

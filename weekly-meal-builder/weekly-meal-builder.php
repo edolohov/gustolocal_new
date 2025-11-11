@@ -9,7 +9,7 @@
 if (!defined('ABSPATH')) exit;
 
 define('WMB_VERSION', '2.0.0');
-if (!defined('WMB_PRODUCT_ID')) define('WMB_PRODUCT_ID', 299);
+if (!defined('WMB_PRODUCT_ID')) define('WMB_PRODUCT_ID', 44);
 
 /* ---------- assets ---------- */
 function wmb_assets_url($p){ return plugins_url('assets/'.$p, __FILE__); }
@@ -528,15 +528,24 @@ add_action('rest_api_init', function () {
 
 /* ---------- Shortcode с оптимизацией производительности ---------- */
 add_shortcode('meal_builder', function(){
+  // Не выполняем шорткод в админке
+  if (is_admin()) {
+    return '';
+  }
+  
   $menu_url = esc_url_raw(rest_url('wmb/v1/menu'));
   $ajax_url = admin_url('admin-ajax.php');
   $nonce = wp_create_nonce('wmb');
   $product_id = (int)WMB_PRODUCT_ID;
   
-  // Предзагрузка данных через <link rel="preload">
-  add_action('wp_head', function() use ($menu_url) {
-    echo '<link rel="preload" as="fetch" href="'.esc_url($menu_url).'" crossorigin="anonymous">'."\n";
-  }, 1);
+  // Предзагрузка данных через <link rel="preload"> - добавляем один раз
+  static $preload_added = false;
+  if (!$preload_added) {
+    add_action('wp_head', function() use ($menu_url) {
+      echo '<link rel="preload" as="fetch" href="'.esc_url($menu_url).'" crossorigin="anonymous">'."\n";
+    }, 1);
+    $preload_added = true;
+  }
   
   // Загружаем CSS и JS
   wp_enqueue_style('wmb-style', wmb_assets_url('wmb.css'), [], wmb_file_ver('wmb.css'));
@@ -626,6 +635,7 @@ function wmb_ajax_add_to_cart(){
 }
 
 /* ---------- WooCommerce integration ---------- */
+// Улучшенное отображение деталей заказа в корзине и на checkout
 add_filter('woocommerce_cart_item_name', 'wmb_display_cart_item_details', 10, 3);
 function wmb_display_cart_item_details($name, $cart_item, $cart_item_key) {
   if (isset($cart_item['wmb_payload'])) {
@@ -634,16 +644,24 @@ function wmb_display_cart_item_details($name, $cart_item, $cart_item_key) {
       $details = [];
       foreach ($payload['items_list'] as $item) {
         if (isset($item['qty']) && $item['qty'] > 0) {
-          $item_name = isset($item['name']) ? $item['name'] : 'Неизвестное блюдо';
-          $item_unit = isset($item['unit']) ? $item['unit'] : '';
+          $item_name = isset($item['name']) ? esc_html($item['name']) : 'Неизвестное блюдо';
+          $item_unit = isset($item['unit']) ? esc_html($item['unit']) : '';
           $item_price = isset($item['price']) ? floatval($item['price']) : 0;
           $item_qty = intval($item['qty']);
           $total_price = $item_price * $item_qty;
-          $details[] = $item_name . ($item_unit ? ' (' . $item_unit . ')' : '') . ' × ' . $item_qty . ' — ' . number_format($total_price, 2) . ' €';
+          
+          // Форматируем как на оригинале: "Название (единица) × количество — цена"
+          $unit_display = $item_unit ? ' (' . $item_unit . ')' : '';
+          // Используем формат WooCommerce для цены (учитывает настройки валюты)
+          $formatted_price = function_exists('wc_price') ? strip_tags(wc_price($total_price)) : number_format($total_price, 2, ',', '') . ' €';
+          $details[] = $item_name . $unit_display . ' × ' . $item_qty . ' — ' . $formatted_price;
         }
       }
       if (!empty($details)) {
-        $name .= '<br><small style="color: #666; font-size: 0.9em;">' . implode('<br>', $details) . '</small>';
+        // Отображаем детали под названием товара
+        $name .= '<div style="margin-top: 8px; padding-left: 0; color: #666; font-size: 0.9em; line-height: 1.6;">';
+        $name .= implode('<br>', $details);
+        $name .= '</div>';
       }
     }
   }
