@@ -50,9 +50,28 @@ function gustolocal_simplify_checkout_fields($fields) {
     
     // Упрощаем billing поля - оставляем только самое необходимое
     unset($fields['billing']['billing_company']);
-    unset($fields['billing']['billing_country']); // По умолчанию Испания
-    unset($fields['billing']['billing_state']); // По умолчанию Валенсия
-    unset($fields['billing']['billing_postcode']); // Не критично для доставки
+    
+    // ВАЖНО: Не удаляем обязательные поля, а делаем их необязательными и скрываем через CSS
+    // Это нужно для корректной работы платежных систем
+    if (isset($fields['billing']['billing_country'])) {
+        $fields['billing']['billing_country']['required'] = false;
+        $fields['billing']['billing_country']['class'][] = 'hidden-field';
+    }
+    
+    if (isset($fields['billing']['billing_state'])) {
+        $fields['billing']['billing_state']['required'] = false;
+        $fields['billing']['billing_state']['class'][] = 'hidden-field';
+    }
+    
+    if (isset($fields['billing']['billing_city'])) {
+        $fields['billing']['billing_city']['required'] = false;
+        $fields['billing']['billing_city']['class'][] = 'hidden-field';
+    }
+    
+    if (isset($fields['billing']['billing_postcode'])) {
+        $fields['billing']['billing_postcode']['required'] = false;
+        $fields['billing']['billing_postcode']['class'][] = 'hidden-field';
+    }
     
     // Переименовываем поля для простоты
     if (isset($fields['billing']['billing_first_name'])) {
@@ -86,9 +105,6 @@ function gustolocal_simplify_checkout_fields($fields) {
         $fields['billing']['billing_phone']['placeholder'] = 'телеграм, whatsApp, телефон или факс';
     }
     
-    // Скрываем город - не нужен для доставки в Валенсии
-    unset($fields['billing']['billing_city']);
-    
     return $fields;
 }
 
@@ -108,6 +124,44 @@ function gustolocal_set_default_checkout_values($value, $input) {
         }
     }
     return $value;
+}
+
+// Устанавливаем значения по умолчанию ПЕРЕД обработкой заказа (критично для платежных систем)
+add_action('woocommerce_checkout_process', 'gustolocal_set_checkout_defaults_before_process');
+function gustolocal_set_checkout_defaults_before_process() {
+    if (empty($_POST['billing_country'])) {
+        $_POST['billing_country'] = 'ES';
+    }
+    if (empty($_POST['billing_state'])) {
+        $_POST['billing_state'] = 'VC';
+    }
+    if (empty($_POST['billing_city'])) {
+        $_POST['billing_city'] = 'Валенсия';
+    }
+    if (empty($_POST['billing_postcode'])) {
+        $_POST['billing_postcode'] = '46000';
+    }
+}
+
+// Также устанавливаем значения в сессии WooCommerce
+add_action('woocommerce_checkout_update_order_meta', 'gustolocal_set_order_defaults', 10, 2);
+function gustolocal_set_order_defaults($order_id, $data) {
+    $order = wc_get_order($order_id);
+    
+    if (!$order->get_billing_country()) {
+        $order->set_billing_country('ES');
+    }
+    if (!$order->get_billing_state()) {
+        $order->set_billing_state('VC');
+    }
+    if (!$order->get_billing_city()) {
+        $order->set_billing_city('Валенсия');
+    }
+    if (!$order->get_billing_postcode()) {
+        $order->set_billing_postcode('46000');
+    }
+    
+    $order->save();
 }
 
 /* ============ WooCommerce опции доставки ============ */

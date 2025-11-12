@@ -1794,6 +1794,17 @@ main.gl-container > .wp-block-group {
   display: none !important;
 }
 
+/* Скрываем обязательные поля, которые заполняются автоматически */
+.woocommerce-checkout .form-row.hidden-field,
+.woocommerce-checkout .form-row .hidden-field {
+  display: none !important;
+  visibility: hidden !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
 /* Улучшаем отображение способа получения заказа */
 .woocommerce-checkout .delivery-options-checkout {
   margin: 2rem 0;
