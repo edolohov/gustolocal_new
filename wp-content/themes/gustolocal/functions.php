@@ -179,15 +179,108 @@ function gustolocal_log_checkout_errors() {
 }
 
 // ФИКС: Исправляем проблему с плагином Checkout Field Editor
-// Плагин получает false вместо объекта заказа в хуке woocommerce_checkout_update_order_meta
-// Проблема в том, что плагин ожидает объект заказа, но получает ID
-// Перехватываем хук ДО плагина и убеждаемся, что заказ создан правильно
-add_action('woocommerce_checkout_update_order_meta', 'gustolocal_fix_checkout_field_editor_order', 1, 2);
+// Плагин получает false вместо объекта заказа и пытается вызвать save() на false
+// Перехватываем хук с максимальным приоритетом и исправляем проблему ДО плагина
+add_action('woocommerce_checkout_update_order_meta', 'gustolocal_fix_checkout_field_editor_order', 0, 2);
 function gustolocal_fix_checkout_field_editor_order($order_id, $data) {
     // Проверяем, что order_id валидный
     if (!$order_id || !is_numeric($order_id)) {
         if (defined('WP_DEBUG') && WP_DEBUG) {
             error_log('GustoLocal: Невалидный order_id в woocommerce_checkout_update_order_meta: ' . var_export($order_id, true));
+        }
+        // Прерываем выполнение, чтобы плагин не получил false
+        return;
+    }
+    
+    // Получаем заказ и проверяем, что он существует
+    $order = wc_get_order($order_id);
+    if (!$order || !is_a($order, 'WC_Order')) {
+        // Если заказ не найден, логируем ошибку и прерываем выполнение
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('GustoLocal: Заказ ' . $order_id . ' не найден при вызове woocommerce_checkout_update_order_meta. Данные: ' . print_r($data, true));
+        }
+        // Прерываем выполнение, чтобы плагин не получил false
+        return;
+    }
+    
+    // Убеждаемся, что заказ сохранен и имеет все необходимые данные
+    $needs_save = false;
+    if (!$order->get_billing_country()) {
+        $order->set_billing_country('ES');
+        $needs_save = true;
+    }
+    if (!$order->get_billing_state()) {
+        $order->set_billing_state('VC');
+        $needs_save = true;
+    }
+    if (!$order->get_billing_city()) {
+        $order->set_billing_city('Валенсия');
+        $needs_save = true;
+    }
+    if (!$order->get_billing_postcode()) {
+        $order->set_billing_postcode('46000');
+        $needs_save = true;
+    }
+    
+    // Сохраняем заказ, чтобы плагин получил валидный объект
+    if ($needs_save) {
+        $order->save();
+    }
+    
+    // КРИТИЧНО: Убеждаемся, что заказ доступен в глобальном контексте для плагина
+    // Плагин может пытаться получить заказ из глобальной переменной
+    global $thwcfd_order;
+    if (!isset($thwcfd_order) || !$thwcfd_order) {
+        $thwcfd_order = $order;
+    }
+}
+
+// Дополнительный фикс: перехватываем создание заказа и сохраняем его в глобальной переменной
+add_action('woocommerce_new_order', 'gustolocal_store_order_for_plugin', 1, 1);
+function gustolocal_store_order_for_plugin($order_id) {
+    if ($order_id && is_numeric($order_id)) {
+        $order = wc_get_order($order_id);
+        if ($order && is_a($order, 'WC_Order')) {
+            global $thwcfd_order;
+            $thwcfd_order = $order;
+        }
+    }
+}
+
+// КРИТИЧЕСКИЙ ФИКС: Перехватываем вызов метода плагина и исправляем проблему
+// Плагин получает false вместо объекта заказа, поэтому перехватываем его метод
+// Используем несколько хуков, чтобы перехватить плагин в любом случае
+add_action('init', 'gustolocal_fix_checkout_field_editor_plugin', 999);
+add_action('wp_loaded', 'gustolocal_fix_checkout_field_editor_plugin', 999);
+function gustolocal_fix_checkout_field_editor_plugin() {
+    // Проверяем, что плагин активен
+    if (!class_exists('THWCFD_Public_Checkout')) {
+        return;
+    }
+    
+    // Получаем экземпляр класса плагина
+    $plugin_instance = THWCFD_Public_Checkout::instance();
+    if (!$plugin_instance) {
+        return;
+    }
+    
+    // Перехватываем метод checkout_update_order_meta
+    // Удаляем оригинальный хук (пробуем разные приоритеты)
+    remove_action('woocommerce_checkout_update_order_meta', array($plugin_instance, 'checkout_update_order_meta'), 10);
+    remove_action('woocommerce_checkout_update_order_meta', array($plugin_instance, 'checkout_update_order_meta'));
+    
+    // Добавляем наш исправленный метод с более высоким приоритетом
+    if (!has_action('woocommerce_checkout_update_order_meta', 'gustolocal_safe_checkout_update_order_meta')) {
+        add_action('woocommerce_checkout_update_order_meta', 'gustolocal_safe_checkout_update_order_meta', 5, 2);
+    }
+}
+
+// Безопасная версия метода плагина, которая проверяет заказ перед использованием
+function gustolocal_safe_checkout_update_order_meta($order_id, $data) {
+    // Проверяем, что order_id валидный
+    if (!$order_id || !is_numeric($order_id)) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('GustoLocal: Пропущен Checkout Field Editor - невалидный order_id: ' . var_export($order_id, true));
         }
         return;
     }
@@ -195,29 +288,31 @@ function gustolocal_fix_checkout_field_editor_order($order_id, $data) {
     // Получаем заказ и проверяем, что он существует
     $order = wc_get_order($order_id);
     if (!$order || !is_a($order, 'WC_Order')) {
-        // Если заказ не найден, логируем ошибку
         if (defined('WP_DEBUG') && WP_DEBUG) {
-            error_log('GustoLocal: Заказ ' . $order_id . ' не найден при вызове woocommerce_checkout_update_order_meta. Данные: ' . print_r($data, true));
+            error_log('GustoLocal: Пропущен Checkout Field Editor - заказ ' . $order_id . ' не найден');
         }
         return;
     }
     
-    // Убеждаемся, что заказ сохранен и имеет все необходимые данные
-    if (!$order->get_billing_country()) {
-        $order->set_billing_country('ES');
+    // Теперь вызываем оригинальный метод плагина, но с гарантией, что заказ существует
+    if (class_exists('THWCFD_Public_Checkout')) {
+        $plugin_instance = THWCFD_Public_Checkout::instance();
+        if ($plugin_instance && method_exists($plugin_instance, 'checkout_update_order_meta')) {
+            // Вызываем метод плагина напрямую, передавая валидный заказ
+            try {
+                // Устанавливаем заказ в глобальной переменной для плагина
+                global $thwcfd_order;
+                $thwcfd_order = $order;
+                
+                // Вызываем метод плагина
+                $plugin_instance->checkout_update_order_meta($order_id, $data);
+            } catch (Exception $e) {
+                if (defined('WP_DEBUG') && WP_DEBUG) {
+                    error_log('GustoLocal: Ошибка в Checkout Field Editor: ' . $e->getMessage());
+                }
+            }
+        }
     }
-    if (!$order->get_billing_state()) {
-        $order->set_billing_state('VC');
-    }
-    if (!$order->get_billing_city()) {
-        $order->set_billing_city('Валенсия');
-    }
-    if (!$order->get_billing_postcode()) {
-        $order->set_billing_postcode('46000');
-    }
-    
-    // Сохраняем заказ, чтобы плагин получил валидный объект
-    $order->save();
 }
 
 /* ============ WooCommerce опции доставки ============ */
