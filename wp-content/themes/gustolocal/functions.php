@@ -174,6 +174,22 @@ function gustolocal_set_checkout_defaults_before_process() {
     if (empty($_POST['billing_postcode']) || !isset($_POST['billing_postcode'])) {
         $_POST['billing_postcode'] = '46000';
     }
+    
+    // Если email пустой, устанавливаем дефолтный для создания заказа
+    // WooCommerce требует email для создания заказа, но мы делаем поле необязательным для пользователя
+    if (empty($_POST['billing_email']) || !isset($_POST['billing_email'])) {
+        // Используем email текущего пользователя, если он залогинен, иначе дефолтный
+        $user_email = '';
+        if (is_user_logged_in()) {
+            $current_user = wp_get_current_user();
+            $user_email = $current_user->user_email;
+        }
+        if (empty($user_email)) {
+            // Дефолтный email для анонимных пользователей
+            $user_email = 'noreply@gustolocal.es';
+        }
+        $_POST['billing_email'] = $user_email;
+    }
 }
 
 // Проверяем успешность создания заказа
