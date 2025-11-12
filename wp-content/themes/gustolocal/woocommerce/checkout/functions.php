@@ -121,9 +121,6 @@ function gustolocal_update_delivery_type() {
     
     if (in_array($delivery_type, array('delivery', 'pickup'))) {
         WC()->session->set('delivery_type', $delivery_type);
-        if (function_exists('WC') && WC()->cart) {
-            WC()->cart->calculate_totals();
-        }
         wp_send_json_success();
     }
     
@@ -150,19 +147,8 @@ function gustolocal_add_delivery_fee() {
     
     $delivery_type = WC()->session->get('delivery_type', 'delivery');
     
-    // Remove previously added delivery fees to avoid duplicates
-    $fees_api = WC()->cart->fees_api();
-    foreach ( $fees_api->get_fees() as $key => $fee ) {
-        if ( in_array( $fee->name, array( 'Доставка', 'Самовывоз' ), true ) ) {
-            $fees_api->remove_fee( $fee );
-        }
-    }
-    
     if ($delivery_type === 'delivery') {
-        WC()->cart->add_fee(__('Доставка', 'woocommerce'), 10.00, false);
-    } else {
-        // Отображаем строку «Самовывоз» с нулевой стоимостью
-        WC()->cart->add_fee(__('Самовывоз', 'woocommerce'), 0, false);
+        WC()->cart->add_fee(__('Доставка', 'woocommerce'), 10.00);
     }
 }
 
@@ -217,17 +203,7 @@ function gustolocal_translate_woocommerce_strings($translated_text, $text, $doma
         'Cart' => 'Корзина',
         'Remove item' => 'Удалить товар',
         'Order total' => 'Сумма заказов',
-        'Cart totals' => 'Сумма заказа',
-        'Proceed to checkout' => 'Перейти к оформлению',
-        'Update cart' => 'Обновить корзину',
         'Delivery' => 'Доставка',
-        'Coupon code applied successfully.' => 'Купон успешно применён.',
-        'Coupon removed.' => 'Купон удалён.',
-        'Coupon code removed successfully.' => 'Купон удалён.',
-        'Coupon:' => 'Купон:',
-        'Your cart is currently empty.' => 'Ваша корзина пуста.',
-        'Return to shop' => 'Вернуться в магазин',
-        'Remove' => 'Удалить',
     );
     
     if (isset($translations[$text])) {
@@ -236,41 +212,3 @@ function gustolocal_translate_woocommerce_strings($translated_text, $text, $doma
     
     return $translated_text;
 }
-
-add_filter('woocommerce_return_to_shop_redirect', function() {
-    return home_url('/');
-});
-
-// Принудительно использовать правильный header для checkout
-add_filter('render_block_core/template-part', function($block_content, $block) {
-    if (is_checkout() && isset($block['attrs']['slug']) && $block['attrs']['slug'] === 'header') {
-        // Загружаем правильный header из файла
-        $header_file = get_template_directory() . '/parts/header.html';
-        if (file_exists($header_file)) {
-            $header_content = file_get_contents($header_file);
-            // Рендерим блоки из файла
-            $parsed_blocks = parse_blocks($header_content);
-            if (!empty($parsed_blocks)) {
-                $rendered = '';
-                foreach ($parsed_blocks as $parsed_block) {
-                    $rendered .= render_block($parsed_block);
-                }
-                return $rendered;
-            }
-        }
-    }
-    return $block_content;
-}, 999, 2);
-
-// Альтернативный подход: перехватываем через get_block_template
-add_filter('get_block_template', function($template, $id, $template_type) {
-    if ($template_type === 'wp_template_part' && is_checkout()) {
-        if (($id === 'gustolocal//header' || $id === 'header') && isset($template->slug) && $template->slug === 'header') {
-            $header_file = get_template_directory() . '/parts/header.html';
-            if (file_exists($header_file)) {
-                $template->content = file_get_contents($header_file);
-            }
-        }
-    }
-    return $template;
-}, 999, 3);
