@@ -42,73 +42,24 @@ add_action( 'enqueue_block_editor_assets', function () {
 } );
 
 /* ============ WooCommerce упрощенная форма оформления ============ */
-// Упрощаем форму оформления заказа - максимально упрощенная форма как на оригинале
+// Минимальные изменения - плагин Checkout Field Editor управляет полями
 add_filter('woocommerce_checkout_fields', 'gustolocal_simplify_checkout_fields');
 function gustolocal_simplify_checkout_fields($fields) {
-    // Полностью скрываем shipping поля
+    // Полностью скрываем shipping поля (доставка не используется)
     unset($fields['shipping']);
     
-    // Упрощаем billing поля - оставляем только самое необходимое
+    // Удаляем только company поле (не используется)
     unset($fields['billing']['billing_company']);
     
-    // ВАЖНО: Не удаляем обязательные поля, а делаем их необязательными и скрываем через CSS
-    // Это нужно для корректной работы платежных систем
-    if (isset($fields['billing']['billing_country'])) {
-        $fields['billing']['billing_country']['required'] = false;
-        $fields['billing']['billing_country']['class'][] = 'hidden-field';
-    }
-    
-    if (isset($fields['billing']['billing_state'])) {
-        $fields['billing']['billing_state']['required'] = false;
-        $fields['billing']['billing_state']['class'][] = 'hidden-field';
-    }
-    
-    if (isset($fields['billing']['billing_city'])) {
-        $fields['billing']['billing_city']['required'] = false;
-        $fields['billing']['billing_city']['class'][] = 'hidden-field';
-    }
-    
-    if (isset($fields['billing']['billing_postcode'])) {
-        $fields['billing']['billing_postcode']['required'] = false;
-        $fields['billing']['billing_postcode']['class'][] = 'hidden-field';
-    }
-    
-    // Переименовываем поля для простоты
-    if (isset($fields['billing']['billing_first_name'])) {
-        $fields['billing']['billing_first_name']['label'] = 'Ваше имя';
-        $fields['billing']['billing_first_name']['placeholder'] = '';
-    }
-    
-    if (isset($fields['billing']['billing_last_name'])) {
-        $fields['billing']['billing_last_name']['label'] = 'и фамилия';
-        $fields['billing']['billing_last_name']['placeholder'] = '';
-    }
-    
-    if (isset($fields['billing']['billing_address_1'])) {
-        $fields['billing']['billing_address_1']['label'] = 'Ваш адрес';
-        $fields['billing']['billing_address_1']['placeholder'] = '';
-    }
-    
-    if (isset($fields['billing']['billing_address_2'])) {
-        $fields['billing']['billing_address_2']['required'] = false;
-        $fields['billing']['billing_address_2']['label'] = 'Как к вам попасть (необязательно)';
-        $fields['billing']['billing_address_2']['placeholder'] = 'Укажите домофон, этаж и квартиру';
-    }
-    
-    if (isset($fields['billing']['billing_email'])) {
-        $fields['billing']['billing_email']['required'] = false;
-        $fields['billing']['billing_email']['label'] = 'Email (необязательно)';
-    }
-    
-    if (isset($fields['billing']['billing_phone'])) {
-        $fields['billing']['billing_phone']['label'] = 'Как с вами связаться';
-        $fields['billing']['billing_phone']['placeholder'] = 'телеграм, whatsApp, телефон или факс';
-    }
+    // ВАЖНО: Не изменяем другие поля - за них отвечает плагин Checkout Field Editor
+    // Плагин сам управляет labels, required, visibility и т.д.
     
     return $fields;
 }
 
-// Устанавливаем значения по умолчанию для скрытых полей
+// Устанавливаем значения по умолчанию только если они пустые (резервное заполнение)
+// Плагин Checkout Field Editor управляет полями, но если значения не установлены,
+// заполняем их для корректной работы платежных систем
 add_filter('woocommerce_checkout_get_value', 'gustolocal_set_default_checkout_values', 10, 2);
 function gustolocal_set_default_checkout_values($value, $input) {
     if (empty($value)) {
@@ -127,6 +78,7 @@ function gustolocal_set_default_checkout_values($value, $input) {
 }
 
 // Устанавливаем значения по умолчанию ПЕРЕД обработкой заказа (критично для платежных систем)
+// Только если значения не были установлены пользователем или плагином
 add_action('woocommerce_checkout_process', 'gustolocal_set_checkout_defaults_before_process');
 function gustolocal_set_checkout_defaults_before_process() {
     if (empty($_POST['billing_country'])) {
@@ -143,7 +95,7 @@ function gustolocal_set_checkout_defaults_before_process() {
     }
 }
 
-// Также устанавливаем значения в сессии WooCommerce
+// Также устанавливаем значения в заказ, если они не были установлены
 add_action('woocommerce_checkout_update_order_meta', 'gustolocal_set_order_defaults', 10, 2);
 function gustolocal_set_order_defaults($order_id, $data) {
     $order = wc_get_order($order_id);
