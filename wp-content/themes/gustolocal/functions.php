@@ -41,6 +41,61 @@ add_action( 'enqueue_block_editor_assets', function () {
     wp_enqueue_style( 'gustolocal-editor', $theme_dir . '/style.css', [], GUSTOLOCAL_VERSION );
 } );
 
+/* ============ Автоматическое создание таблиц WooCommerce ============ */
+// Проверяем и создаем недостающие таблицы WooCommerce
+add_action('woocommerce_loaded', 'gustolocal_check_wc_tables', 20);
+function gustolocal_check_wc_tables() {
+    // Проверяем только если WooCommerce активен
+    if (!class_exists('WooCommerce')) {
+        return;
+    }
+    
+    // Загружаем класс установки WooCommerce, если он еще не загружен
+    if (!class_exists('WC_Install')) {
+        $wc_install_file = WP_PLUGIN_DIR . '/woocommerce/includes/class-wc-install.php';
+        if (file_exists($wc_install_file)) {
+            require_once($wc_install_file);
+        } else {
+            return; // Не можем создать таблицы без класса установки
+        }
+    }
+    
+    global $wpdb;
+    $table_prefix = $wpdb->prefix;
+    
+    // Проверяем наличие критических таблиц
+    $critical_tables = array(
+        'wc_orders_meta',
+        'wc_order_addresses',
+    );
+    
+    $missing_tables = array();
+    foreach ($critical_tables as $table) {
+        $full_table_name = $table_prefix . $table;
+        $exists = $wpdb->get_var($wpdb->prepare("SHOW TABLES LIKE %s", $full_table_name));
+        if (!$exists) {
+            $missing_tables[] = $table;
+        }
+    }
+    
+    // Если есть недостающие таблицы, создаем их
+    if (!empty($missing_tables) && class_exists('WC_Install') && method_exists('WC_Install', 'create_tables')) {
+        try {
+            // Запускаем создание таблиц WooCommerce
+            WC_Install::create_tables();
+            
+            // Логируем для отладки
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('GustoLocal: Созданы недостающие таблицы WooCommerce: ' . implode(', ', $missing_tables));
+            }
+        } catch (Exception $e) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('GustoLocal: Ошибка при создании таблиц WooCommerce: ' . $e->getMessage());
+            }
+        }
+    }
+}
+
 /* ============ WooCommerce упрощенная форма оформления ============ */
 // Упрощаем форму чекаута - оставляем только необходимые поля
 add_filter('woocommerce_checkout_fields', 'gustolocal_simplify_checkout_fields');
