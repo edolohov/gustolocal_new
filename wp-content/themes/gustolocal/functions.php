@@ -79,10 +79,16 @@ function gustolocal_set_default_checkout_values($value, $input) {
 
 // Устанавливаем значения по умолчанию ПЕРЕД обработкой заказа (критично для платежных систем)
 // Используем более ранний хук, чтобы значения были установлены до валидации
-add_action('woocommerce_before_checkout_process', 'gustolocal_set_checkout_defaults_before_process', 5);
-add_action('woocommerce_checkout_process', 'gustolocal_set_checkout_defaults_before_process', 5);
+// ВАЖНО: Устанавливаем значения только в $_POST, не трогая процесс создания заказа
+add_action('woocommerce_before_checkout_process', 'gustolocal_set_checkout_defaults_before_process', 1);
 function gustolocal_set_checkout_defaults_before_process() {
+    // Проверяем, что это действительно запрос чекаута
+    if (!isset($_POST['woocommerce-process-checkout-nonce'])) {
+        return;
+    }
+    
     // Устанавливаем значения только если они действительно пустые
+    // Это нужно для корректной работы платежных систем
     if (empty($_POST['billing_country']) || !isset($_POST['billing_country'])) {
         $_POST['billing_country'] = 'ES';
     }
@@ -98,32 +104,49 @@ function gustolocal_set_checkout_defaults_before_process() {
 }
 
 // Также устанавливаем значения в заказ, если они не были установлены
-add_action('woocommerce_checkout_update_order_meta', 'gustolocal_set_order_defaults', 10, 2);
-function gustolocal_set_order_defaults($order_id, $data) {
-    if (!$order_id) {
+// Используем хук ПОСЛЕ создания заказа, чтобы не конфликтовать с плагином Checkout Field Editor
+add_action('woocommerce_new_order', 'gustolocal_set_order_defaults_after_creation', 20, 1);
+add_action('woocommerce_checkout_order_processed', 'gustolocal_set_order_defaults_after_creation', 20, 1);
+function gustolocal_set_order_defaults_after_creation($order_id) {
+    // Проверяем, что это действительно ID заказа
+    if (!$order_id || !is_numeric($order_id)) {
         return;
     }
     
+    // Используем небольшую задержку, чтобы плагин успел обработать заказ
+    // Но делаем это синхронно, чтобы не было проблем с AJAX
+    gustolocal_apply_order_defaults($order_id);
+}
+
+function gustolocal_apply_order_defaults($order_id) {
     try {
         $order = wc_get_order($order_id);
-        if (!$order) {
+        if (!$order || !is_a($order, 'WC_Order')) {
             return;
         }
         
+        $needs_save = false;
+        
         if (!$order->get_billing_country()) {
             $order->set_billing_country('ES');
+            $needs_save = true;
         }
         if (!$order->get_billing_state()) {
             $order->set_billing_state('VC');
+            $needs_save = true;
         }
         if (!$order->get_billing_city()) {
             $order->set_billing_city('Валенсия');
+            $needs_save = true;
         }
         if (!$order->get_billing_postcode()) {
             $order->set_billing_postcode('46000');
+            $needs_save = true;
         }
         
-        $order->save();
+        if ($needs_save) {
+            $order->save();
+        }
     } catch (Exception $e) {
         // Логируем ошибку, но не прерываем процесс
         if (defined('WP_DEBUG') && WP_DEBUG) {
