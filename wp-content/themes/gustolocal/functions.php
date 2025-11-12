@@ -78,19 +78,21 @@ function gustolocal_set_default_checkout_values($value, $input) {
 }
 
 // Устанавливаем значения по умолчанию ПЕРЕД обработкой заказа (критично для платежных систем)
-// Только если значения не были установлены пользователем или плагином
-add_action('woocommerce_checkout_process', 'gustolocal_set_checkout_defaults_before_process');
+// Используем более ранний хук, чтобы значения были установлены до валидации
+add_action('woocommerce_before_checkout_process', 'gustolocal_set_checkout_defaults_before_process', 5);
+add_action('woocommerce_checkout_process', 'gustolocal_set_checkout_defaults_before_process', 5);
 function gustolocal_set_checkout_defaults_before_process() {
-    if (empty($_POST['billing_country'])) {
+    // Устанавливаем значения только если они действительно пустые
+    if (empty($_POST['billing_country']) || !isset($_POST['billing_country'])) {
         $_POST['billing_country'] = 'ES';
     }
-    if (empty($_POST['billing_state'])) {
+    if (empty($_POST['billing_state']) || !isset($_POST['billing_state'])) {
         $_POST['billing_state'] = 'VC';
     }
-    if (empty($_POST['billing_city'])) {
+    if (empty($_POST['billing_city']) || !isset($_POST['billing_city'])) {
         $_POST['billing_city'] = 'Валенсия';
     }
-    if (empty($_POST['billing_postcode'])) {
+    if (empty($_POST['billing_postcode']) || !isset($_POST['billing_postcode'])) {
         $_POST['billing_postcode'] = '46000';
     }
 }
@@ -98,22 +100,47 @@ function gustolocal_set_checkout_defaults_before_process() {
 // Также устанавливаем значения в заказ, если они не были установлены
 add_action('woocommerce_checkout_update_order_meta', 'gustolocal_set_order_defaults', 10, 2);
 function gustolocal_set_order_defaults($order_id, $data) {
-    $order = wc_get_order($order_id);
-    
-    if (!$order->get_billing_country()) {
-        $order->set_billing_country('ES');
-    }
-    if (!$order->get_billing_state()) {
-        $order->set_billing_state('VC');
-    }
-    if (!$order->get_billing_city()) {
-        $order->set_billing_city('Валенсия');
-    }
-    if (!$order->get_billing_postcode()) {
-        $order->set_billing_postcode('46000');
+    if (!$order_id) {
+        return;
     }
     
-    $order->save();
+    try {
+        $order = wc_get_order($order_id);
+        if (!$order) {
+            return;
+        }
+        
+        if (!$order->get_billing_country()) {
+            $order->set_billing_country('ES');
+        }
+        if (!$order->get_billing_state()) {
+            $order->set_billing_state('VC');
+        }
+        if (!$order->get_billing_city()) {
+            $order->set_billing_city('Валенсия');
+        }
+        if (!$order->get_billing_postcode()) {
+            $order->set_billing_postcode('46000');
+        }
+        
+        $order->save();
+    } catch (Exception $e) {
+        // Логируем ошибку, но не прерываем процесс
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('GustoLocal: Ошибка при установке значений по умолчанию для заказа ' . $order_id . ': ' . $e->getMessage());
+        }
+    }
+}
+
+// Логирование ошибок чекаута для отладки
+add_action('woocommerce_checkout_process', 'gustolocal_log_checkout_errors', 999);
+function gustolocal_log_checkout_errors() {
+    if (defined('WP_DEBUG') && WP_DEBUG && defined('WP_DEBUG_LOG') && WP_DEBUG_LOG) {
+        $errors = wc_get_notices('error');
+        if (!empty($errors)) {
+            error_log('GustoLocal: Ошибки валидации чекаута: ' . print_r($errors, true));
+        }
+    }
 }
 
 /* ============ WooCommerce опции доставки ============ */
