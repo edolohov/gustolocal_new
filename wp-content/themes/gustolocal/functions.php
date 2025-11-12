@@ -55,21 +55,25 @@ function gustolocal_simplify_checkout_fields($fields) {
     if (isset($fields['billing']['billing_country'])) {
         $fields['billing']['billing_country']['required'] = false;
         $fields['billing']['billing_country']['class'][] = 'hidden-field';
+        $fields['billing']['billing_country']['validate'] = array(); // Убираем валидацию
     }
     
     if (isset($fields['billing']['billing_state'])) {
         $fields['billing']['billing_state']['required'] = false;
         $fields['billing']['billing_state']['class'][] = 'hidden-field';
+        $fields['billing']['billing_state']['validate'] = array(); // Убираем валидацию
     }
     
     if (isset($fields['billing']['billing_city'])) {
         $fields['billing']['billing_city']['required'] = false;
         $fields['billing']['billing_city']['class'][] = 'hidden-field';
+        $fields['billing']['billing_city']['validate'] = array(); // Убираем валидацию
     }
     
     if (isset($fields['billing']['billing_postcode'])) {
         $fields['billing']['billing_postcode']['required'] = false;
         $fields['billing']['billing_postcode']['class'][] = 'hidden-field';
+        $fields['billing']['billing_postcode']['validate'] = array(); // Убираем валидацию
     }
     
     // Настраиваем видимые поля согласно дизайну
@@ -90,29 +94,29 @@ function gustolocal_simplify_checkout_fields($fields) {
     }
     
     if (isset($fields['billing']['billing_address_1'])) {
-        $fields['billing']['billing_address_1']['label'] = 'Ваш адрес (необязательно)';
+        $fields['billing']['billing_address_1']['label'] = 'Адрес';
         $fields['billing']['billing_address_1']['required'] = false;
-        $fields['billing']['billing_address_1']['placeholder'] = 'достаточно названия улицы и номера дома';
+        $fields['billing']['billing_address_1']['placeholder'] = 'Номер дома и название улицы';
         $fields['billing']['billing_address_1']['priority'] = 30;
+    }
+    
+    if (isset($fields['billing']['billing_email'])) {
+        $fields['billing']['billing_email']['label'] = 'Ваш e-mail';
+        $fields['billing']['billing_email']['required'] = false;
+        $fields['billing']['billing_email']['placeholder'] = '';
+        $fields['billing']['billing_email']['priority'] = 40;
     }
     
     if (isset($fields['billing']['billing_address_2'])) {
         $fields['billing']['billing_address_2']['required'] = false;
-        $fields['billing']['billing_address_2']['label'] = 'Как к вам попасть (необязательно)';
+        $fields['billing']['billing_address_2']['label'] = 'Как к вам попасть';
         $fields['billing']['billing_address_2']['placeholder'] = 'укажите домофон, этаж и квартиру';
-        $fields['billing']['billing_address_2']['priority'] = 40;
-    }
-    
-    if (isset($fields['billing']['billing_email'])) {
-        $fields['billing']['billing_email']['label'] = 'Ваш e-mail (необязательно)';
-        $fields['billing']['billing_email']['required'] = false;
-        $fields['billing']['billing_email']['placeholder'] = '';
-        $fields['billing']['billing_email']['priority'] = 50;
+        $fields['billing']['billing_address_2']['priority'] = 50;
     }
     
     if (isset($fields['billing']['billing_phone'])) {
         $fields['billing']['billing_phone']['required'] = false;
-        $fields['billing']['billing_phone']['label'] = 'Как с вами связаться (необязательно)';
+        $fields['billing']['billing_phone']['label'] = 'Как с вами связаться';
         $fields['billing']['billing_phone']['placeholder'] = 'телеграм, whatsApp, телефон или факс';
         $fields['billing']['billing_phone']['priority'] = 60;
     }
@@ -128,6 +132,50 @@ function gustolocal_make_email_optional($fields) {
         $fields['billing']['billing_email']['validate'] = array('email'); // Валидация формата, но не обязательность
     }
     return $fields;
+}
+
+// Отключаем валидацию скрытых полей (провинция, страна, город, почтовый индекс)
+add_action('woocommerce_checkout_process', 'gustolocal_disable_hidden_fields_validation', 1);
+function gustolocal_disable_hidden_fields_validation() {
+    // Устанавливаем значения по умолчанию для скрытых полей перед валидацией
+    if (empty($_POST['billing_country']) || !isset($_POST['billing_country'])) {
+        $_POST['billing_country'] = 'ES';
+    }
+    if (empty($_POST['billing_state']) || !isset($_POST['billing_state'])) {
+        $_POST['billing_state'] = 'VC';
+    }
+    if (empty($_POST['billing_city']) || !isset($_POST['billing_city'])) {
+        $_POST['billing_city'] = 'Валенсия';
+    }
+    if (empty($_POST['billing_postcode']) || !isset($_POST['billing_postcode'])) {
+        $_POST['billing_postcode'] = '46000';
+    }
+}
+
+// Удаляем ошибки валидации для скрытых полей
+add_filter('woocommerce_checkout_fields', 'gustolocal_remove_hidden_fields_errors', 999);
+function gustolocal_remove_hidden_fields_errors($fields) {
+    // Удаляем ошибки валидации для скрытых полей
+    $hidden_fields = array('billing_country', 'billing_state', 'billing_city', 'billing_postcode');
+    foreach ($hidden_fields as $field_key) {
+        if (isset($fields['billing'][$field_key])) {
+            // Убираем все валидации
+            $fields['billing'][$field_key]['validate'] = array();
+            $fields['billing'][$field_key]['required'] = false;
+        }
+    }
+    return $fields;
+}
+
+// Удаляем уведомления об ошибках для скрытых полей
+add_action('woocommerce_after_checkout_validation', 'gustolocal_remove_hidden_fields_notices', 10, 2);
+function gustolocal_remove_hidden_fields_notices($data, $errors) {
+    $hidden_fields = array('billing_country', 'billing_state', 'billing_city', 'billing_postcode');
+    foreach ($hidden_fields as $field_key) {
+        if ($errors->get_error_message($field_key)) {
+            $errors->remove($field_key);
+        }
+    }
 }
 
 // Устанавливаем значения по умолчанию только если они пустые (резервное заполнение)
