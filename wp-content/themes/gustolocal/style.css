@@ -1722,14 +1722,22 @@ main.gl-container > .wp-block-group {
   white-space: normal !important;
   word-wrap: break-word !important;
   overflow-wrap: break-word !important;
-  max-width: 100%;
+  word-break: break-word !important;
+  max-width: 100% !important;
+  box-sizing: border-box !important;
 }
 
 .woocommerce-cart .cart_item .product-name *,
-.woocommerce-checkout .cart_item .product-name * {
+.woocommerce-checkout .cart_item .product-name *,
+.woocommerce-cart .cart_item .product-name a,
+.woocommerce-checkout .cart_item .product-name a,
+.woocommerce-cart .cart_item .product-name span,
+.woocommerce-checkout .cart_item .product-name span {
   white-space: normal !important;
   word-wrap: break-word !important;
   overflow-wrap: break-word !important;
+  word-break: break-word !important;
+  max-width: 100% !important;
 }
 
 .woocommerce-cart .cart_item .product-name > div,
@@ -2227,8 +2235,13 @@ main.gl-container > .wp-block-group {
   }
 
   .woocommerce-cart .shop_table tbody td.product-name {
-    display: block;
-    width: 100%;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    box-sizing: border-box !important;
   }
 
   .woocommerce-cart .shop_table tbody td:last-child {
@@ -2275,25 +2288,35 @@ main.gl-container > .wp-block-group {
   .woocommerce-cart .shop_table .product-name {
     display: block !important;
     width: 100% !important;
+    max-width: 100% !important;
     white-space: normal !important;
     word-wrap: break-word !important;
     overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    hyphens: auto !important;
     flex-direction: column;
     align-items: flex-start;
     gap: 0.5rem;
     font-weight: 600;
     font-size: 1rem;
     margin-bottom: 0.5rem;
+    box-sizing: border-box !important;
   }
 
   .woocommerce-cart .shop_table .product-name::before {
     display: none;
   }
 
-  .woocommerce-cart .shop_table .product-name * {
+  .woocommerce-cart .shop_table .product-name *,
+  .woocommerce-cart .shop_table .product-name a,
+  .woocommerce-cart .shop_table .product-name span,
+  .woocommerce-cart .shop_table .product-name div {
     white-space: normal !important;
     word-wrap: break-word !important;
     overflow-wrap: break-word !important;
+    word-break: break-word !important;
+    hyphens: auto !important;
+    max-width: 100% !important;
   }
 
   .woocommerce-cart .shop_table .product-price,
