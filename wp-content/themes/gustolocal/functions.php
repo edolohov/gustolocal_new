@@ -72,39 +72,61 @@ function gustolocal_simplify_checkout_fields($fields) {
         $fields['billing']['billing_postcode']['class'][] = 'hidden-field';
     }
     
-    // Настраиваем видимые поля
+    // Настраиваем видимые поля согласно дизайну
     if (isset($fields['billing']['billing_first_name'])) {
-        $fields['billing']['billing_first_name']['label'] = 'Имя';
+        $fields['billing']['billing_first_name']['label'] = 'Ваше имя';
+        $fields['billing']['billing_first_name']['required'] = true;
         $fields['billing']['billing_first_name']['placeholder'] = '';
+        $fields['billing']['billing_first_name']['priority'] = 10;
+        $fields['billing']['billing_first_name']['class'] = array('form-row-first');
     }
     
     if (isset($fields['billing']['billing_last_name'])) {
-        $fields['billing']['billing_last_name']['label'] = 'Фамилия';
+        $fields['billing']['billing_last_name']['label'] = 'и фамилия';
+        $fields['billing']['billing_last_name']['required'] = true;
         $fields['billing']['billing_last_name']['placeholder'] = '';
+        $fields['billing']['billing_last_name']['priority'] = 20;
+        $fields['billing']['billing_last_name']['class'] = array('form-row-last');
     }
     
     if (isset($fields['billing']['billing_address_1'])) {
-        $fields['billing']['billing_address_1']['label'] = 'Адрес';
-        $fields['billing']['billing_address_1']['placeholder'] = 'Номер дома и название улицы';
+        $fields['billing']['billing_address_1']['label'] = 'Ваш адрес (необязательно)';
+        $fields['billing']['billing_address_1']['required'] = false;
+        $fields['billing']['billing_address_1']['placeholder'] = 'достаточно названия улицы и номера дома';
+        $fields['billing']['billing_address_1']['priority'] = 30;
     }
     
     if (isset($fields['billing']['billing_address_2'])) {
         $fields['billing']['billing_address_2']['required'] = false;
-        $fields['billing']['billing_address_2']['label'] = 'Крыло, подъезд, этаж и т.д. (необязательно)';
-        $fields['billing']['billing_address_2']['placeholder'] = '';
+        $fields['billing']['billing_address_2']['label'] = 'Как к вам попасть (необязательно)';
+        $fields['billing']['billing_address_2']['placeholder'] = 'укажите домофон, этаж и квартиру';
+        $fields['billing']['billing_address_2']['priority'] = 40;
     }
     
     if (isset($fields['billing']['billing_email'])) {
-        $fields['billing']['billing_email']['label'] = 'Email';
+        $fields['billing']['billing_email']['label'] = 'Ваш e-mail (необязательно)';
+        $fields['billing']['billing_email']['required'] = false;
         $fields['billing']['billing_email']['placeholder'] = '';
+        $fields['billing']['billing_email']['priority'] = 50;
     }
     
     if (isset($fields['billing']['billing_phone'])) {
         $fields['billing']['billing_phone']['required'] = false;
-        $fields['billing']['billing_phone']['label'] = 'Телефон (необязательно)';
-        $fields['billing']['billing_phone']['placeholder'] = '';
+        $fields['billing']['billing_phone']['label'] = 'Как с вами связаться (необязательно)';
+        $fields['billing']['billing_phone']['placeholder'] = 'телеграм, whatsApp, телефон или факс';
+        $fields['billing']['billing_phone']['priority'] = 60;
     }
     
+    return $fields;
+}
+
+// Отключаем обязательную валидацию email, так как поле необязательное
+add_filter('woocommerce_checkout_fields', 'gustolocal_make_email_optional', 20);
+function gustolocal_make_email_optional($fields) {
+    if (isset($fields['billing']['billing_email'])) {
+        $fields['billing']['billing_email']['required'] = false;
+        $fields['billing']['billing_email']['validate'] = array('email'); // Валидация формата, но не обязательность
+    }
     return $fields;
 }
 
