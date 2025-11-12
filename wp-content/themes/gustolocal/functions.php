@@ -103,6 +103,18 @@ function gustolocal_set_checkout_defaults_before_process() {
     }
 }
 
+// Проверяем успешность создания заказа
+add_filter('woocommerce_checkout_create_order', 'gustolocal_ensure_order_creation', 10, 2);
+function gustolocal_ensure_order_creation($order, $data) {
+    if (!$order || is_wp_error($order)) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('GustoLocal: Ошибка создания заказа: ' . (is_wp_error($order) ? $order->get_error_message() : 'Order is false'));
+            error_log('GustoLocal: Данные заказа: ' . print_r($data, true));
+        }
+    }
+    return $order;
+}
+
 // Также устанавливаем значения в заказ, если они не были установлены
 // Используем хук ПОСЛЕ создания заказа, чтобы не конфликтовать с плагином Checkout Field Editor
 add_action('woocommerce_new_order', 'gustolocal_set_order_defaults_after_creation', 20, 1);
@@ -164,6 +176,48 @@ function gustolocal_log_checkout_errors() {
             error_log('GustoLocal: Ошибки валидации чекаута: ' . print_r($errors, true));
         }
     }
+}
+
+// ФИКС: Исправляем проблему с плагином Checkout Field Editor
+// Плагин получает false вместо объекта заказа в хуке woocommerce_checkout_update_order_meta
+// Проблема в том, что плагин ожидает объект заказа, но получает ID
+// Перехватываем хук ДО плагина и убеждаемся, что заказ создан правильно
+add_action('woocommerce_checkout_update_order_meta', 'gustolocal_fix_checkout_field_editor_order', 1, 2);
+function gustolocal_fix_checkout_field_editor_order($order_id, $data) {
+    // Проверяем, что order_id валидный
+    if (!$order_id || !is_numeric($order_id)) {
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('GustoLocal: Невалидный order_id в woocommerce_checkout_update_order_meta: ' . var_export($order_id, true));
+        }
+        return;
+    }
+    
+    // Получаем заказ и проверяем, что он существует
+    $order = wc_get_order($order_id);
+    if (!$order || !is_a($order, 'WC_Order')) {
+        // Если заказ не найден, логируем ошибку
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            error_log('GustoLocal: Заказ ' . $order_id . ' не найден при вызове woocommerce_checkout_update_order_meta. Данные: ' . print_r($data, true));
+        }
+        return;
+    }
+    
+    // Убеждаемся, что заказ сохранен и имеет все необходимые данные
+    if (!$order->get_billing_country()) {
+        $order->set_billing_country('ES');
+    }
+    if (!$order->get_billing_state()) {
+        $order->set_billing_state('VC');
+    }
+    if (!$order->get_billing_city()) {
+        $order->set_billing_city('Валенсия');
+    }
+    if (!$order->get_billing_postcode()) {
+        $order->set_billing_postcode('46000');
+    }
+    
+    // Сохраняем заказ, чтобы плагин получил валидный объект
+    $order->save();
 }
 
 /* ============ WooCommerce опции доставки ============ */
