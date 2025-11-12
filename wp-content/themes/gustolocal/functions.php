@@ -42,17 +42,68 @@ add_action( 'enqueue_block_editor_assets', function () {
 } );
 
 /* ============ WooCommerce упрощенная форма оформления ============ */
-// Минимальные изменения - плагин Checkout Field Editor управляет полями
+// Упрощаем форму чекаута - оставляем только необходимые поля
 add_filter('woocommerce_checkout_fields', 'gustolocal_simplify_checkout_fields');
 function gustolocal_simplify_checkout_fields($fields) {
     // Полностью скрываем shipping поля (доставка не используется)
     unset($fields['shipping']);
     
-    // Удаляем только company поле (не используется)
+    // Удаляем ненужные поля
     unset($fields['billing']['billing_company']);
     
-    // ВАЖНО: Не изменяем другие поля - за них отвечает плагин Checkout Field Editor
-    // Плагин сам управляет labels, required, visibility и т.д.
+    // Скрываем поля, которые заполняются автоматически (делаем необязательными и скрываем через CSS)
+    if (isset($fields['billing']['billing_country'])) {
+        $fields['billing']['billing_country']['required'] = false;
+        $fields['billing']['billing_country']['class'][] = 'hidden-field';
+    }
+    
+    if (isset($fields['billing']['billing_state'])) {
+        $fields['billing']['billing_state']['required'] = false;
+        $fields['billing']['billing_state']['class'][] = 'hidden-field';
+    }
+    
+    if (isset($fields['billing']['billing_city'])) {
+        $fields['billing']['billing_city']['required'] = false;
+        $fields['billing']['billing_city']['class'][] = 'hidden-field';
+    }
+    
+    if (isset($fields['billing']['billing_postcode'])) {
+        $fields['billing']['billing_postcode']['required'] = false;
+        $fields['billing']['billing_postcode']['class'][] = 'hidden-field';
+    }
+    
+    // Настраиваем видимые поля
+    if (isset($fields['billing']['billing_first_name'])) {
+        $fields['billing']['billing_first_name']['label'] = 'Имя';
+        $fields['billing']['billing_first_name']['placeholder'] = '';
+    }
+    
+    if (isset($fields['billing']['billing_last_name'])) {
+        $fields['billing']['billing_last_name']['label'] = 'Фамилия';
+        $fields['billing']['billing_last_name']['placeholder'] = '';
+    }
+    
+    if (isset($fields['billing']['billing_address_1'])) {
+        $fields['billing']['billing_address_1']['label'] = 'Адрес';
+        $fields['billing']['billing_address_1']['placeholder'] = 'Номер дома и название улицы';
+    }
+    
+    if (isset($fields['billing']['billing_address_2'])) {
+        $fields['billing']['billing_address_2']['required'] = false;
+        $fields['billing']['billing_address_2']['label'] = 'Крыло, подъезд, этаж и т.д. (необязательно)';
+        $fields['billing']['billing_address_2']['placeholder'] = '';
+    }
+    
+    if (isset($fields['billing']['billing_email'])) {
+        $fields['billing']['billing_email']['label'] = 'Email';
+        $fields['billing']['billing_email']['placeholder'] = '';
+    }
+    
+    if (isset($fields['billing']['billing_phone'])) {
+        $fields['billing']['billing_phone']['required'] = false;
+        $fields['billing']['billing_phone']['label'] = 'Телефон (необязательно)';
+        $fields['billing']['billing_phone']['placeholder'] = '';
+    }
     
     return $fields;
 }
