@@ -1796,8 +1796,12 @@ main.gl-container > .wp-block-group {
 
 .woocommerce-cart .cart_item .product-name *,
 .woocommerce-checkout .cart_item .product-name *,
+/* Убираем стили ссылок на товары - они не должны быть кликабельными */
 .woocommerce-cart .cart_item .product-name a,
 .woocommerce-checkout .cart_item .product-name a,
+.woocommerce-order-details .product-name a,
+.woocommerce-table--order-details .product-name a,
+.woocommerce-orders-table .product-name a,
 .woocommerce-cart .cart_item .product-name span,
 .woocommerce-checkout .cart_item .product-name span {
   white-space: normal !important;
@@ -1842,6 +1846,29 @@ main.gl-container > .wp-block-group {
   display: block;
   content: "";
   margin-bottom: 0.25rem;
+}
+
+/* Убираем стили ссылок на товары - делаем их неактивными */
+.woocommerce-cart .cart_item .product-name a,
+.woocommerce-checkout .cart_item .product-name a,
+.woocommerce-order-details .product-name a,
+.woocommerce-table--order-details .product-name a,
+.woocommerce-orders-table .product-name a,
+.woocommerce-email-order-items .product-name a {
+  color: inherit !important;
+  text-decoration: none !important;
+  cursor: default !important;
+  pointer-events: none !important;
+}
+
+.woocommerce-cart .cart_item .product-name a:hover,
+.woocommerce-checkout .cart_item .product-name a:hover,
+.woocommerce-order-details .product-name a:hover,
+.woocommerce-table--order-details .product-name a:hover,
+.woocommerce-orders-table .product-name a:hover,
+.woocommerce-email-order-items .product-name a:hover {
+  color: inherit !important;
+  text-decoration: none !important;
 }
 
 /* Улучшаем форматирование секции итогов в чекауте */
