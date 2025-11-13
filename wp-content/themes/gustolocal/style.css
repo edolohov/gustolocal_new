@@ -3037,3 +3037,166 @@ main.gl-container > .wp-block-group {
   margin-top: 1rem;
   text-align: center;
 }
+
+/* ============ Улучшение таблицы заказа на чекауте ============ */
+/* Скрываем количество × 1 на чекауте */
+.woocommerce-checkout .product-quantity {
+  display: none !important;
+}
+
+/* Улучшаем таблицу заказа на чекауте */
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0;
+}
+
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table thead {
+  border-bottom: 2px solid #e5e5e5;
+}
+
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table thead th {
+  padding: 0.75rem 0;
+  font-weight: 600;
+  text-align: left;
+  color: var(--gl-color-text);
+}
+
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table thead th.product-name {
+  width: 60%;
+}
+
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table thead th.product-total {
+  width: 40%;
+  text-align: right;
+}
+
+/* Стили для тела таблицы */
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tbody tr {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tbody td {
+  padding: 1rem 0;
+  vertical-align: top;
+}
+
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tbody td.product-name {
+  padding-right: 1rem;
+}
+
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tbody td.product-total {
+  text-align: right;
+  padding-left: 1rem;
+  white-space: nowrap;
+}
+
+/* Стили для деталей продукта */
+.woocommerce-checkout .wmb-product-name-main {
+  font-weight: 600;
+  color: var(--gl-color-text);
+  margin-bottom: 0.25rem;
+}
+
+.woocommerce-checkout .wmb-product-details {
+  font-size: 0.875rem;
+  color: var(--gl-color-text-muted);
+  line-height: 1.5;
+}
+
+/* Стили для итогов (tfoot) */
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tfoot {
+  border-top: 2px solid #e5e5e5;
+  margin-top: 0.5rem;
+}
+
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tfoot tr {
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tfoot tr:last-child {
+  border-bottom: none;
+}
+
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tfoot th {
+  padding: 0.75rem 0;
+  font-weight: 500;
+  text-align: left;
+  color: var(--gl-color-text);
+  padding-right: 1rem;
+}
+
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tfoot td {
+  padding: 0.75rem 0;
+  text-align: right;
+  padding-left: 1rem;
+  white-space: nowrap;
+}
+
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tfoot .cart-subtotal th,
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tfoot .cart-subtotal td {
+  padding-top: 1rem;
+}
+
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tfoot .fee th,
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tfoot .fee td {
+  padding: 0.5rem 0;
+}
+
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tfoot .order-total {
+  border-top: 2px solid #e5e5e5;
+  margin-top: 0.5rem;
+}
+
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tfoot .order-total th {
+  padding-top: 1rem;
+  font-weight: 700;
+  font-size: 1.125rem;
+  color: var(--gl-color-text);
+}
+
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tfoot .order-total td {
+  padding-top: 1rem;
+  font-weight: 700;
+  font-size: 1.125rem;
+}
+
+.woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tfoot .order-total .woocommerce-Price-amount {
+  color: var(--gl-color-primary);
+  font-size: 1.25rem;
+}
+
+/* Мобильная версия */
+@media (max-width: 768px) {
+  .woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table thead th.product-name,
+  .woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table thead th.product-total {
+    width: auto;
+  }
+  
+  .woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tbody td.product-name {
+    padding-right: 0.5rem;
+  }
+  
+  .woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tbody td.product-total {
+    padding-left: 0.5rem;
+  }
+  
+  .woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tfoot th {
+    padding-right: 0.5rem;
+    font-size: 0.9375rem;
+  }
+  
+  .woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tfoot td {
+    padding-left: 0.5rem;
+    font-size: 0.9375rem;
+  }
+  
+  .woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tfoot .order-total th,
+  .woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tfoot .order-total td {
+    font-size: 1rem;
+  }
+  
+  .woocommerce-checkout .shop_table.woocommerce-checkout-review-order-table tfoot .order-total .woocommerce-Price-amount {
+    font-size: 1.125rem;
+  }
+}
