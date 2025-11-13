@@ -110,9 +110,35 @@
 	<div class="wp-block-column" style="flex-basis:33.33%">
 		<!-- wp:group {"className":"gl-card gl-form-card","layout":{"type":"constrained"}} -->
 		<div class="wp-block-group gl-card gl-form-card">
-			<!-- wp:shortcode -->
-			[contact-form-7 id="db040f5" title="Тестовый набор"]
-			<!-- /wp:shortcode -->
+			<!-- wp:html -->
+			<div class="gl-form-grid">
+				<div class="gl-form-group">
+					<label><strong>Сколько человек дома?</strong></label>
+					[text* family-size placeholder "например: 2 взрослых и ребёнок"]
+				</div>
+
+				<div class="gl-form-group">
+					<label><strong>Район/улица</strong></label>
+					[text* district placeholder "например: Ruzafa или Quart de Poblet"]
+				</div>
+
+				<div class="gl-form-group">
+					<label><strong>Как с вами связаться?</strong></label>
+					[text* contact placeholder "@telegram / WhatsApp / телефон"]
+				</div>
+
+				<div class="gl-form-group">
+					<label><strong>Пожелания и особенности</strong></label>
+					[textarea wishes placeholder "что хотите добавить, заменить или уточнить?"]
+				</div>
+			</div>
+
+			<div class="gl-form-actions">
+				[submit class:gl-button class:gl-button--primary "Хочу попробовать!"]
+			</div>
+
+			<p class="gl-footnote">Мы свяжемся в ближайшее время и подтвердим состав, способ оплаты и доставку.</p>
+			<!-- /wp:html -->
 		</div>
 		<!-- /wp:group -->
 	</div>
