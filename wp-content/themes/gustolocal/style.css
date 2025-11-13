@@ -464,11 +464,44 @@ main.gl-container > .wp-block-group {
 }
 
 /* WordPress navigation block overrides */
-/* Hide WordPress navigation block's own mobile toggle buttons */
+/* Style WordPress navigation block's mobile toggle buttons */
 .gl-navigation .wp-block-navigation__responsive-container-open,
 .gl-navigation button[aria-label*="Open menu"],
 .gl-navigation button[aria-label*="Close menu"] {
-  display: none !important;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--gl-color-text);
+  width: 40px;
+  height: 40px;
+  padding: var(--gl-spacing-xs);
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.gl-navigation .wp-block-navigation__responsive-container-open svg,
+.gl-navigation button[aria-label*="Open menu"] svg,
+.gl-navigation button[aria-label*="Close menu"] svg {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+
+.gl-navigation .wp-block-navigation__responsive-container-open:hover,
+.gl-navigation .wp-block-navigation__responsive-container-open:focus,
+.gl-navigation button[aria-label*="Open menu"]:hover,
+.gl-navigation button[aria-label*="Open menu"]:focus,
+.gl-navigation button[aria-label*="Close menu"]:hover,
+.gl-navigation button[aria-label*="Close menu"]:focus {
+  color: var(--gl-color-primary);
+  outline: none;
+}
+
+.gl-navigation button[aria-label*="Close menu"] {
+  align-self: flex-end;
+  margin: var(--gl-spacing-sm);
 }
 
 /* Show navigation menu on desktop */
@@ -530,6 +563,12 @@ main.gl-container > .wp-block-group {
   .gl-navigation .wp-block-navigation__responsive-container-content > ul + ul {
     margin-left: 0 !important;
     padding-left: 0 !important;
+  }
+
+  .gl-navigation .wp-block-navigation__responsive-container-open,
+  .gl-navigation button[aria-label*="Open menu"],
+  .gl-navigation button[aria-label*="Close menu"] {
+    display: none !important;
   }
 }
 
