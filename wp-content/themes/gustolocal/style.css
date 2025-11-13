@@ -381,7 +381,9 @@ main.gl-container > .wp-block-group {
 }
 
 .gl-mobile-toggle {
-  display: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   background: none;
   border: none;
   color: var(--gl-color-text);
