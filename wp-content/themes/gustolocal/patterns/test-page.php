@@ -111,7 +111,7 @@
 		<!-- wp:group {"className":"gl-card gl-form-card","layout":{"type":"constrained"}} -->
 		<div class="wp-block-group gl-card gl-form-card">
 			<!-- wp:html -->
-			<div class="gl-form-grid">
+			<div class="gl-form-grid gl-form-grid-single">
 				<div class="gl-form-group">
 					<label><strong>Сколько человек дома?</strong></label>
 					[text* family-size placeholder "например: 2 взрослых и ребёнок"]
