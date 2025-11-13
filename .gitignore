@@ -20,3 +20,7 @@ wp-content/debug.log
 
 # WP MU plugins (env-specific)
 wp-content/mu-plugins/
+
+# Server-specific files (should not be committed)
+.htaccess
+wp-config.php
