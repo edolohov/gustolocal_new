@@ -63,13 +63,53 @@ header('Content-Type: text/html; charset=utf-8');
     <p>Скрипт помогает найти причины ошибки <code>INSERT INTO ... stg_wffilemods ...</code>, которая возникает при сканировании Wordfence.</p>
 
     <?php
-    // Проверка существования таблицы
+    // Сначала ищем все таблицы Wordfence
+    $all_tables = $wpdb->get_col( "SHOW TABLES" );
+    $wf_tables = array_filter( $all_tables, function( $table ) {
+        return strpos( $table, 'wffilemods' ) !== false || 
+               strpos( $table, 'wf' ) !== false;
+    } );
+    
+    echo '<h2>Найденные таблицы Wordfence</h2>';
+    if ( ! empty( $wf_tables ) ) {
+        echo '<div class="info">Найдено таблиц Wordfence: ' . count( $wf_tables ) . '</div>';
+        echo '<ul>';
+        foreach ( $wf_tables as $table ) {
+            echo '<li><code>' . esc_html( $table ) . '</code></li>';
+        }
+        echo '</ul>';
+    } else {
+        echo '<div class="warning">Таблицы Wordfence не найдены. Возможно, Wordfence не установлен или использует другой префикс.</div>';
+    }
+    
+    // Проверка существования таблицы wffilemods
     $table_exists = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table_name ) );
-
+    
+    // Если не найдена с префиксом stg_, пробуем другие варианты
     if ( $table_exists !== $table_name ) {
-        echo '<div class="error">Таблица <code>' . esc_html( $table_name ) . '</code> не найдена. Убедитесь, что Wordfence установлен корректно.</div>';
-        echo '</body></html>';
-        exit;
+        // Пробуем найти таблицу с любым префиксом
+        $found_table = null;
+        foreach ( $wf_tables as $table ) {
+            if ( strpos( $table, 'wffilemods' ) !== false ) {
+                $found_table = $table;
+                break;
+            }
+        }
+        
+        if ( $found_table ) {
+            $table_name = $found_table;
+            echo '<div class="info">Используем таблицу: <code>' . esc_html( $table_name ) . '</code></div>';
+        } else {
+            echo '<div class="error">Таблица <code>wffilemods</code> не найдена ни с одним префиксом.</div>';
+            echo '<div class="info">Возможные причины:<ul>';
+            echo '<li>Wordfence не установлен или не активирован</li>';
+            echo '<li>Wordfence еще не выполнил первое сканирование</li>';
+            echo '<li>Таблица была удалена</li>';
+            echo '</ul></div>';
+            echo '<p>Попробуйте запустить сканирование Wordfence вручную: <strong>Wordfence → Scan → Start Scan</strong></p>';
+            echo '</body></html>';
+            exit;
+        }
     }
 
     echo '<div class="info">Таблица <code>' . esc_html( $table_name ) . '</code> обнаружена.</div>';
@@ -155,7 +195,7 @@ header('Content-Type: text/html; charset=utf-8');
     <ol>
         <li>Если <code>max_allowed_packet</code> меньше 16MB, увеличьте его через phpMyAdmin или обратитесь в поддержку хостинга.</li>
         <li>Очистите устаревшие записи (старше 30 дней):
-            <pre>DELETE FROM <?php echo esc_html( $table_name ); ?>
+            <pre>DELETE FROM <?php echo esc_html( $table_name ); ?> 
 WHERE mtime &lt; UNIX_TIMESTAMP(DATE_SUB(NOW(), INTERVAL 30 DAY));</pre>
         </li>
         <li>Оптимизируйте таблицу после очистки:
