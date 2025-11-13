@@ -2856,12 +2856,14 @@ main.gl-container > .wp-block-group {
   padding-top: 0 !important;
 }
 
-.gl-custom-section .gl-panel {
+.gl-custom-section .gl-panel,
+.gl-testset-section .gl-panel {
   background: var(--gl-color-surface);
   border-radius: 16px;
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
   padding: 1.5rem;
   margin-top: 1.5rem;
+  overflow: hidden;
 }
 
 /* Сетка формы */
@@ -2918,8 +2920,10 @@ main.gl-container > .wp-block-group {
 }
 
 .gl-panel textarea {
-  min-height: 80px;
+  min-height: 70px;
+  max-height: 120px;
   resize: vertical;
+  overflow-y: auto;
 }
 
 .gl-panel input:focus,
