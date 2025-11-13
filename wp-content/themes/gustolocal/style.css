@@ -757,33 +757,52 @@ main.gl-container > .wp-block-group {
   }
 
   .gl-navigation {
-    position: absolute !important; /* Remove from grid flow */
-    display: none;
+    grid-column: 3 !important; /* Position in 3rd column for toggle button */
+    display: flex !important; /* Show to display toggle button */
     align-items: center;
     justify-content: center;
-    flex: 1;
-    min-width: 0;
+    flex-shrink: 0;
+    width: 40px !important;
+    min-width: 40px !important;
+    max-width: 40px !important;
     margin: 0;
     padding: 0;
     background: transparent;
-    z-index: auto;
+    position: relative;
+    z-index: 1001;
     overflow: visible;
-    pointer-events: none;
-    grid-column: none !important; /* Explicitly remove from grid */
-    grid-row: none !important;
-    width: 0 !important;
-    height: 0 !important;
-    opacity: 0;
+    pointer-events: auto;
   }
 
-  .gl-navigation.is-open {
-    pointer-events: auto;
-    width: 100% !important; /* Override width: 0 when open */
-    height: 100% !important; /* Override height: 0 when open */
+  /* Show toggle button on mobile */
+  .gl-navigation .wp-block-navigation__responsive-container-open {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 40px !important;
+    height: 40px !important;
+    padding: var(--gl-spacing-xs) !important;
+    background: none !important;
+    border: none !important;
+    color: var(--gl-color-text) !important;
+    cursor: pointer !important;
+    position: relative !important;
+    z-index: 1002 !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+
+  .gl-navigation .wp-block-navigation__responsive-container-open svg {
+    width: 24px !important;
+    height: 24px !important;
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
 
   /* Hide navigation container by default on mobile */
-  .gl-navigation:not(.is-open) .wp-block-navigation__responsive-container {
+  .gl-navigation .wp-block-navigation__responsive-container {
     display: none !important;
     visibility: hidden !important;
     opacity: 0 !important;
