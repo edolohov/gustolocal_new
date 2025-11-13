@@ -4,7 +4,7 @@
 
 Скопируйте и вставьте этот код в поле "Текст" формы Contact Form 7:
 
-<div class="gl-form-grid">
+<div class="gl-form-grid gl-form-grid-single">
   <div class="gl-form-group">
     <label><strong>Сколько человек дома?</strong></label>
     [text* family-size placeholder "например: 2 взрослых и ребёнок"]

@@ -2872,6 +2872,11 @@ main.gl-container > .wp-block-group {
   margin-bottom: 1.5rem;
 }
 
+/* Форма в одну колонку (для страницы test) */
+.gl-form-grid-single {
+  grid-template-columns: 1fr;
+}
+
 @media (max-width: 900px) {
   .gl-form-grid {
     grid-template-columns: 1fr;
