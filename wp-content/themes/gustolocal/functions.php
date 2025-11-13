@@ -180,6 +180,11 @@ function gustolocal_seed_static_pages() {
             'pattern'     => 'gustolocal/como-preparamos',
             'option_name' => 'gustolocal_seed_como_preparamos',
         ),
+        array(
+            'slug'        => 'test',
+            'pattern'     => 'gustolocal/test-page',
+            'option_name' => 'gustolocal_seed_test',
+        ),
     );
     
     $registry = WP_Block_Patterns_Registry::get_instance();

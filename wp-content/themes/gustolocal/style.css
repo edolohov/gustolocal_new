@@ -2737,3 +2737,115 @@ main.gl-container > .wp-block-group {
     padding: 0.75rem;
   }
 }
+
+/* ============ Стили для страницы "Тестовый набор" ============ */
+.gl-testset-section {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+.gl-testset-grid {
+  gap: 2rem;
+  align-items: start;
+}
+
+@media (max-width: 900px) {
+  .gl-testset-grid {
+    flex-direction: column;
+  }
+  
+  .gl-testset-grid .wp-block-column {
+    flex-basis: 100% !important;
+  }
+}
+
+/* Карточки на странице test */
+.gl-testset-section .gl-card {
+  background: var(--gl-color-surface);
+  border: 1px solid #eee;
+  border-radius: 16px;
+  padding: 1.5rem;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+  margin-bottom: 1rem;
+}
+
+.gl-testset-section .gl-card h3 {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+  font-size: 1.25rem;
+}
+
+/* Бейдж со скидкой */
+.gl-badge-discount {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #0f5132;
+  background: #D8E4A0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 999px;
+  border: 1px solid #d4d9a0;
+  margin-bottom: 1rem;
+}
+
+/* Цены */
+.gl-price-wrap {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin: 0.75rem 0;
+}
+
+.gl-price-big {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--gl-color-primary);
+  background: #E7F2EC;
+  padding: 0.5rem 0.75rem;
+  border-radius: 12px;
+}
+
+.gl-price-alt {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #0f5132;
+}
+
+/* Ссылки контактов */
+.gl-contact-links {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.gl-contact-links .gl-button {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 0.625rem 1rem;
+  text-decoration: none;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.2s ease;
+}
+
+.gl-contact-links .gl-button:hover {
+  background: var(--gl-color-primary);
+  color: #fff !important;
+  border-color: transparent;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Форма в правой колонке */
+.gl-form-card {
+  position: sticky;
+  top: 2rem;
+}
+
+@media (max-width: 900px) {
+  .gl-form-card {
+    position: static;
+  }
+}
