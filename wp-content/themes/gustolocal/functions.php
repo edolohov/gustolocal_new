@@ -857,3 +857,26 @@ add_filter('get_block_template', function($template, $id, $template_type) {
     }
     return $template;
 }, 999, 3);
+
+/* ============ Убираем ссылки на товары в корзине, чекауте и заказах ============ */
+// Убираем ссылки на товары в корзине
+add_filter('woocommerce_cart_item_permalink', '__return_empty_string', 10, 3);
+
+// Убираем ссылки на товары в заказах (чекаут, подтверждение заказа, письма)
+add_filter('woocommerce_order_item_permalink', '__return_empty_string', 10, 3);
+
+// Дополнительно: убираем ссылки из названия товара, если они там есть
+add_filter('woocommerce_cart_item_name', 'gustolocal_remove_product_links_from_name', 10, 3);
+function gustolocal_remove_product_links_from_name($name, $cart_item, $cart_item_key) {
+    // Удаляем все ссылки <a> из названия товара
+    $name = preg_replace('/<a[^>]*>(.*?)<\/a>/i', '$1', $name);
+    return $name;
+}
+
+// Убираем ссылки из названия товара в заказах
+add_filter('woocommerce_order_item_name', 'gustolocal_remove_product_links_from_order_name', 10, 2);
+function gustolocal_remove_product_links_from_order_name($name, $item) {
+    // Удаляем все ссылки <a> из названия товара
+    $name = preg_replace('/<a[^>]*>(.*?)<\/a>/i', '$1', $name);
+    return $name;
+}
