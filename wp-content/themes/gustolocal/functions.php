@@ -96,6 +96,61 @@ function gustolocal_check_wc_tables() {
     }
 }
 
+/* ============ Контент главной страницы ============ */
+// Если страница "Главная" пустая, заполняем ее шаблоном-паттерном
+add_action('init', 'gustolocal_seed_front_page_content', 30);
+function gustolocal_seed_front_page_content() {
+    if (is_admin() && !wp_doing_ajax()) {
+        // В админке не вмешиваемся, чтобы не мешать редактированию
+        return;
+    }
+    
+    $already_seeded = get_option('gustolocal_front_page_seeded', false);
+    $front_page_id = (int) get_option('page_on_front');
+    if (!$front_page_id) {
+        return;
+    }
+    
+    $front_page = get_post($front_page_id);
+    if (!$front_page || 'page' !== $front_page->post_type) {
+        return;
+    }
+    
+    // Если на странице уже есть контент, фиксируем флаг и выходим
+    if (!empty(trim($front_page->post_content))) {
+        if (!$already_seeded) {
+            update_option('gustolocal_front_page_seeded', 1);
+        }
+        return;
+    }
+    
+    if ($already_seeded) {
+        // Контент пустой, но мы уже заполняли раньше — не перезаписываем
+        return;
+    }
+    
+    if (!class_exists('WP_Block_Patterns_Registry')) {
+        return;
+    }
+    
+    $registry = WP_Block_Patterns_Registry::get_instance();
+    if (!$registry->is_registered('gustolocal/homepage')) {
+        return;
+    }
+    
+    $pattern = $registry->get_registered('gustolocal/homepage');
+    if (empty($pattern['content'])) {
+        return;
+    }
+    
+    wp_update_post(array(
+        'ID' => $front_page_id,
+        'post_content' => $pattern['content'],
+    ));
+    
+    update_option('gustolocal_front_page_seeded', 1);
+}
+
 /* ============ WooCommerce упрощенная форма оформления ============ */
 // Упрощаем форму чекаута - оставляем только необходимые поля
 add_filter('woocommerce_checkout_fields', 'gustolocal_simplify_checkout_fields');
