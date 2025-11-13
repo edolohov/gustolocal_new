@@ -54,7 +54,8 @@ do_action( 'woocommerce_before_cart' ); ?>
 
 					<td scope="row" role="rowheader" class="product-name" data-title="<?php esc_attr_e( 'Product', 'woocommerce' ); ?>">
 						<?php
-						echo esc_html( wp_strip_all_tags( $product_name ) );
+						// Используем wp_kses_post для сохранения HTML-тегов из фильтра woocommerce_cart_item_name
+						echo wp_kses_post( $product_name );
 						do_action( 'woocommerce_after_cart_item_name', $cart_item, $cart_item_key );
 						echo wc_get_formatted_cart_item_data( $cart_item );
 

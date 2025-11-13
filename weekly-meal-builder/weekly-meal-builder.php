@@ -496,11 +496,11 @@ add_action('rest_api_init', function () {
       }
 
       $hard_order = [
-        'Паста ручной работы',
-        'Авторские сэндвичи',
-        'Основные блюда - мясо, птица, рыба (сувид)',
-        'Гарниры и зелень',
         'Завтраки и сладкое',
+        'Авторские сэндвичи и перекусы',
+        'Паста ручной работы',
+        'Основные блюда',
+        'Гарниры и зелень',
         'Супы и крем-супы',
         'Для запаса / в морозильник',
       ];
@@ -650,7 +650,7 @@ function wmb_display_cart_item_details($name, $cart_item, $cart_item_key) {
           $item_qty = intval($item['qty']);
           $total_price = $item_price * $item_qty;
           
-          // Форматируем как на оригинале: "Название (единица) × количество — цена"
+          // Форматируем дочерние товары: "Название (единица) × количество — цена"
           $unit_display = $item_unit ? ' (' . $item_unit . ')' : '';
           // Используем формат WooCommerce для цены (учитывает настройки валюты)
           $formatted_price = function_exists('wc_price') ? strip_tags(wc_price($total_price)) : number_format($total_price, 2, ',', '') . ' €';
@@ -658,8 +658,16 @@ function wmb_display_cart_item_details($name, $cart_item, $cart_item_key) {
         }
       }
       if (!empty($details)) {
-        // Отображаем детали под названием товара
-        $name .= '<div style="margin-top: 8px; padding-left: 0; color: #666; font-size: 0.9em; line-height: 1.6;">';
+        // Извлекаем только название товара (без количества и цены, если они были добавлены)
+        $clean_name = wp_strip_all_tags($name);
+        // Удаляем возможные паттерны " × количество — цена" из конца названия
+        $clean_name = preg_replace('/\s*×\s*\d+\s*—\s*[€$]?[\d,\.]+\s*$/', '', $clean_name);
+        $clean_name = trim($clean_name);
+        
+        // Основной товар отображаем без количества и цены, только название
+        // Дочерние товары отображаем в столбик под основным товаром
+        $name = '<div class="wmb-product-name-main">' . esc_html($clean_name) . '</div>';
+        $name .= '<div class="wmb-product-details">';
         $name .= implode('<br>', $details);
         $name .= '</div>';
       }

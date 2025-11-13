@@ -1756,6 +1756,34 @@ main.gl-container > .wp-block-group {
   line-height: 1.6;
 }
 
+/* Стили для отображения товаров в столбик */
+.woocommerce-cart .cart_item .product-name .wmb-product-name-main,
+.woocommerce-checkout .cart_item .product-name .wmb-product-name-main {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #000;
+  margin-bottom: 0;
+}
+
+.woocommerce-cart .cart_item .product-name .wmb-product-details,
+.woocommerce-checkout .cart_item .product-name .wmb-product-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-top: 8px;
+  padding-left: 0;
+  color: #666;
+  font-size: 0.9em;
+  line-height: 1.8;
+}
+
+.woocommerce-cart .cart_item .product-name .wmb-product-details br,
+.woocommerce-checkout .cart_item .product-name .wmb-product-details br {
+  display: block;
+  content: "";
+  margin-bottom: 0.25rem;
+}
+
 /* Упрощаем форму оформления заказа */
 .woocommerce-checkout .woocommerce-billing-fields h3,
 .woocommerce-checkout .woocommerce-shipping-fields h3 {
