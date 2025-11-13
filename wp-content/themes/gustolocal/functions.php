@@ -166,21 +166,89 @@ function gustolocal_front_page_fallback_pattern($block_content, $block) {
         return $block_content;
     }
     
-    if (!class_exists('WP_Block_Patterns_Registry')) {
-        return $block_content;
-    }
+    $pattern_content = gustolocal_get_pattern_content('gustolocal/homepage');
+
+    return $pattern_content ? $pattern_content : $block_content;
+}
+
+// Утилита для заполнения страниц контентом из паттернов (одноразово)
+add_action('wp_loaded', 'gustolocal_seed_static_pages');
+function gustolocal_seed_static_pages() {
+    $pages = array(
+        array(
+            'slug'        => 'como-preparamos',
+            'pattern'     => 'gustolocal/como-preparamos',
+            'option_name' => 'gustolocal_seed_como_preparamos',
+        ),
+    );
     
     $registry = WP_Block_Patterns_Registry::get_instance();
-    if (!$registry->is_registered('gustolocal/homepage')) {
-        return $block_content;
-    }
     
-    $pattern = $registry->get_registered('gustolocal/homepage');
-    if (empty($pattern['content'])) {
-        return $block_content;
+    foreach ($pages as $item) {
+        $option_name  = $item['option_name'];
+        $option_value = get_option($option_name);
+        
+        $page = get_page_by_path($item['slug']);
+        if (!$page) {
+            continue;
+        }
+        
+        $has_blocks = strpos($page->post_content, '<!-- wp:') !== false;
+
+        if ($option_value === 'done' && $has_blocks) {
+            continue;
+        }
+
+        if (!empty(trim($page->post_content))) {
+            // Если контент уже заполнен блоками, пропускаем
+            if ($has_blocks) {
+                update_option($option_name, 'done');
+                continue;
+            }
+        }
+        
+        $pattern_content = gustolocal_get_pattern_content($item['pattern']);
+        if (!$pattern_content) {
+            continue;
+        }
+        
+        wp_update_post(array(
+            'ID'           => $page->ID,
+            'post_content' => $pattern_content,
+        ));
+        
+        update_option($option_name, 'done');
     }
-    
-    return $pattern['content'];
+}
+
+function gustolocal_get_pattern_content($pattern_slug) {
+    $content = '';
+
+    if (class_exists('WP_Block_Patterns_Registry')) {
+        $registry = WP_Block_Patterns_Registry::get_instance();
+        if ($registry->is_registered($pattern_slug)) {
+            $pattern = $registry->get_registered($pattern_slug);
+            if (!empty($pattern['content'])) {
+                $content = $pattern['content'];
+            }
+        }
+    }
+
+    if ($content) {
+        return $content;
+    }
+
+    $parts = explode('/', $pattern_slug);
+    $file  = end($parts);
+    $path  = get_theme_file_path('patterns/' . $file . '.php');
+
+    if (!file_exists($path)) {
+        return '';
+    }
+
+    ob_start();
+    include $path;
+    return trim(ob_get_clean());
 }
 
 /* ============ WooCommerce упрощенная форма оформления ============ */
