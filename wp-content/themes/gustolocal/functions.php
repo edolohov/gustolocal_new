@@ -185,6 +185,11 @@ function gustolocal_seed_static_pages() {
             'pattern'     => 'gustolocal/test-page',
             'option_name' => 'gustolocal_seed_test',
         ),
+        array(
+            'slug'        => 'custom',
+            'pattern'     => 'gustolocal/custom-page',
+            'option_name' => 'gustolocal_seed_custom',
+        ),
     );
     
     $registry = WP_Block_Patterns_Registry::get_instance();
