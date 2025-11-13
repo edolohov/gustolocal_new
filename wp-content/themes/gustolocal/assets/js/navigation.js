@@ -34,6 +34,7 @@
     console.log('Toggle clicked!', event);
     event.preventDefault();
     event.stopPropagation();
+    event.stopImmediatePropagation(); // Prevent WordPress handlers from running
     
     const toggle = event.currentTarget;
     console.log('Toggle element:', toggle);
@@ -133,15 +134,19 @@
   // Attach event listeners when DOM is ready
   function initNavigation() {
     console.log('Initializing navigation...');
-    const toggles = document.querySelectorAll('[data-gl-mobile-toggle]');
-    console.log('Found toggles:', toggles.length);
+    // Find both custom toggle and WordPress navigation toggle
+    const customToggles = document.querySelectorAll('[data-gl-mobile-toggle]');
+    const wpToggles = document.querySelectorAll('.wp-block-navigation__responsive-container-open');
+    const allToggles = [...customToggles, ...wpToggles];
+    console.log('Found toggles:', allToggles.length, 'Custom:', customToggles.length, 'WP:', wpToggles.length);
     
-    toggles.forEach(function(toggle) {
+    allToggles.forEach(function(toggle) {
       console.log('Attaching listener to toggle:', toggle);
-      // Remove any existing listeners
-      toggle.removeEventListener('click', handleToggleClick);
-      // Add new listener with capture phase
-      toggle.addEventListener('click', handleToggleClick, true);
+      // Remove any existing listeners (both capture and bubble)
+      toggle.removeEventListener('click', handleToggleClick, true);
+      toggle.removeEventListener('click', handleToggleClick, false);
+      // Add new listener with capture phase (runs before WordPress handlers)
+      toggle.addEventListener('click', handleToggleClick, { capture: true, passive: false });
     });
   }
 
@@ -160,7 +165,9 @@
   // Close navigation when clicking outside or on overlay
   document.addEventListener('click', function(event) {
     const navigation = document.querySelector('.gl-navigation');
-    const toggle = document.querySelector('[data-gl-mobile-toggle]');
+    const customToggle = document.querySelector('[data-gl-mobile-toggle]');
+    const wpToggle = document.querySelector('.wp-block-navigation__responsive-container-open');
+    const toggle = customToggle || wpToggle;
     
     if (!navigation || !toggle) return;
     
@@ -193,11 +200,23 @@
   document.addEventListener('keydown', function(event) {
     if (event.key === 'Escape') {
       const navigation = document.querySelector('.gl-navigation');
-      const toggle = document.querySelector('[data-gl-mobile-toggle]');
+      const customToggle = document.querySelector('[data-gl-mobile-toggle]');
+      const wpToggle = document.querySelector('.wp-block-navigation__responsive-container-open');
+      const toggle = customToggle || wpToggle;
       
       if (navigation && navigation.classList.contains('is-open')) {
         navigation.classList.remove('is-open');
         document.body.style.overflow = '';
+        
+        // Hide WordPress container
+        const wpContainer = navigation.querySelector('.wp-block-navigation__responsive-container');
+        if (wpContainer) {
+          wpContainer.style.display = 'none';
+          wpContainer.style.visibility = 'hidden';
+          wpContainer.style.opacity = '0';
+          wpContainer.classList.remove('is-menu-open', 'has-modal-open');
+        }
+        
         if (toggle) {
           toggle.setAttribute('aria-expanded', 'false');
           toggle.setAttribute('aria-label', 'Toggle navigation menu');
