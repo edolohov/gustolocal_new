@@ -2897,6 +2897,8 @@ main.gl-container > .wp-block-group {
 
 /* Стили для полей Contact Form 7 */
 .gl-panel input[type="text"],
+.gl-panel input[type="email"],
+.gl-panel input[type="tel"],
 .gl-panel textarea,
 .gl-panel select {
   width: 100%;
@@ -2907,6 +2909,7 @@ main.gl-container > .wp-block-group {
   transition: border-color 0.15s, box-shadow 0.15s;
   font-size: 0.9375rem;
   font-family: inherit;
+  color: var(--gl-color-text);
 }
 
 .gl-panel textarea {
@@ -2920,6 +2923,61 @@ main.gl-container > .wp-block-group {
   outline: none;
   border-color: #cbe7dc;
   box-shadow: 0 0 0 6px rgba(23, 129, 94, 0.12);
+}
+
+/* Стили для чекбоксов и радио Contact Form 7 */
+.gl-panel .wpcf7-checkbox,
+.gl-panel .wpcf7-radio {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.gl-panel .wpcf7-list-item {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.gl-panel .wpcf7-list-item label {
+  font-weight: 400;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.gl-panel input[type="checkbox"],
+.gl-panel input[type="radio"] {
+  width: auto;
+  margin: 0;
+  cursor: pointer;
+  accent-color: var(--gl-color-primary);
+}
+
+/* Кнопка отправки формы */
+.gl-panel input[type="submit"],
+.gl-panel .wpcf7-submit {
+  background: var(--gl-color-primary);
+  color: #fff;
+  border: 0;
+  border-radius: 14px;
+  padding: 0.75rem 1.5rem;
+  font-weight: 700;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: auto;
+  display: inline-block;
+}
+
+.gl-panel input[type="submit"]:hover,
+.gl-panel .wpcf7-submit:hover {
+  background: var(--gl-color-primary-dark);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(23, 129, 94, 0.3);
 }
 
 /* Действия формы */
@@ -2961,4 +3019,12 @@ main.gl-container > .wp-block-group {
 .gl-form-actions .gl-button--ghost:hover {
   background: #f0fdf4;
   border-color: var(--gl-color-primary);
+}
+
+/* Сноска под формой */
+.gl-footnote {
+  color: var(--gl-color-text-muted);
+  font-size: 0.875rem;
+  margin-top: 1rem;
+  text-align: center;
 }
