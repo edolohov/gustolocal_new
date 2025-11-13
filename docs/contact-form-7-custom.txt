@@ -30,7 +30,7 @@
   <!-- 3. Вкусы и ограничения -->
   <div class="gl-form-group">
     <label><strong>Что любите</strong></label>
-    [textarea likes placeholder "кухни, продукты, уровни остроты, "больше овощей/рыбы/птицы""]
+    [textarea likes placeholder 'кухни, продукты, уровни остроты, "больше овощей/рыбы/птицы"']
   </div>
 
   <div class="gl-form-group">
