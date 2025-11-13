@@ -32,20 +32,17 @@
 		<div class="gl-form-grid">
 			<div class="gl-form-group">
 				<label><strong>Сколько вас дома?</strong></label>
-				<span class="gl-hint">например: 2 взрослых и ребёнок</span>
-				[text* family-size placeholder "2 взрослых и ребёнок"]
+				[text* family-size placeholder "например: 2 взрослых и ребёнок"]
 			</div>
 
 			<div class="gl-form-group">
 				<label><strong>Где вы живёте?</strong></label>
-				<span class="gl-hint">район или улица — чтобы уточнить доставку</span>
-				[text* user-district placeholder "Ruzafa / Benimaclet / ..."]
+				[text* user-district placeholder "район или улица — чтобы уточнить доставку"]
 			</div>
 
 			<div class="gl-form-group">
 				<label><strong>Как с вами связаться?</strong></label>
-				<span class="gl-hint">Telegram @ник, WhatsApp или телефон</span>
-				[text* user-contact placeholder "@name / +34 6XX XX XX XX"]
+				[text* user-contact placeholder "@telegram / WhatsApp / телефон"]
 			</div>
 
 			<div class="gl-form-group">
@@ -60,12 +57,11 @@
 
 			<div class="gl-form-group">
 				<label><strong>Пожелания и особенности</strong></label>
-				<span class="gl-hint">аллергии, любимые продукты, диета — всё что важно</span>
-				[textarea user-message placeholder "например: не ем сельдерей, люблю нежирные соусы"]
+				[textarea user-message placeholder "аллергии, любимые продукты, диета — всё что важно"]
 			</div>
 
 			<div class="gl-form-group">
-				<label class="gl-hint" style="font-weight:400"><strong>Хочу продолжать после теста</strong></label>
+				<label><strong>Хочу продолжать после теста</strong></label>
 				[checkbox opt-continue "Да, интересно еженедельное меню"]
 			</div>
 		</div>
@@ -74,7 +70,6 @@
 		<!-- wp:html -->
 		<div class="gl-form-actions">
 			[submit class:gl-button class:gl-button--primary "Хочу попробовать!"]
-			<a href="/menu" class="gl-button gl-button--ghost">Собрать меню на сайте</a>
 		</div>
 		<!-- /wp:html -->
 

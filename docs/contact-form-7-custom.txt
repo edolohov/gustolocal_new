@@ -8,60 +8,51 @@
   <!-- 1. Кто и сколько едят -->
   <div class="gl-form-group">
     <label><strong>Сколько вас дома?</strong></label>
-    <span class="gl-hint">например: 2 взрослых и ребёнок</span>
     [text* family-size placeholder "например: 2 взрослых и ребёнок"]
   </div>
 
   <div class="gl-form-group">
     <label><strong>Цели и акценты (можно выбрать несколько)</strong></label>
-    <span class="gl-hint">выберите то, что важно для вас</span>
     [checkbox goals use_label_element "Сэкономить время" "Здоровее питаться" "Режим для спорт/сброса веса" "Пост/вегетарианство"]
   </div>
 
   <!-- 2. Объём и ритм -->
   <div class="gl-form-group">
     <label><strong>Сколько приёмов пищи в неделю вы хотите закрыть нами?</strong></label>
-    <span class="gl-hint">например: 5 ужинов + 3 обеда + 2 супа</span>
     [text* weekly-meals placeholder "например: 5 ужинов + 3 обеда + 2 супа"]
   </div>
 
   <div class="gl-form-group">
     <label><strong>Формат блюд (можно выбрать несколько)</strong></label>
-    <span class="gl-hint">выберите удобный формат</span>
     [checkbox format use_label_element "Готовое — только разогреть" "Полуфабрикаты — доготавливаю (вкуснее)" "Заморозка в запас"]
   </div>
 
   <!-- 3. Вкусы и ограничения -->
   <div class="gl-form-group">
     <label><strong>Что любите</strong></label>
-    <span class="gl-hint">кухни, продукты, уровни остроты, "больше овощей/рыбы/птицы"</span>
     [textarea likes placeholder "кухни, продукты, уровни остроты, "больше овощей/рыбы/птицы""]
   </div>
 
   <div class="gl-form-group">
     <label><strong>Что не любите / нельзя</strong></label>
-    <span class="gl-hint">аллергии, исключения, религиозные запреты</span>
     [textarea dislikes placeholder "аллергии, исключения, религиозные запреты"]
   </div>
 
   <!-- 4. Логистика -->
   <div class="gl-form-group">
     <label><strong>Район/адрес для доставки</strong></label>
-    <span class="gl-hint">район или улица — чтобы рассчитать логистику</span>
     [text* district placeholder "район или улица — чтобы рассчитать логистику"]
   </div>
 
   <!-- 5. Контакты -->
   <div class="gl-form-group">
     <label><strong>Как с вами связаться</strong></label>
-    <span class="gl-hint">@telegram / WhatsApp / телефон</span>
     [text* contact placeholder "@telegram / WhatsApp / телефон"]
   </div>
 </div>
 
 <div class="gl-form-actions">
   [submit class:gl-button class:gl-button--primary "Хочу персональный план"]
-  <a href="/menu" class="gl-button gl-button--ghost">Собрать меню на сайте</a>
 </div>
 
 <p class="gl-footnote">Мы свяжемся в ближайшее время и предложим наполнение под ваш состав семьи.</p>
