@@ -151,6 +151,38 @@ function gustolocal_seed_front_page_content() {
     update_option('gustolocal_front_page_seeded', 1);
 }
 
+// Фолбэк: если по какой-то причине контент пустой, показываем паттерн на фронте
+add_filter('render_block', 'gustolocal_front_page_fallback_pattern', 20, 2);
+function gustolocal_front_page_fallback_pattern($block_content, $block) {
+    if (!is_front_page()) {
+        return $block_content;
+    }
+    
+    if ($block['blockName'] !== 'core/post-content') {
+        return $block_content;
+    }
+    
+    if (trim($block_content) !== '') {
+        return $block_content;
+    }
+    
+    if (!class_exists('WP_Block_Patterns_Registry')) {
+        return $block_content;
+    }
+    
+    $registry = WP_Block_Patterns_Registry::get_instance();
+    if (!$registry->is_registered('gustolocal/homepage')) {
+        return $block_content;
+    }
+    
+    $pattern = $registry->get_registered('gustolocal/homepage');
+    if (empty($pattern['content'])) {
+        return $block_content;
+    }
+    
+    return $pattern['content'];
+}
+
 /* ============ WooCommerce упрощенная форма оформления ============ */
 // Упрощаем форму чекаута - оставляем только необходимые поля
 add_filter('woocommerce_checkout_fields', 'gustolocal_simplify_checkout_fields');
