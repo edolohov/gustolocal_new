@@ -2918,7 +2918,7 @@ main.gl-container > .wp-block-group {
 }
 
 .gl-panel textarea {
-  min-height: 130px;
+  min-height: 100px;
   resize: vertical;
 }
 
