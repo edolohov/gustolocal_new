@@ -172,6 +172,54 @@ function gustolocal_front_page_fallback_pattern($block_content, $block) {
 }
 
 // Утилита для заполнения страниц контентом из паттернов (одноразово)
+add_action('init', 'gustolocal_register_theme_patterns', 9);
+function gustolocal_register_theme_patterns() {
+    if (!function_exists('register_block_pattern')) {
+        return;
+    }
+
+    $patterns_dir = get_theme_file_path('patterns');
+    if (!is_dir($patterns_dir)) {
+        return;
+    }
+
+    $files = glob($patterns_dir . '/*.php');
+    if (!$files) {
+        return;
+    }
+
+    foreach ($files as $file_path) {
+        $data = get_file_data($file_path, array(
+            'title'      => 'Title',
+            'slug'       => 'Slug',
+            'categories' => 'Categories',
+        ));
+
+        $slug = !empty($data['slug']) ? trim($data['slug']) : 'gustolocal/' . basename($file_path, '.php');
+        $title = !empty($data['title']) ? $data['title'] : ucwords(str_replace('-', ' ', basename($file_path, '.php')));
+        $categories = array();
+
+        if (!empty($data['categories'])) {
+            $categories = array_map('trim', explode(',', $data['categories']));
+        }
+
+        if (empty($categories)) {
+            $categories = array('featured');
+        }
+
+        $content = gustolocal_load_pattern_file($file_path);
+        if (empty($content)) {
+            continue;
+        }
+
+        register_block_pattern($slug, array(
+            'title'      => $title,
+            'categories' => $categories,
+            'content'    => $content,
+        ));
+    }
+}
+
 add_action('wp_loaded', 'gustolocal_seed_static_pages');
 function gustolocal_seed_static_pages() {
     $pages = array(
@@ -189,6 +237,11 @@ function gustolocal_seed_static_pages() {
             'slug'        => 'custom',
             'pattern'     => 'gustolocal/custom-page',
             'option_name' => 'gustolocal_seed_custom',
+        ),
+        array(
+            'slug'        => 'pan-sandwiches-valencia',
+            'pattern'     => 'gustolocal/pan-sandwiches',
+            'option_name' => 'gustolocal_seed_pan_sandwiches',
         ),
     );
     
@@ -252,10 +305,13 @@ function gustolocal_get_pattern_content($pattern_slug) {
     $file  = end($parts);
     $path  = get_theme_file_path('patterns/' . $file . '.php');
 
+    return gustolocal_load_pattern_file($path);
+}
+
+function gustolocal_load_pattern_file($path) {
     if (!file_exists($path)) {
         return '';
     }
-
     ob_start();
     include $path;
     return trim(ob_get_clean());
