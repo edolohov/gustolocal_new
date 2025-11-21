@@ -248,6 +248,11 @@ function gustolocal_seed_static_pages() {
             'pattern'     => 'gustolocal/corporate-meals',
             'option_name' => 'gustolocal_seed_corporate_meals',
         ),
+        array(
+            'slug'        => 'catering',
+            'pattern'     => 'gustolocal/catering',
+            'option_name' => 'gustolocal_seed_catering',
+        ),
     );
     
     $registry = WP_Block_Patterns_Registry::get_instance();
