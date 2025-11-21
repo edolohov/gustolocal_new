@@ -243,6 +243,11 @@ function gustolocal_seed_static_pages() {
             'pattern'     => 'gustolocal/pan-sandwiches',
             'option_name' => 'gustolocal_seed_pan_sandwiches',
         ),
+        array(
+            'slug'        => 'corporate-meals',
+            'pattern'     => 'gustolocal/corporate-meals',
+            'option_name' => 'gustolocal_seed_corporate_meals',
+        ),
     );
     
     $registry = WP_Block_Patterns_Registry::get_instance();
