@@ -2753,6 +2753,19 @@ function gustolocal_register_feedback_endpoint() {
     add_rewrite_tag('%feedback_token%', '([^&]+)');
 }
 
+function gustolocal_feedback_rewrite_exists() {
+    $rules = get_option('rewrite_rules');
+    return is_array($rules) && array_key_exists('^feedback/([^/]+)/?$', $rules);
+}
+
+add_action('init', 'gustolocal_ensure_feedback_rewrite', 19);
+function gustolocal_ensure_feedback_rewrite() {
+    if (!gustolocal_feedback_rewrite_exists()) {
+        gustolocal_register_feedback_endpoint();
+        flush_rewrite_rules(false);
+    }
+}
+
 // Перезапись правил при активации
 add_action('after_switch_theme', 'gustolocal_flush_rewrite_rules');
 function gustolocal_flush_rewrite_rules() {
