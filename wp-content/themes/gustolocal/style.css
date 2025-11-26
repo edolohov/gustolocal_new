@@ -3399,3 +3399,77 @@ main.gl-container > .wp-block-group {
 .gl-tooltip-content li:last-child {
   margin-bottom: 0;
 }
+
+/* ============ КРИТИЧЕСКИЕ СТИЛИ ДЛЯ ФОРМЫ CONTACT FORM 7 - ПРИНУДИТЕЛЬНОЕ ПРИМЕНЕНИЕ ============ */
+/* Добавлено в конец файла для максимальной специфичности */
+div.wpcf7 form.wpcf7-form div.gl-form-grid.gl-form-grid-single {
+  display: grid !important;
+  grid-template-columns: 1fr !important;
+  gap: 0.5rem !important;
+  row-gap: 0.5rem !important;
+  column-gap: 0.5rem !important;
+  margin-bottom: 0.75rem !important;
+}
+
+div.wpcf7 form.wpcf7-form div.gl-form-grid.gl-form-grid-single div.gl-form-group {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: 0.2rem !important;
+  margin-bottom: 0 !important;
+  margin-top: 0 !important;
+}
+
+div.wpcf7 form.wpcf7-form div.gl-form-grid.gl-form-grid-single div.gl-form-group + div.gl-form-group {
+  margin-top: 0.3rem !important;
+}
+
+div.wpcf7 form.wpcf7-form div.gl-form-group p {
+  margin: 0 !important;
+  margin-block-start: 0 !important;
+  margin-block-end: 0 !important;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  padding: 0 !important;
+  line-height: 1.2 !important;
+  height: auto !important;
+}
+
+div.wpcf7 form.wpcf7-form div.gl-form-group br {
+  display: none !important;
+  line-height: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+div.wpcf7 form.wpcf7-form div.gl-form-group .wpcf7-form-control-wrap {
+  display: block !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100% !important;
+}
+
+div.wpcf7 form.wpcf7-form div.gl-form-group label {
+  margin-bottom: 0.2rem !important;
+  display: block !important;
+}
+
+div.wpcf7 form.wpcf7-form div.gl-form-group .wpcf7-form-control,
+div.wpcf7 form.wpcf7-form div.gl-form-group input,
+div.wpcf7 form.wpcf7-form div.gl-form-group textarea {
+  width: 100% !important;
+  margin: 0 !important;
+  box-sizing: border-box !important;
+}
+
+div.wpcf7 form.wpcf7-form div.gl-form-actions {
+  display: flex !important;
+  justify-content: center !important;
+  text-align: center !important;
+  margin-top: 0.75rem !important;
+}
+
+div.wpcf7 form.wpcf7-form div.gl-form-actions p {
+  margin: 0 !important;
+  padding: 0 !important;
+}
