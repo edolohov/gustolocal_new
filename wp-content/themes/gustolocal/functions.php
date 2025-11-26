@@ -37,6 +37,74 @@ add_action( 'wp_enqueue_scripts', function () {
     }
 } );
 
+// Inline стили для формы Contact Form 7 - принудительное применение
+add_action( 'wp_head', function () {
+    ?>
+    <style id="gustolocal-form-fix">
+    /* Принудительные стили для формы Contact Form 7 */
+    .gl-form-grid,
+    .wpcf7-form .gl-form-grid {
+        display: grid !important;
+        gap: 0.5rem !important;
+        margin-bottom: 0.75rem !important;
+    }
+    .gl-form-grid-single {
+        grid-template-columns: 1fr !important;
+    }
+    .gl-form-group,
+    .wpcf7-form .gl-form-group {
+        display: flex !important;
+        flex-direction: column !important;
+        gap: 0.2rem !important;
+        margin-bottom: 0 !important;
+    }
+    .gl-form-grid-single .gl-form-group + .gl-form-group {
+        margin-top: 0.3rem !important;
+    }
+    .gl-form-group p,
+    .gl-form-actions p,
+    .wpcf7-form p {
+        margin: 0 !important;
+        padding: 0 !important;
+        line-height: 1.2 !important;
+    }
+    .gl-form-group br,
+    .wpcf7-form br {
+        display: none !important;
+        line-height: 0 !important;
+        height: 0 !important;
+    }
+    .gl-form-group .wpcf7-form-control-wrap {
+        display: block !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        width: 100% !important;
+    }
+    .gl-form-group label {
+        margin-bottom: 0.2rem !important;
+        display: block !important;
+    }
+    .gl-form-group .wpcf7-form-control,
+    .gl-form-group input,
+    .gl-form-group textarea {
+        width: 100% !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+    }
+    .gl-form-actions {
+        display: flex !important;
+        justify-content: center !important;
+        text-align: center !important;
+        margin-top: 0.75rem !important;
+    }
+    .gl-form-actions p {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+    </style>
+    <?php
+}, 999 );
+
 add_action( 'enqueue_block_editor_assets', function () {
     $theme_dir = get_template_directory_uri();
     wp_enqueue_style( 'gustolocal-editor', $theme_dir . '/style.css', [], GUSTOLOCAL_VERSION );
