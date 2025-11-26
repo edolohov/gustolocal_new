@@ -2909,6 +2909,24 @@ main.gl-container > .wp-block-group {
   color: var(--gl-color-text);
 }
 
+/* Убираем отступы у параграфов внутри групп формы (Contact Form 7 добавляет <p>) */
+.gl-form-group p {
+  margin: 0;
+  padding: 0;
+}
+
+/* Убираем отступы от <br> тегов, которые Contact Form 7 добавляет после label */
+.gl-form-group br {
+  display: none;
+}
+
+/* Убираем лишние отступы у оберток Contact Form 7 */
+.gl-form-group .wpcf7-form-control-wrap {
+  display: block;
+  margin: 0;
+  padding: 0;
+}
+
 .gl-hint {
   color: var(--gl-color-text-muted);
   font-size: 0.8125rem;
@@ -2924,7 +2942,11 @@ main.gl-container > .wp-block-group {
 .gl-card input[type="email"],
 .gl-card input[type="tel"],
 .gl-card textarea,
-.gl-card select {
+.gl-card select,
+.gl-form-group .wpcf7-form-control,
+.gl-form-group input,
+.gl-form-group textarea,
+.gl-form-group select {
   width: 100%;
   padding: 0.75rem 0.875rem;
   border-radius: 12px;
@@ -2934,6 +2956,7 @@ main.gl-container > .wp-block-group {
   font-size: 0.9375rem;
   font-family: inherit;
   color: var(--gl-color-text);
+  box-sizing: border-box;
 }
 
 .gl-panel textarea,
@@ -2948,12 +2971,7 @@ main.gl-container > .wp-block-group {
   max-width: 100%;
 }
 
-.gl-form-group textarea,
-.gl-form-group input,
-.gl-form-group select {
-  width: 100%;
-  box-sizing: border-box;
-}
+/* Эти стили уже применены выше через .gl-form-group .wpcf7-form-control */
 
 .gl-panel input:focus,
 .gl-panel textarea:focus,
