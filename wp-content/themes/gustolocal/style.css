@@ -2910,31 +2910,54 @@ main.gl-container > .wp-block-group {
   margin-top: 0.3rem !important;
 }
 
-.gl-form-group label {
+.gl-form-group label,
+.gl-card .gl-form-group label,
+.gl-form-card .gl-form-group label,
+.wpcf7-form .gl-form-group label {
   font-weight: 600;
   color: var(--gl-color-text);
+  margin-bottom: 0.2rem !important;
+  display: block;
 }
 
 /* Убираем отступы у параграфов внутри групп формы (Contact Form 7 добавляет <p>) */
 .gl-form-group p,
 .gl-form-actions p,
-.wpcf7-form p {
+.wpcf7-form p,
+.gl-card .gl-form-group p,
+.gl-card .gl-form-actions p,
+.gl-form-card .gl-form-group p,
+.gl-form-card .gl-form-actions p,
+.gl-card .wpcf7-form p,
+.gl-form-card .wpcf7-form p {
   margin: 0 !important;
   padding: 0 !important;
+  line-height: 1.2 !important;
 }
 
 /* Убираем отступы от <br> тегов, которые Contact Form 7 добавляет после label */
 .gl-form-group br,
-.wpcf7-form br {
+.wpcf7-form br,
+.gl-card .gl-form-group br,
+.gl-form-card .gl-form-group br,
+.gl-card .wpcf7-form br,
+.gl-form-card .wpcf7-form br {
   display: none !important;
+  line-height: 0 !important;
+  height: 0 !important;
 }
 
 /* Убираем лишние отступы у оберток Contact Form 7 */
 .gl-form-group .wpcf7-form-control-wrap,
-.wpcf7-form-control-wrap {
-  display: block;
+.wpcf7-form-control-wrap,
+.gl-card .gl-form-group .wpcf7-form-control-wrap,
+.gl-form-card .gl-form-group .wpcf7-form-control-wrap,
+.gl-card .wpcf7-form-control-wrap,
+.gl-form-card .wpcf7-form-control-wrap {
+  display: block !important;
   margin: 0 !important;
   padding: 0 !important;
+  width: 100% !important;
 }
 
 .gl-hint {
@@ -2956,17 +2979,25 @@ main.gl-container > .wp-block-group {
 .gl-form-group .wpcf7-form-control,
 .gl-form-group input,
 .gl-form-group textarea,
-.gl-form-group select {
-  width: 100%;
-  padding: 0.75rem 0.875rem;
-  border-radius: 12px;
-  border: 1px solid #e5e7eb;
-  background: #fff;
-  transition: border-color 0.15s, box-shadow 0.15s;
-  font-size: 0.9375rem;
-  font-family: inherit;
-  color: var(--gl-color-text);
-  box-sizing: border-box;
+.gl-form-group select,
+.gl-card .gl-form-group .wpcf7-form-control,
+.gl-form-card .gl-form-group .wpcf7-form-control,
+.gl-card .wpcf7-form-control,
+.gl-form-card .wpcf7-form-control,
+.wpcf7-form .gl-form-group input,
+.wpcf7-form .gl-form-group textarea,
+.wpcf7-form .gl-form-group select {
+  width: 100% !important;
+  padding: 0.75rem 0.875rem !important;
+  border-radius: 12px !important;
+  border: 1px solid #e5e7eb !important;
+  background: #fff !important;
+  transition: border-color 0.15s, box-shadow 0.15s !important;
+  font-size: 0.9375rem !important;
+  font-family: inherit !important;
+  color: var(--gl-color-text) !important;
+  box-sizing: border-box !important;
+  margin: 0 !important;
 }
 
 .gl-panel textarea,
