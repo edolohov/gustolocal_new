@@ -101,6 +101,18 @@ add_action( 'wp_head', function () {
         margin: 0 !important;
         padding: 0 !important;
     }
+    .gl-form-actions .gl-button--primary,
+    .gl-form-actions input[type="submit"],
+    .gl-form-actions .wpcf7-submit {
+        background: rgb(216, 228, 160) !important;
+        color: #1a1a1a !important;
+    }
+    .gl-form-actions .gl-button--primary:hover,
+    .gl-form-actions input[type="submit"]:hover,
+    .gl-form-actions .wpcf7-submit:hover {
+        background: rgb(23, 129, 94) !important;
+        color: #fff !important;
+    }
     </style>
     <?php
 }, 999 );

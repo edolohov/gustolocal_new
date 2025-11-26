@@ -3062,8 +3062,8 @@ main.gl-container > .wp-block-group {
 .gl-panel .wpcf7-submit,
 .gl-card input[type="submit"],
 .gl-card .wpcf7-submit {
-  background: var(--gl-color-primary);
-  color: #fff;
+  background: rgb(216, 228, 160);
+  color: #1a1a1a;
   border: 0;
   border-radius: 14px;
   padding: 0.75rem 1.5rem;
@@ -3079,7 +3079,8 @@ main.gl-container > .wp-block-group {
 .gl-panel .wpcf7-submit:hover,
 .gl-card input[type="submit"]:hover,
 .gl-card .wpcf7-submit:hover {
-  background: var(--gl-color-primary-dark);
+  background: rgb(23, 129, 94);
+  color: #fff;
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(23, 129, 94, 0.3);
 }
@@ -3108,12 +3109,13 @@ main.gl-container > .wp-block-group {
 }
 
 .gl-form-actions .gl-button--primary {
-  background: var(--gl-color-primary);
-  color: #fff;
+  background: rgb(216, 228, 160);
+  color: #1a1a1a;
 }
 
 .gl-form-actions .gl-button--primary:hover {
-  background: var(--gl-color-primary-dark);
+  background: rgb(23, 129, 94);
+  color: #fff;
 }
 
 .gl-form-actions .gl-button--ghost {
@@ -3472,4 +3474,19 @@ div.wpcf7 form.wpcf7-form div.gl-form-actions {
 div.wpcf7 form.wpcf7-form div.gl-form-actions p {
   margin: 0 !important;
   padding: 0 !important;
+}
+
+/* Стили кнопки формы */
+div.wpcf7 form.wpcf7-form div.gl-form-actions .gl-button--primary,
+div.wpcf7 form.wpcf7-form div.gl-form-actions input[type="submit"],
+div.wpcf7 form.wpcf7-form div.gl-form-actions .wpcf7-submit {
+  background: rgb(216, 228, 160) !important;
+  color: #1a1a1a !important;
+}
+
+div.wpcf7 form.wpcf7-form div.gl-form-actions .gl-button--primary:hover,
+div.wpcf7 form.wpcf7-form div.gl-form-actions input[type="submit"]:hover,
+div.wpcf7 form.wpcf7-form div.gl-form-actions .wpcf7-submit:hover {
+  background: rgb(23, 129, 94) !important;
+  color: #fff !important;
 }
