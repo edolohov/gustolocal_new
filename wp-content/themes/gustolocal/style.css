@@ -2919,7 +2919,12 @@ main.gl-container > .wp-block-group {
 .gl-panel input[type="email"],
 .gl-panel input[type="tel"],
 .gl-panel textarea,
-.gl-panel select {
+.gl-panel select,
+.gl-card input[type="text"],
+.gl-card input[type="email"],
+.gl-card input[type="tel"],
+.gl-card textarea,
+.gl-card select {
   width: 100%;
   padding: 0.75rem 0.875rem;
   border-radius: 12px;
@@ -2931,7 +2936,8 @@ main.gl-container > .wp-block-group {
   color: var(--gl-color-text);
 }
 
-.gl-panel textarea {
+.gl-panel textarea,
+.gl-card textarea {
   min-height: 70px;
   max-height: 120px;
   resize: vertical;
@@ -2951,7 +2957,10 @@ main.gl-container > .wp-block-group {
 
 .gl-panel input:focus,
 .gl-panel textarea:focus,
-.gl-panel select:focus {
+.gl-panel select:focus,
+.gl-card input:focus,
+.gl-card textarea:focus,
+.gl-card select:focus {
   outline: none;
   border-color: #cbe7dc;
   box-shadow: 0 0 0 6px rgba(23, 129, 94, 0.12);
@@ -2991,7 +3000,9 @@ main.gl-container > .wp-block-group {
 
 /* Кнопка отправки формы */
 .gl-panel input[type="submit"],
-.gl-panel .wpcf7-submit {
+.gl-panel .wpcf7-submit,
+.gl-card input[type="submit"],
+.gl-card .wpcf7-submit {
   background: var(--gl-color-primary);
   color: #fff;
   border: 0;
@@ -3006,7 +3017,9 @@ main.gl-container > .wp-block-group {
 }
 
 .gl-panel input[type="submit"]:hover,
-.gl-panel .wpcf7-submit:hover {
+.gl-panel .wpcf7-submit:hover,
+.gl-card input[type="submit"]:hover,
+.gl-card .wpcf7-submit:hover {
   background: var(--gl-color-primary-dark);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(23, 129, 94, 0.3);
