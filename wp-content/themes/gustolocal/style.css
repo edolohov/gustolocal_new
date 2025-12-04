@@ -2635,21 +2635,31 @@ main.gl-container > .wp-block-group {
     padding: 1rem;
     background: #f9f9f9;
     border-radius: 12px;
+    display: flex;
+    gap: 0.5rem;
+    align-items: stretch;
   }
 
   .woocommerce-cart .coupon input[type="text"] {
-    width: 100%;
-    margin-bottom: 0.75rem;
+    flex: 1;
+    margin-bottom: 0;
     padding: 0.75rem;
     border: 1px solid #ddd;
     border-radius: 8px;
     font-size: 1rem;
+    height: auto;
+    line-height: 1.5;
+    box-sizing: border-box;
   }
 
   .woocommerce-cart .coupon .button {
-    width: 100%;
-    padding: 0.75rem;
+    flex-shrink: 0;
+    padding: 0.75rem 1.25rem;
     font-size: 1rem;
+    height: auto;
+    line-height: 1.5;
+    box-sizing: border-box;
+    white-space: nowrap;
   }
 
   /* Улучшаем кнопку "Перейти к оформлению" на мобилке */
