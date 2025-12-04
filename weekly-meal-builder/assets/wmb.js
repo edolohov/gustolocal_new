@@ -27,6 +27,7 @@
   var menuGlovoUber = null;
   var state = { week:"", qty:{}, qtyMercat:{}, filters:{ sections:[], tags:[] }, activeTab: 'smart_food' };
   var countdownTimer = null;
+  var cartUpdateTimer = null; // Таймер для debounce обновления корзины
 
   function flatItems(menuData){
     menuData = menuData || menu;
@@ -100,6 +101,8 @@
       var cartItems = result.data.items || [];
       var cartQty = {};
       var cartQtyMercat = {};
+      var needsSuperfood = false;
+      var needsMercat = false;
       
       // Собираем товары из корзины
       cartItems.forEach(function(item){
@@ -113,8 +116,10 @@
                 if (qty > 0) {
                 if (saleType === 'mercat') {
                   cartQtyMercat[id] = qty;
+                  needsMercat = true;
                 } else {
                   cartQty[id] = qty;
+                  needsSuperfood = true;
                 }
             }
             });
@@ -128,6 +133,40 @@
       state.qty = cartQty;
       state.qtyMercat = cartQtyMercat;
       persist();
+      
+      // Загружаем необходимые меню для корректного расчета суммы
+      var loadPromises = [];
+      if (needsSuperfood && !menu) {
+        loadPromises.push(
+          fetch(MENU_URL + '?sale_type=smart_food', {credentials:'same-origin'}).then(function(res){
+            if (!res.ok) throw new Error('HTTP '+res.status);
+            return res.json();
+          }).then(function(data){
+            menu = data;
+          }).catch(function(e){
+            console.error('Не удалось загрузить меню Superfood из', MENU_URL, e);
+            menu = { description:'', sections: [] };
+          })
+        );
+      }
+      if (needsMercat && !menuMercat) {
+        loadPromises.push(
+          fetch(MENU_URL + '?sale_type=mercat', {credentials:'same-origin'}).then(function(res){
+            if (!res.ok) throw new Error('HTTP '+res.status);
+            return res.json();
+          }).then(function(data){
+            menuMercat = data;
+          }).catch(function(e){
+            console.error('Не удалось загрузить меню Mercat из', MENU_URL, e);
+            menuMercat = { description:'', sections: [] };
+          })
+        );
+      }
+      
+      // Ждем загрузки всех необходимых меню
+      if (loadPromises.length > 0) {
+        await Promise.all(loadPromises);
+      }
       
     }catch(e){
       console.error('Error syncing with cart:', e);
@@ -407,7 +446,7 @@
     root.innerHTML = [
       '<div class="wmb-wrapper">',
         '<div class="wmb-tabs">',
-          '<button class="wmb-tab' + (state.activeTab === 'smart_food' ? ' wmb-tab-active' : '') + '" data-tab="smart_food">Smart Food</button>',
+          '<button class="wmb-tab' + (state.activeTab === 'smart_food' ? ' wmb-tab-active' : '') + '" data-tab="smart_food">Superfood</button>',
           '<button class="wmb-tab' + (state.activeTab === 'mercat' ? ' wmb-tab-active' : '') + '" data-tab="mercat">Mercat</button>',
           '<button class="wmb-tab' + (state.activeTab === 'glovo_uber' ? ' wmb-tab-active' : '') + '" data-tab="glovo_uber">Glovo / Uber</button>',
         '</div>',
@@ -456,6 +495,7 @@
               '<div class="wmb-summary-row"><span>Порций</span><strong id="wmb-total-portions">'+totalPortions()+'</strong></div>',
               '<div class="wmb-summary-row"><span>Итого</span><strong id="wmb-total-price">'+money(totalPrice())+'</strong></div>',
               '<button id="wmb-checkout" class="wmb-checkout-btn" '+(totalPortions()===0?'disabled':'')+'>Перейти к оформлению</button>',
+              '<button id="wmb-clear-cart" class="wmb-clear-cart-btn" '+(totalPortions()===0?'disabled':'')+'>Очистить корзину</button>',
             '</div>',
           '</aside>',
         '</div>',
@@ -465,7 +505,10 @@
             '<div style="font-size:12px;color:#666">Итого</div>',
             '<div style="font-weight:700" id="wmb-total-price-mobile">'+money(totalPrice())+'</div>',
           '</div>',
+          '<div style="display:flex;gap:8px;flex-direction:column;">',
           '<button id="wmb-checkout-mobile" class="wmb-checkout-btn" '+(totalPortions()===0?'disabled':'')+'>Перейти к оформлению</button>',
+            '<button id="wmb-clear-cart-mobile" class="wmb-clear-cart-btn" '+(totalPortions()===0?'disabled':'')+'>Очистить корзину</button>',
+          '</div>',
         '</div>',
       '</div>'
     ].join("");
@@ -484,7 +527,11 @@
             var newUrl = window.location.pathname + '#' + newTab;
             history.pushState(null, '', newUrl);
           }
-          render(root);
+          
+          // Ленивая загрузка меню для переключенной вкладки
+          loadMenuForTab(newTab).then(function(){
+            render(root);
+          });
         }
       });
     });
@@ -535,6 +582,85 @@
         e.stopPropagation();
         onCheckout(delivery);
       });
+    }
+    
+    // Кнопка очистки корзины (десктоп)
+    var clearCartBtn = el('#wmb-clear-cart', root);
+    if (clearCartBtn) {
+      clearCartBtn.addEventListener('click', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        if (confirm('Вы уверены, что хотите очистить корзину?')) {
+          clearCart();
+        }
+      });
+    }
+    
+    // Кнопка очистки корзины (мобилка)
+    var clearCartBtnMobile = el('#wmb-clear-cart-mobile', document);
+    if (clearCartBtnMobile) {
+      clearCartBtnMobile.addEventListener('click', function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        if (confirm('Вы уверены, что хотите очистить корзину?')) {
+          clearCart();
+        }
+      });
+    }
+  }
+  
+  async function clearCart(){
+    try {
+      // Получаем все товары из корзины
+      var cartResponse = await fetch(CFG.ajax_url, {
+        method: 'POST',
+        headers: {'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},
+        body: 'action=wmb_get_cart_contents&nonce=' + CFG.nonce,
+        credentials: 'same-origin'
+      });
+      
+      if (cartResponse.ok) {
+        var cartResult = await cartResponse.json();
+        if (cartResult.success && cartResult.data && cartResult.data.items) {
+          // Удаляем только товары Meal Builder (Smart Food и Mercat)
+          var itemsToRemove = cartResult.data.items.filter(function(item) {
+            return item.wmb_payload && (item.product_id == CFG.product_id || item.product_id == (CFG.mercat_product_id || CFG.product_id));
+          });
+          
+          // Удаляем товары по очереди
+          for (var i = 0; i < itemsToRemove.length; i++) {
+            await fetch(CFG.ajax_url, {
+              method: 'POST',
+              headers: {'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},
+              body: 'action=wmb_remove_cart_item&cart_item_key=' + itemsToRemove[i].key + '&nonce=' + CFG.nonce,
+              credentials: 'same-origin'
+            });
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        }
+      }
+      
+      // Очищаем локальное состояние
+      state.qty = {};
+      state.qtyMercat = {};
+      persist();
+      
+      // Обновляем UI
+      var root = document.getElementById('meal-builder-root');
+      if (root) {
+        // Обновляем все карточки, чтобы убрать индикаторы "В корзине"
+        var allCards = root.querySelectorAll('.wmb-card');
+        allCards.forEach(function(card) {
+          var id = card.getAttribute('data-item-id');
+          if (id) {
+            updateCardQty(card, id, 0);
+          }
+        });
+        updateSummary();
+      }
+    } catch(e) {
+      console.error('Ошибка при очистке корзины:', e);
+      alert('Ошибка при очистке корзины: ' + e.message);
     }
   }
 
@@ -608,9 +734,13 @@
     
     var checkout = el('#wmb-checkout');
     var checkoutMobile = el('#wmb-checkout-mobile');
+    var clearCart = el('#wmb-clear-cart');
+    var clearCartMobile = el('#wmb-clear-cart-mobile');
     var hasItems = totalPortions() > 0;
     if(checkout) checkout.disabled = !hasItems;
     if(checkoutMobile) checkoutMobile.disabled = !hasItems;
+    if(clearCart) clearCart.disabled = !hasItems;
+    if(clearCartMobile) clearCartMobile.disabled = !hasItems;
   }
 
   function updateCardQty(cardEl, id, qty){
@@ -636,6 +766,35 @@
     }
   }
 
+  // Ленивая загрузка меню для конкретной вкладки
+  async function loadMenuForTab(tab){
+    if (tab === 'smart_food' && !menu) {
+      menu = await fetch(MENU_URL + '?sale_type=smart_food', {credentials:'same-origin'}).then(function(res){
+        if (!res.ok) throw new Error('HTTP '+res.status);
+        return res.json();
+      }).catch(function(e){
+        console.error('Не удалось загрузить меню Superfood из', MENU_URL, e);
+        return { description:'', sections: [] };
+      });
+    } else if (tab === 'mercat' && !menuMercat) {
+      menuMercat = await fetch(MENU_URL + '?sale_type=mercat', {credentials:'same-origin'}).then(function(res){
+        if (!res.ok) throw new Error('HTTP '+res.status);
+        return res.json();
+      }).catch(function(e){
+        console.error('Не удалось загрузить меню Mercat из', MENU_URL, e);
+        return { description:'', sections: [] };
+      });
+    } else if (tab === 'glovo_uber' && !menuGlovoUber) {
+      menuGlovoUber = await fetch(MENU_URL + '?sale_type=glovo_uber', {credentials:'same-origin'}).then(function(res){
+        if (!res.ok) throw new Error('HTTP '+res.status);
+        return res.json();
+      }).catch(function(e){
+        console.error('Не удалось загрузить меню Glovo/Uber из', MENU_URL, e);
+        return { description:'', sections: [] };
+      });
+    }
+  }
+
   function changeQty(id, delta, root){
     var activeQty = getActiveQty();
     var cur = activeQty[id] || 0;
@@ -656,6 +815,118 @@
         return;
       }
       updateSummary();
+      
+      // НЕ обновляем корзину автоматически - только при нажатии "Перейти к оформлению"
+      // Это предотвращает дублирование товаров и лишние запросы
+    }
+  }
+  
+  // Автоматическое обновление корзины на основе текущего состояния
+  async function updateCartFromState(){
+    try {
+      var hasSmartFood = Object.keys(state.qty).length > 0;
+      var hasMercat = Object.keys(state.qtyMercat).length > 0;
+      
+      if (!hasSmartFood && !hasMercat) {
+        // Если корзина пустая, очищаем корзину WooCommerce
+        await clearCart();
+        return;
+      }
+      
+      // Обновляем Smart Food товары
+      if (hasSmartFood) {
+        var payload = {
+          week: state.week || "",
+          items: Object.fromEntries(Object.entries(state.qty).map(function(kv){return [kv[0], Number(kv[1])]})),
+          total_portions: Object.values(state.qty).reduce(function(a,b){return a+b},0),
+          total_price: Object.entries(state.qty).reduce(function(sum, kv){
+            var it=byId(kv[0]); return sum + (it ? (Number(it.price)||0)*kv[1] : 0);
+          }, 0),
+          sale_type: 'smart_food'
+        };
+        await addToCart(payload, CFG.product_id);
+      } else {
+        // Если Smart Food товаров нет, удаляем их из корзины
+        await removeCartItemsByType('smart_food', CFG.product_id);
+      }
+      
+      // Обновляем Mercat товары
+      if (hasMercat) {
+        var mercatPayload = {
+          week: "",
+          items: Object.fromEntries(Object.entries(state.qtyMercat).map(function(kv){return [kv[0], Number(kv[1])]})),
+          total_portions: Object.values(state.qtyMercat).reduce(function(a,b){return a+b},0),
+          total_price: Object.entries(state.qtyMercat).reduce(function(sum, kv){
+            var it=byId(kv[0]); return sum + (it ? (Number(it.price)||0)*kv[1] : 0);
+          }, 0),
+          sale_type: 'mercat'
+        };
+        var mercatProductId = CFG.mercat_product_id || CFG.product_id;
+        await addToCart(mercatPayload, mercatProductId);
+      } else {
+        // Если Mercat товаров нет, удаляем их из корзины
+        var mercatProductId = CFG.mercat_product_id || CFG.product_id;
+        await removeCartItemsByType('mercat', mercatProductId);
+      }
+      
+      // Синхронизируемся с корзиной после обновления
+      await syncWithCart();
+      
+      // Обновляем UI
+      var root = document.getElementById('meal-builder-root');
+      if (root) {
+        updateSummary();
+        // Обновляем визуальное состояние карточек
+        Object.keys(state.qty).forEach(function(id) {
+          var cardEl = root.querySelector('[data-item-id="' + id + '"]');
+          if (cardEl) updateCardQty(cardEl, id, state.qty[id]);
+        });
+        Object.keys(state.qtyMercat).forEach(function(id) {
+          var cardEl = root.querySelector('[data-item-id="' + id + '"]');
+          if (cardEl) updateCardQty(cardEl, id, state.qtyMercat[id]);
+        });
+      }
+    } catch(e) {
+      console.error('Ошибка при автоматическом обновлении корзины:', e);
+    }
+  }
+  
+  // Удаление товаров определенного типа из корзины
+  async function removeCartItemsByType(saleType, productId){
+    try {
+      var cartResponse = await fetch(CFG.ajax_url, {
+        method: 'POST',
+        headers: {'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},
+        body: 'action=wmb_get_cart_contents&nonce=' + CFG.nonce,
+        credentials: 'same-origin'
+      });
+      
+      if (cartResponse.ok) {
+        var cartResult = await cartResponse.json();
+        if (cartResult.success && cartResult.data && cartResult.data.items) {
+          var itemsToRemove = cartResult.data.items.filter(function(item) {
+            if (!item.wmb_payload || item.product_id != productId) return false;
+            try {
+              var itemPayload = JSON.parse(item.wmb_payload);
+              return itemPayload.sale_type === saleType;
+            } catch(e) {
+              return false;
+            }
+          });
+          
+          for (var i = 0; i < itemsToRemove.length; i++) {
+            await fetch(CFG.ajax_url, {
+              method: 'POST',
+              headers: {'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},
+              body: 'action=wmb_remove_cart_item&cart_item_key=' + itemsToRemove[i].key + '&nonce=' + CFG.nonce,
+              credentials: 'same-origin'
+            });
+            await new Promise(resolve => setTimeout(resolve, 100));
+          }
+        }
+      }
+    } catch(e) {
+      console.error('Ошибка при удалении товаров из корзины:', e);
     }
   }
   
@@ -982,13 +1253,19 @@
           sale_type: 'mercat'
         };
         
-        // Используем тот же product_id или отдельный для Mercat
-        // TODO: создать отдельный продукт для Mercat или использовать тот же
-        await addToCart(mercatPayload, CFG.product_id);
+        // Используем отдельный продукт для Mercat
+        var mercatProductId = CFG.mercat_product_id || CFG.product_id;
+        await addToCart(mercatPayload, mercatProductId);
       }
       
+      // Очищаем локальное состояние после успешного добавления в корзину
+      state.qty = {};
+      state.qtyMercat = {};
+      persist();
+      
       // Перенаправляем на страницу корзины
-      window.location.href = '/cart/';
+      var cartUrl = CFG.cart_url || '/cart/';
+      window.location.href = cartUrl;
       return;
     }catch(e){
       alert('ОШИБКА: ' + e.message);
@@ -1085,38 +1362,78 @@
       persist();
     }
 
-    // Параллельно загружаем все меню и синхронизируемся с корзиной
-    var menuPromise = fetch(MENU_URL + '?sale_type=smart_food', {credentials:'same-origin'}).then(function(res){
-      if (!res.ok) throw new Error('HTTP '+res.status);
-      return res.json();
-    }).catch(function(e){
-      console.error('Не удалось загрузить меню Smart Food из', MENU_URL, e);
-      return { description:'', sections: [] };
-    });
-    
-    var menuMercatPromise = fetch(MENU_URL + '?sale_type=mercat', {credentials:'same-origin'}).then(function(res){
-      if (!res.ok) throw new Error('HTTP '+res.status);
-      return res.json();
-    }).catch(function(e){
-      console.error('Не удалось загрузить меню Mercat из', MENU_URL, e);
-      return { description:'', sections: [] };
-    });
-    
-    var menuGlovoUberPromise = fetch(MENU_URL + '?sale_type=glovo_uber', {credentials:'same-origin'}).then(function(res){
-      if (!res.ok) throw new Error('HTTP '+res.status);
-      return res.json();
-    }).catch(function(e){
-      console.error('Не удалось загрузить меню Glovo/Uber из', MENU_URL, e);
-      return { description:'', sections: [] };
-    });
-    
+    // Оптимизация: загружаем только активную вкладку сразу, остальные - лениво
     var cartPromise = syncWithCart();
     
-    // Ждем все запросы параллельно
-    menu = await menuPromise;
-    menuMercat = await menuMercatPromise;
-    menuGlovoUber = await menuGlovoUberPromise;
+    // Загружаем меню для активной вкладки сразу
+    if (state.activeTab === 'smart_food') {
+      menu = await fetch(MENU_URL + '?sale_type=smart_food', {credentials:'same-origin'}).then(function(res){
+      if (!res.ok) throw new Error('HTTP '+res.status);
+      return res.json();
+    }).catch(function(e){
+        console.error('Не удалось загрузить меню Superfood из', MENU_URL, e);
+      return { description:'', sections: [] };
+    });
+    } else if (state.activeTab === 'mercat') {
+      menuMercat = await fetch(MENU_URL + '?sale_type=mercat', {credentials:'same-origin'}).then(function(res){
+        if (!res.ok) throw new Error('HTTP '+res.status);
+        return res.json();
+      }).catch(function(e){
+        console.error('Не удалось загрузить меню Mercat из', MENU_URL, e);
+        return { description:'', sections: [] };
+      });
+    } else if (state.activeTab === 'glovo_uber') {
+      menuGlovoUber = await fetch(MENU_URL + '?sale_type=glovo_uber', {credentials:'same-origin'}).then(function(res){
+        if (!res.ok) throw new Error('HTTP '+res.status);
+        return res.json();
+      }).catch(function(e){
+        console.error('Не удалось загрузить меню Glovo/Uber из', MENU_URL, e);
+        return { description:'', sections: [] };
+      });
+    }
+    
+    // Синхронизируемся с корзиной (она сама загрузит необходимые меню для товаров в корзине)
     await cartPromise;
+    
+    // После синхронизации обновляем summary, чтобы сумма отобразилась корректно
+    updateSummary();
+    
+    // Остальные меню загружаем в фоне (ленивая загрузка)
+    if (!menu && state.activeTab !== 'smart_food') {
+      fetch(MENU_URL + '?sale_type=smart_food', {credentials:'same-origin'}).then(function(res){
+        if (!res.ok) throw new Error('HTTP '+res.status);
+        return res.json();
+      }).then(function(data){
+        menu = data;
+      }).catch(function(e){
+        console.error('Не удалось загрузить меню Superfood из', MENU_URL, e);
+        menu = { description:'', sections: [] };
+      });
+    }
+    
+    if (!menuMercat && state.activeTab !== 'mercat') {
+      fetch(MENU_URL + '?sale_type=mercat', {credentials:'same-origin'}).then(function(res){
+        if (!res.ok) throw new Error('HTTP '+res.status);
+        return res.json();
+      }).then(function(data){
+        menuMercat = data;
+      }).catch(function(e){
+        console.error('Не удалось загрузить меню Mercat из', MENU_URL, e);
+        menuMercat = { description:'', sections: [] };
+      });
+    }
+    
+    if (!menuGlovoUber && state.activeTab !== 'glovo_uber') {
+      fetch(MENU_URL + '?sale_type=glovo_uber', {credentials:'same-origin'}).then(function(res){
+        if (!res.ok) throw new Error('HTTP '+res.status);
+        return res.json();
+      }).then(function(data){
+        menuGlovoUber = data;
+      }).catch(function(e){
+        console.error('Не удалось загрузить меню Glovo/Uber из', MENU_URL, e);
+        menuGlovoUber = { description:'', sections: [] };
+      });
+    }
     
     restore();
     render(root);

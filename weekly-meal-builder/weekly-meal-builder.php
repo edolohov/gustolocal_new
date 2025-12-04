@@ -10,6 +10,7 @@ if (!defined('ABSPATH')) exit;
 
 define('WMB_VERSION', '2.0.0');
 if (!defined('WMB_PRODUCT_ID')) define('WMB_PRODUCT_ID', 44);
+if (!defined('WMB_MERCAT_PRODUCT_ID')) define('WMB_MERCAT_PRODUCT_ID', 713);
 
 /* ---------- assets ---------- */
 function wmb_assets_url($p){ return plugins_url('assets/'.$p, __FILE__); }
@@ -206,7 +207,7 @@ function wmb_page_items(){
       $ing   = sanitize_textarea_field($q['ingredients']??'');
       $alrg  = sanitize_text_field($q['allergens']??'');
         $shelf_life = sanitize_text_field($q['shelf_life']??'');
-        $active= !empty($q['active']) ? '1' : '0';
+      $active= !empty($q['active']) ? '1' : '0';
         $photo_url = esc_url_raw($q['photo_url']??'');
         $photo_alt = sanitize_text_field($q['photo_alt']??'');
         $nutrition = sanitize_text_field($q['nutrition']??'');
@@ -214,12 +215,12 @@ function wmb_page_items(){
         $available_on_glovo_uber = !empty($q['available_on_glovo_uber']) ? '1' : '0';
         $glovo_url = esc_url_raw($q['glovo_url']??'');
         $uber_url = esc_url_raw($q['uber_url']??'');
-        $id = wp_insert_post(['post_type'=>'wmb_dish','post_status'=>'publish','post_title'=>$title]);
-        if (!is_wp_error($id)){
-          update_post_meta($id,'wmb_price',$price);
-          update_post_meta($id,'wmb_unit',$unit);
-          update_post_meta($id,'wmb_ingredients',$ing);
-          update_post_meta($id,'wmb_allergens',$alrg);
+      $id = wp_insert_post(['post_type'=>'wmb_dish','post_status'=>'publish','post_title'=>$title]);
+      if (!is_wp_error($id)){
+        update_post_meta($id,'wmb_price',$price);
+        update_post_meta($id,'wmb_unit',$unit);
+        update_post_meta($id,'wmb_ingredients',$ing);
+        update_post_meta($id,'wmb_allergens',$alrg);
           update_post_meta($id,'wmb_shelf_life',$shelf_life);
           update_post_meta($id,'wmb_sale_type',$sale_type);
           update_post_meta($id,'wmb_available_on_glovo_uber',$available_on_glovo_uber);
@@ -228,7 +229,7 @@ function wmb_page_items(){
           update_post_meta($id,'wmb_photo_url',$photo_url);
           update_post_meta($id,'wmb_photo_alt',$photo_alt);
           update_post_meta($id,'wmb_nutrition',$nutrition);
-          update_post_meta($id,'wmb_active',$active);
+        update_post_meta($id,'wmb_active',$active);
         $section = sanitize_text_field($q['section']??'');
         if ($section){
           $term = term_exists($section,'wmb_section') ?: wp_insert_term($section,'wmb_section');
@@ -343,7 +344,7 @@ function wmb_page_items(){
           echo '<label><strong>Тип продажи</strong><br><select name="row['.$id.'][sale_type]" style="width:100%">';
           echo '<option value="smart_food" '.selected($sale_type,'smart_food',false).'>Smart Food</option>';
           echo '<option value="mercat" '.selected($sale_type,'mercat',false).'>Mercat</option>';
-          echo '<option value="both" '.selected($sale_type,'both',false).'>Оба (Smart Food + Mercat)</option>';
+          echo '<option value="both" '.selected($sale_type,'both',false).'>Оба (Superfood + Mercat)</option>';
           echo '</select></label>';
           echo '<label style="display:flex;align-items:center;gap:6px"><input type="checkbox" name="row['.$id.'][available_on_glovo_uber]" value="1" '.checked($available_on_glovo_uber,true,false).'> Доступно на Glovo/Uber</label>';
           echo '<label><strong>Glovo URL</strong><br><input type="url" name="row['.$id.'][glovo_url]" value="'.esc_url($glovo_url).'" placeholder="https://glovoapp.com/..."></label>';
@@ -408,9 +409,9 @@ function wmb_page_import(){
       if (empty($rows)) {
         $errors[] = 'CSV файл пуст или не может быть распарсен.';
       } else {
-        $header = array_map('trim', array_shift($rows));
-        $map = array_flip($header);
-        
+      $header = array_map('trim', array_shift($rows));
+      $map = array_flip($header);
+
         // Отладочная информация
         if (empty($map['Тип продажи'])) {
           $errors[] = 'Внимание: колонка "Тип продажи" не найдена в CSV. Найденные колонки: ' . implode(', ', array_keys($map));
@@ -825,6 +826,7 @@ add_shortcode('meal_builder', function(){
   $ajax_url = admin_url('admin-ajax.php');
   $nonce = wp_create_nonce('wmb');
   $product_id = (int)WMB_PRODUCT_ID;
+  $mercat_product_id = (int)WMB_MERCAT_PRODUCT_ID;
   
   // Предзагрузка данных через <link rel="preload"> - добавляем один раз
   static $preload_added = false;
@@ -842,7 +844,10 @@ add_shortcode('meal_builder', function(){
     'ajax_url'=>$ajax_url,
     'nonce'=>$nonce,
     'product_id'=>$product_id,
+    'mercat_product_id'=>$mercat_product_id,
     'menu_url'=>$menu_url,
+    'cart_url'=>function_exists('wc_get_cart_url') ? wc_get_cart_url() : home_url('/cart/'),
+    'menu_url_base'=>get_permalink(get_page_by_path('menu')) ?: home_url('/menu/'),
   ]);
   wp_enqueue_script('wmb-app');
   
@@ -929,13 +934,8 @@ function wmb_display_cart_item_details($name, $cart_item, $cart_item_key) {
   if (isset($cart_item['wmb_payload'])) {
     $payload = json_decode($cart_item['wmb_payload'], true);
     if ($payload && isset($payload['items_list']) && is_array($payload['items_list'])) {
-      $sale_type = isset($payload['sale_type']) ? $payload['sale_type'] : 'smart_food';
+      // Убираем бейджи - они дублируют информацию, так как товары уже разделены
       $sale_type_label = '';
-      if ($sale_type === 'mercat') {
-        $sale_type_label = '<span class="wmb-sale-type-badge wmb-sale-type-mercat">Mercat</span>';
-      } elseif ($sale_type === 'smart_food') {
-        $sale_type_label = '<span class="wmb-sale-type-badge wmb-sale-type-smart-food">Smart Food</span>';
-      }
       
       $details = [];
       foreach ($payload['items_list'] as $item) {
@@ -995,6 +995,53 @@ add_action('woocommerce_checkout_create_order_line_item', function($item,$key,$v
   }
 },10,3);
 
+// Подсказки в корзине о возможности дозаказа
+add_action('woocommerce_before_cart', 'wmb_show_cart_addon_hints');
+function wmb_show_cart_addon_hints() {
+  if (!function_exists('WC') || !WC()->cart) return;
+  
+  $has_smart_food = false;
+  $has_mercat = false;
+  
+  foreach (WC()->cart->get_cart() as $cart_item) {
+    if (isset($cart_item['wmb_payload'])) {
+      $payload = json_decode($cart_item['wmb_payload'], true);
+      if ($payload && isset($payload['sale_type'])) {
+        if ($payload['sale_type'] === 'smart_food') {
+          $has_smart_food = true;
+        } elseif ($payload['sale_type'] === 'mercat') {
+          $has_mercat = true;
+        }
+      }
+    }
+  }
+  
+  $menu_url = get_permalink(get_page_by_path('menu'));
+  if (!$menu_url) $menu_url = home_url('/menu/');
+  
+  if ($has_smart_food && !$has_mercat) {
+    echo '<div class="wmb-cart-hint" style="background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%); border: 2px solid #2196f3; border-radius: 12px; padding: 20px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(33,150,243,0.15);">';
+    echo '<div style="display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap;">';
+    echo '<div style="flex: 1; min-width: 200px;">';
+    echo '<strong style="display: block; font-size: 18px; color: #1976d2; margin-bottom: 8px;">Добавьте товары из Mercat!</strong>';
+    echo '<p style="font-size: 14px; color: #555; margin: 0 0 12px 0; line-height: 1.5;">Вы можете добавить товары из раздела Mercat к вашему заказу Superfood. Доставка будет объединена на следующий день.</p>';
+    echo '<a href="' . esc_url($menu_url) . '#mercat" style="display: inline-block; padding: 10px 20px; background: #2196f3; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; transition: all 0.2s;">Перейти к Mercat →</a>';
+    echo '</div>';
+    echo '</div>';
+    echo '</div>';
+  } elseif ($has_mercat && !$has_smart_food) {
+    echo '<div class="wmb-cart-hint" style="background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%); border: 2px solid #ff9800; border-radius: 12px; padding: 20px; margin-bottom: 24px; box-shadow: 0 4px 12px rgba(255,152,0,0.15);">';
+    echo '<div style="display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap;">';
+    echo '<div style="flex: 1; min-width: 200px;">';
+    echo '<strong style="display: block; font-size: 18px; color: #f57c00; margin-bottom: 8px;">Добавьте Superfood!</strong>';
+    echo '<p style="font-size: 14px; color: #555; margin: 0 0 12px 0; line-height: 1.5;">Вы можете добавить блюда из раздела Superfood к вашему заказу Mercat. Доставка будет объединена на следующий день.</p>';
+    echo '<a href="' . esc_url($menu_url) . '#smart_food" style="display: inline-block; padding: 10px 20px; background: #ff9800; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; transition: all 0.2s;">Перейти к Superfood →</a>';
+    echo '</div>';
+    echo '</div>';
+    echo '</div>';
+  }
+}
+
 // Подсказки при оформлении заказа о возможности дозаказа
 add_action('woocommerce_before_checkout_form', 'wmb_show_addon_hints');
 function wmb_show_addon_hints() {
@@ -1028,9 +1075,9 @@ function wmb_show_addon_hints() {
     $menu_url = get_permalink(get_page_by_path('menu'));
     if (!$menu_url) $menu_url = home_url('/menu/');
     echo '<div class="wmb-checkout-hint" style="background: #fff3e0; border-left: 4px solid #ff9800; padding: 16px; margin-bottom: 20px; border-radius: 4px;">';
-    echo '<strong>💡 Хотите добавить Smart Food?</strong><br>';
-    echo '<span style="font-size: 14px; color: #666;">Вы можете добавить блюда из раздела Smart Food к вашему заказу Mercat. Доставка будет объединена на следующий день.</span><br>';
-    echo '<a href="' . esc_url($menu_url) . '#smart_food" style="display: inline-block; margin-top: 8px; padding: 8px 16px; background: #ff9800; color: white; text-decoration: none; border-radius: 4px; font-weight: 600;">Перейти к Smart Food →</a>';
+    echo '<strong>Хотите добавить Superfood?</strong><br>';
+    echo '<span style="font-size: 14px; color: #666;">Вы можете добавить блюда из раздела Superfood к вашему заказу Mercat. Доставка будет объединена на следующий день.</span><br>';
+    echo '<a href="' . esc_url($menu_url) . '#smart_food" style="display: inline-block; margin-top: 8px; padding: 8px 16px; background: #ff9800; color: white; text-decoration: none; border-radius: 4px; font-weight: 600;">Перейти к Superfood →</a>';
     echo '</div>';
   }
 }

@@ -659,12 +659,35 @@ body:has(#meal-builder-root) .wp-block-post-content > p{ margin:6px 0 10px !impo
 }
 .wmb-summary{background:#fff;border:1px solid #eee;border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:10px}
 .wmb-summary-row{display:flex;align-items:center;justify-content:space-between}
-.wmb-checkout-btn{width:100%;padding:12px 14px;border:0;border-radius:10px;background:#7b66ff;color:#fff;font-weight:700;cursor:pointer}
+.wmb-checkout-btn{width:100%;padding:12px 14px;border:0;border-radius:10px;background:#7b66ff;color:#fff;font-weight:700;cursor:pointer;margin-top:4px}
 .wmb-checkout-btn:disabled{opacity:.5;cursor:default}
+.wmb-clear-cart-btn{
+  width: 100%;
+  padding: 10px 14px;
+  margin-top: 8px;
+  background: #f5f5f5;
+  color: #666;
+  border: 1px solid #ddd;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.wmb-clear-cart-btn:hover:not(:disabled){
+  background: #e8e8e8;
+  border-color: #ccc;
+  color: #333;
+}
+.wmb-clear-cart-btn:disabled{
+  opacity: 0.5;
+  cursor: not-allowed;
+}
 
 /* Sticky checkout for mobile */
 .wmb-sticky{position:fixed;left:0;right:0;bottom:0;width:100%;box-sizing:border-box;display:none;align-items:center;justify-content:space-between;gap:12px;background:#fff;border-top:1px solid #eee;padding:10px 12px;z-index:9999;box-shadow:0 -4px 10px rgba(0,0,0,.06);padding-bottom:calc(10px + env(safe-area-inset-bottom));padding-left:calc(12px + env(safe-area-inset-left));padding-right:calc(12px + env(safe-area-inset-right))}
 .wmb-sticky .wmb-checkout-btn{width:auto;min-width:170px}
+.wmb-sticky .wmb-clear-cart-btn{width:auto;min-width:170px;font-size:13px;padding:8px 12px}
 @media (max-width:768px){
   .wmb-sticky{display:flex}
   .wmb-sidebar{display:none}
