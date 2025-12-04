@@ -261,6 +261,40 @@
     document.addEventListener('keydown', function(e){ if(e.key==='Escape') close(); });
   }
 
+  /* ======== PHOTO MODAL ======== */
+  function ensurePhotoModal(){
+    if (document.getElementById('wmb-photo-modal')) return;
+    document.body.insertAdjacentHTML('beforeend', [
+      '<div id="wmb-photo-modal" aria-hidden="true">',
+        '<div class="back" tabindex="-1"></div>',
+        '<div class="dialog" role="dialog" aria-modal="true" aria-labelledby="wmb-photo-title">',
+          '<button class="close" aria-label="Закрыть">×</button>',
+          '<h3 id="wmb-photo-title"></h3>',
+          '<div class="wmb-photo-container">',
+            '<img id="wmb-photo-img" src="" alt="">',
+          '</div>',
+        '</div>',
+      '</div>'
+    ].join(''));
+    var modal = el('#wmb-photo-modal');
+    var close = function(){ modal.classList.remove('open'); modal.setAttribute('aria-hidden','true'); };
+    modal.querySelector('.back').addEventListener('click', close);
+    modal.querySelector('.close').addEventListener('click', close);
+    document.addEventListener('keydown', function(e){ if(e.key==='Escape') close(); });
+  }
+
+  function openPhotoFor(url, alt, title){
+    if (!url) return;
+    ensurePhotoModal();
+    var modal = el('#wmb-photo-modal');
+    el('#wmb-photo-title').textContent = title || 'Фото блюда';
+    var img = el('#wmb-photo-img');
+    img.src = url;
+    img.alt = alt || title || 'Фото блюда';
+    modal.classList.add('open');
+    modal.setAttribute('aria-hidden','false');
+  }
+
   function openIngredientsFor(id){
     var item = byId(id);
     if (!item) return;
@@ -457,26 +491,35 @@
     var hasIngredients = !!(item.ingredients && String(item.ingredients).trim().length);
     var hasAllergens = allergens.length > 0;
     var inCart = q > 0; // Индикатор что товар уже в корзине
+    var photoUrl = item.photo_url || '';
+    var photoAlt = item.photo_alt || item.name || '';
+    var nutrition = item.nutrition || '';
+    var shelfLife = item.shelf_life || '';
 
     return [
       '<div class="wmb-card' + (inCart ? ' wmb-card-in-cart' : '') + '" data-item-id="' + escapeHtml(item.id) + '">',
-        '<div class="wmb-card-title">',
-          escapeHtml(item.name),
-          (inCart ? '<span class="wmb-in-cart-badge">В корзине</span>' : ''),
-          '<div class="wmb-card-buttons">',
-            (hasIngredients ? '<button class="wmb-ing-btn" data-id="'+item.id+'" aria-label="Состав блюда '+escapeHtml(item.name)+'">Состав</button>' : ''),
-            (hasAllergens ? '<button class="wmb-allergens-btn" data-id="'+item.id+'" aria-label="Аллергены блюда '+escapeHtml(item.name)+'">Аллергены</button>' : ''),
+        (photoUrl ? '<div class="wmb-card-image"><img src="'+escapeHtml(photoUrl)+'" alt="'+escapeHtml(photoAlt)+'" loading="lazy" class="wmb-photo-clickable" data-photo-url="'+escapeHtml(photoUrl)+'" data-photo-alt="'+escapeHtml(photoAlt)+'" data-photo-title="'+escapeHtml(item.name)+'"></div>' : ''),
+        '<div class="wmb-card-content">',
+          '<div class="wmb-card-title">',
+            escapeHtml(item.name),
+            (inCart ? '<span class="wmb-in-cart-badge">В корзине</span>' : ''),
+            '<div class="wmb-card-buttons">',
+              (hasIngredients ? '<button class="wmb-ing-btn" data-id="'+item.id+'" aria-label="Состав блюда '+escapeHtml(item.name)+'">Состав</button>' : ''),
+              (hasAllergens ? '<button class="wmb-allergens-btn" data-id="'+item.id+'" aria-label="Аллергены блюда '+escapeHtml(item.name)+'">Аллергены</button>' : ''),
+            '</div>',
           '</div>',
-        '</div>',
-        '<div class="wmb-card-meta">',
-          '<span>'+money(Number(item.price)||0)+'</span>',
-          (unit ? '<span class="wmb-unit">'+escapeHtml(unit)+'</span>' : ''),
-        '</div>',
-        (tags.length? '<div class="wmb-card-tags">'+tags.map(function(t){return '<span class="wmb-tag">'+escapeHtml(t)+'</span>'}).join('')+'</div>' : ''),
-        '<div class="wmb-qty">',
-          '<button class="wmb-qty-dec" data-id="'+item.id+'" '+(q===0?'disabled':'')+' aria-label="Уменьшить">–</button>',
-          '<span class="wmb-qty-value" aria-live="polite">'+q+'</span>',
-          '<button class="wmb-qty-inc" data-id="'+item.id+'" aria-label="Увеличить">+</button>',
+          '<div class="wmb-card-meta">',
+            '<span>'+money(Number(item.price)||0)+'</span>',
+            (unit ? '<span class="wmb-unit">'+escapeHtml(unit)+'</span>' : ''),
+          '</div>',
+          (nutrition ? '<div class="wmb-card-nutrition">'+escapeHtml(nutrition)+'</div>' : ''),
+          (shelfLife ? '<div class="wmb-card-shelf-life">'+escapeHtml(shelfLife)+'</div>' : ''),
+          (tags.length? '<div class="wmb-card-tags">'+tags.map(function(t){return '<span class="wmb-tag">'+escapeHtml(t)+'</span>'}).join('')+'</div>' : ''),
+          '<div class="wmb-qty">',
+            '<button class="wmb-qty-dec" data-id="'+item.id+'" '+(q===0?'disabled':'')+' aria-label="Уменьшить">–</button>',
+            '<span class="wmb-qty-value" aria-live="polite">'+q+'</span>',
+            '<button class="wmb-qty-inc" data-id="'+item.id+'" aria-label="Увеличить">+</button>',
+          '</div>',
         '</div>',
       '</div>'
     ].join('');
@@ -895,6 +938,16 @@
       e.preventDefault();
       e.stopPropagation();
       openAllergensFor(t.getAttribute('data-id'));
+    }
+    // Клик на фото для открытия в модальном окне
+    else if (t.classList.contains('wmb-photo-clickable') || t.closest('.wmb-photo-clickable')) {
+      e.preventDefault();
+      e.stopPropagation();
+      var img = t.classList.contains('wmb-photo-clickable') ? t : t.closest('.wmb-photo-clickable');
+      var url = img.getAttribute('data-photo-url') || img.src;
+      var alt = img.getAttribute('data-photo-alt') || img.alt;
+      var title = img.getAttribute('data-photo-title') || '';
+      openPhotoFor(url, alt, title);
     }
   };
   

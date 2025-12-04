@@ -1,0 +1,52 @@
+#!/usr/bin/expect -f
+# Деплой плагина weekly-meal-builder через SCP
+
+set timeout 120
+set host "82.29.185.42"
+set port "65002"
+set user "u850527203"
+set pass "hiLKov15!"
+
+# Получаем путь из переменной окружения или используем дефолтный
+if {[info exists env(SFTP_REMOTE_PATH)]} {
+    set remote_path $env(SFTP_REMOTE_PATH)
+} else {
+    set remote_path "/home/u850527203/domains/gustolocal.es/public_html"
+}
+
+set plugin_path "$remote_path/wp-content/plugins/weekly-meal-builder"
+
+puts "🚀 Деплою плагин weekly-meal-builder..."
+puts "📦 Загружаю файлы через SCP..."
+
+# Загружаем файлы через scp (загружаем всю папку)
+spawn scp -P $port -o StrictHostKeyChecking=no -r weekly-meal-builder $user@$host:$remote_path/wp-content/plugins/
+
+expect {
+    "password:" {
+        send "$pass\r"
+        exp_continue
+    }
+    "yes/no" {
+        send "yes\r"
+        exp_continue
+    }
+    timeout {
+        puts "❌ Таймаут подключения"
+        exit 1
+    }
+    eof {
+        puts "✅ Файлы загружены!"
+    }
+}
+
+puts ""
+puts "✅ Деплой завершен!"
+puts ""
+puts "📝 Проверьте в админке WordPress:"
+puts "   Meal Builder > Блюда > Откройте любое блюдо"
+puts "   В правой колонке 'Параметры блюда' должны появиться новые поля:"
+puts "   - Фото (URL)"
+puts "   - Alt текст для фото (SEO)"
+puts "   - КБЖУ (100 г)"
+

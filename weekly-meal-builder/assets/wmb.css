@@ -2,7 +2,25 @@
 /* Убираем overflow-x:hidden который ломает sticky */
 html,body{overflow-x:hidden}
 html,body{overflow:visible !important}
-#meal-builder-root{padding-left:12px;padding-right:12px}
+/* Убеждаемся что viewport правильно настроен для мобильных */
+@supports (width: 100vw) {
+  html {
+    width: 100%;
+    max-width: 100vw;
+  }
+  body {
+    width: 100%;
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+}
+#meal-builder-root{
+  padding-left:12px;
+  padding-right:12px;
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
+}
 @supports (padding: max(0px)){
   #meal-builder-root{padding-left:max(12px, env(safe-area-inset-left));padding-right:max(12px, env(safe-area-inset-right))}
 }
@@ -151,32 +169,352 @@ body:has(#meal-builder-root) .wp-block-post-content > p{ margin:6px 0 10px !impo
 /* Catalog */
 .wmb-section{margin:12px 0 24px}
 .wmb-section-title{font-size:28px;margin:0 0 10px}
-.wmb-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
-@media (max-width: 1200px){ .wmb-grid{grid-template-columns:repeat(3,1fr)} }
-@media (max-width: 900px){ .wmb-grid{grid-template-columns:repeat(2,1fr)} }
-@media (max-width: 560px){ .wmb-grid{grid-template-columns:1fr} }
+.wmb-grid{
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:16px;
+  width:100%;
+  max-width:100%;
+  box-sizing:border-box;
+  /* Критично: предотвращаем вылезание карточек */
+  min-width:0;
+  grid-auto-rows:min-content;
+}
+.wmb-grid > *{
+  min-width:0;
+  max-width:100%;
+}
+@media (max-width: 1200px){ 
+  .wmb-grid{
+    grid-template-columns:repeat(3,1fr);
+  } 
+}
+@media (max-width: 900px){ 
+  .wmb-grid{
+    grid-template-columns:repeat(2,1fr);
+  } 
+}
+@media (max-width: 560px){ 
+  .wmb-grid{
+    grid-template-columns:1fr;
+    gap:12px;
+  } 
+}
 
 /* Card */
-.wmb-card{background:#fff;border:1px solid #eee;border-radius:16px;padding:16px}
-.wmb-card-title{font-weight:700;font-size:20px;line-height:1.25;margin-bottom:8px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:space-between}
-.wmb-card-buttons{display:flex;gap:8px;flex-wrap:wrap}
-.wmb-card-buttons .wmb-ing-btn{font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid #4a90e2;background:#e3f2fd;color:#1976d2;cursor:pointer;font-weight:500;transition:all 0.2s ease}
-.wmb-card-buttons .wmb-ing-btn:hover{background:#bbdefb;border-color:#1976d2}
-.wmb-card-buttons .wmb-allergens-btn{font-size:13px;padding:6px 12px;border-radius:999px;border:1px solid #f57c00;background:#fff3e0;color:#e65100;cursor:pointer;font-weight:500;transition:all 0.2s ease}
-.wmb-card-buttons .wmb-allergens-btn:hover{background:#ffcc02;border-color:#f57c00}
-.wmb-card-meta{display:flex;gap:12px;align-items:center;margin-bottom:8px}
-.wmb-unit{color:#666}
-.wmb-card-tags{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 8px}
-.wmb-tag{padding:4px 8px;border-radius:999px;background:#f6f6fb;border:1px solid #e6e6ef;font-size:12px;color:#666}
-.wmb-allergens{display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px}
-.wmb-allergen{display:inline-flex;align-items:center;gap:6px;padding:6px 10px;border-radius:999px;background:#fff;border:1px solid #e6e6ef;font-size:.9rem}
+.wmb-card{
+  background:#fff;
+  border:1px solid #eee;
+  border-radius:16px;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+  transition:all 0.2s ease;
+  height:100%;
+  max-width:100%;
+  box-sizing:border-box;
+}
+.wmb-card:hover{
+  box-shadow:0 4px 12px rgba(0,0,0,.08);
+  transform:translateY(-2px);
+}
+.wmb-card-image{
+  width:100%;
+  max-width:100%;
+  height:200px;
+  min-height:200px;
+  max-height:200px;
+  overflow:hidden !important;
+  background:#f5f5f5;
+  position:relative;
+  flex-shrink:0;
+  border-radius:16px 16px 0 0;
+  box-sizing:border-box !important;
+  /* Критично для предотвращения вылезания */
+  contain:layout style paint;
+  /* Дополнительная защита */
+  clip-path:inset(0);
+}
+.wmb-card-image img{
+  width:100% !important;
+  height:100% !important;
+  max-width:100% !important;
+  max-height:100% !important;
+  min-width:0 !important;
+  min-height:0 !important;
+  object-fit:cover !important;
+  object-position:center !important;
+  display:block !important;
+  cursor:pointer;
+  transition:transform 0.3s ease;
+  /* Критично для предотвращения вылезания */
+  box-sizing:border-box !important;
+  border:none !important;
+  padding:0 !important;
+  margin:0 !important;
+  /* Дополнительная защита от вылезания */
+  vertical-align:top;
+  position:relative;
+}
+.wmb-card-image:hover img{
+  transform:scale(1.05);
+  /* При hover тоже не должно вылезать */
+  transform-origin:center center;
+}
+.wmb-card-content{
+  padding:16px;
+  display:flex;
+  flex-direction:column;
+  flex:1;
+  gap:8px;
+  min-width:0; /* Позволяет flex-элементам сжиматься */
+}
+.wmb-card-title{
+  font-weight:700;
+  font-size:18px;
+  line-height:1.3;
+  margin-bottom:4px;
+  display:flex;
+  gap:8px;
+  align-items:flex-start;
+  flex-wrap:wrap;
+  justify-content:space-between;
+  word-wrap:break-word;
+  overflow-wrap:break-word;
+  hyphens:auto;
+}
+.wmb-card-buttons{
+  display:flex;
+  gap:6px;
+  flex-wrap:wrap;
+  margin-top:4px;
+}
+.wmb-card-buttons .wmb-ing-btn{
+  font-size:12px;
+  padding:4px 10px;
+  border-radius:999px;
+  border:1px solid #4a90e2;
+  background:#e3f2fd;
+  color:#1976d2;
+  cursor:pointer;
+  font-weight:500;
+  transition:all 0.2s ease;
+  white-space:nowrap;
+}
+.wmb-card-buttons .wmb-ing-btn:hover{
+  background:#bbdefb;
+  border-color:#1976d2;
+}
+.wmb-card-buttons .wmb-allergens-btn{
+  font-size:12px;
+  padding:4px 10px;
+  border-radius:999px;
+  border:1px solid #f57c00;
+  background:#fff3e0;
+  color:#e65100;
+  cursor:pointer;
+  font-weight:500;
+  transition:all 0.2s ease;
+  white-space:nowrap;
+}
+.wmb-card-buttons .wmb-allergens-btn:hover{
+  background:#ffcc02;
+  border-color:#f57c00;
+}
+.wmb-card-meta{
+  display:flex;
+  gap:12px;
+  align-items:center;
+  margin-bottom:4px;
+  font-size:16px;
+  font-weight:600;
+  color:#2d5a3d;
+}
+.wmb-unit{
+  color:#666;
+  font-size:14px;
+  font-weight:400;
+}
+.wmb-card-nutrition{
+  font-size:13px;
+  color:#666;
+  padding:6px 10px;
+  background:#f8f9fa;
+  border-radius:8px;
+  margin:4px 0;
+  line-height:1.4;
+}
+.wmb-card-tags{
+  display:flex;
+  flex-wrap:wrap;
+  gap:6px;
+  margin:4px 0 6px;
+}
+.wmb-tag{
+  padding:4px 10px;
+  border-radius:999px;
+  background:#f6f6fb;
+  border:1px solid #e6e6ef;
+  font-size:12px;
+  color:#666;
+  white-space:nowrap;
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+/* Бейдж срока хранения */
+.wmb-card-shelf-life{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 12px;
+  border-radius:8px;
+  background:linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+  border:1px solid #81c784;
+  font-size:12px;
+  font-weight:600;
+  color:#2e7d32;
+  margin:4px 0 6px;
+  white-space:nowrap;
+}
+.wmb-card-shelf-life::before{
+  content:"⏱";
+  font-size:14px;
+  line-height:1;
+}
+/* Исправление верстки для длинных текстов */
+.wmb-card{
+  word-wrap:break-word;
+  overflow-wrap:break-word;
+  /* Критично: предотвращаем вылезание содержимого */
+  min-width:0;
+  width:100%;
+  max-width:100%;
+}
+.wmb-card-title{
+  word-break:break-word;
+  overflow-wrap:anywhere;
+  min-width:0;
+  flex:1;
+}
+.wmb-card-tags .wmb-tag{
+  max-width:100%;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  display:inline-block;
+}
+/* Ограничение длины тегов на мобилке */
+@media (max-width: 560px){
+  .wmb-card-tags .wmb-tag{
+    max-width:calc(50% - 3px);
+    font-size:11px;
+    padding:3px 8px;
+  }
+}
+/* Дополнительная защита от вылезания фото */
+.wmb-grid .wmb-card{
+  width:100%;
+  max-width:100%;
+  min-width:0;
+  overflow:hidden !important;
+}
+.wmb-card-image,
+.wmb-card-image *{
+  max-width:100% !important;
+  box-sizing:border-box !important;
+}
+/* Агрессивная защита от вылезания на всех уровнях */
+.wmb-section,
+.wmb-catalog,
+.wmb-wrapper,
+#meal-builder-root{
+  overflow-x:hidden !important;
+  max-width:100% !important;
+}
+.wmb-card *{
+  max-width:100%;
+  box-sizing:border-box;
+}
+.wmb-allergens{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  margin:6px 0 10px;
+}
+.wmb-allergen{
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  padding:6px 10px;
+  border-radius:999px;
+  background:#fff;
+  border:1px solid #e6e6ef;
+  font-size:.9rem;
+}
 .wmb-allergen i{font-style:normal;opacity:.8}
 
+/* Адаптивность карточек */
+@media (max-width: 560px){
+  .wmb-card-image{
+    height:180px;
+  }
+  .wmb-card-title{
+    font-size:16px;
+  }
+  .wmb-card-content{
+    padding:12px;
+  }
+  .wmb-card-meta{
+    font-size:15px;
+  }
+}
+
+/* Исправление вылезания фото за границы */
+.wmb-card{
+  max-width:100%;
+  box-sizing:border-box;
+}
+.wmb-grid{
+  width:100%;
+  box-sizing:border-box;
+}
+
 /* Qty */
-.wmb-qty{display:flex;gap:10px;align-items:center;margin-top:10px}
-.wmb-qty button{width:36px;height:36px;border-radius:10px;border:1px solid #ddd;background:#fff;font-size:18px;cursor:pointer}
-.wmb-qty button:disabled{opacity:.5;cursor:default}
-.wmb-qty-value{min-width:20px;text-align:center;font-weight:600}
+.wmb-qty{
+  display:flex;
+  gap:10px;
+  align-items:center;
+  margin-top:auto;
+  padding-top:8px;
+  border-top:1px solid #f0f0f0;
+}
+.wmb-qty button{
+  width:36px;
+  height:36px;
+  border-radius:10px;
+  border:1px solid #ddd;
+  background:#fff;
+  font-size:18px;
+  cursor:pointer;
+  transition:all 0.2s ease;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.wmb-qty button:hover:not(:disabled){
+  background:#f5f5f5;
+  border-color:#bbb;
+}
+.wmb-qty button:disabled{
+  opacity:.5;
+  cursor:default;
+}
+.wmb-qty-value{
+  min-width:24px;
+  text-align:center;
+  font-weight:600;
+  font-size:16px;
+}
 
 /* Sidebar - исправлен sticky */
 .wmb-sidebar{
@@ -244,6 +582,81 @@ body:has(#meal-builder-root) .wp-block-post-content > p{ margin:6px 0 10px !impo
 #wmb-allergens-modal h3{margin:0 24px 4px 0;font-size:22px}
 #wmb-allergens-modal .allergens-list{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0}
 #wmb-allergens-modal .allergen-pill{display:inline-block;padding:8px 16px;border-radius:999px;background:#fff3cd;border:1px solid #ffeaa7;color:#856404;font-weight:500}
+
+/* ============ Photo modal ============ */
+#wmb-photo-modal{position:fixed;inset:0;display:none;z-index:10000}
+#wmb-photo-modal.open{display:flex;align-items:center;justify-content:center}
+#wmb-photo-modal .back{position:absolute;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(4px)}
+#wmb-photo-modal .dialog{
+  position:relative;
+  max-width:90vw;
+  max-height:90vh;
+  background:#fff;
+  border-radius:16px;
+  padding:20px;
+  display:flex;
+  flex-direction:column;
+  z-index:10001;
+}
+#wmb-photo-modal .close{
+  position:absolute;
+  top:12px;
+  right:12px;
+  border:0;
+  background:rgba(255,255,255,.9);
+  border-radius:50%;
+  width:36px;
+  height:36px;
+  font-size:24px;
+  cursor:pointer;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:10002;
+  transition:all 0.2s ease;
+}
+#wmb-photo-modal .close:hover{
+  background:#fff;
+  transform:scale(1.1);
+}
+#wmb-photo-modal h3{
+  margin:0 40px 12px 0;
+  font-size:20px;
+  font-weight:600;
+}
+.wmb-photo-container{
+  flex:1;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  overflow:hidden;
+  border-radius:8px;
+  background:#f5f5f5;
+  min-height:200px;
+  max-height:calc(90vh - 100px);
+}
+.wmb-photo-container img{
+  max-width:100%;
+  max-height:100%;
+  width:auto;
+  height:auto;
+  object-fit:contain;
+  display:block;
+}
+@media (max-width:768px){
+  #wmb-photo-modal .dialog{
+    max-width:95vw;
+    max-height:95vh;
+    padding:16px;
+  }
+  #wmb-photo-modal h3{
+    font-size:18px;
+    margin-bottom:8px;
+  }
+  .wmb-photo-container{
+    max-height:calc(95vh - 80px);
+  }
+}
 
 /* ============ Sticky Fixes ============ */
 /* Убираем возможные ограничения от родительских элементов */

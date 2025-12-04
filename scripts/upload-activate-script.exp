@@ -1,0 +1,40 @@
+#!/usr/bin/expect -f
+# Загрузка скрипта активации блюд на сервер
+
+set timeout 60
+set host "82.29.185.42"
+set port "65002"
+set user "u850527203"
+set pass "hiLKov15!"
+
+set remote_path "/home/u850527203/domains/gustolocal.es/public_html"
+set local_file "scripts/activate-all-dishes.php"
+set remote_file "activate-all-dishes.php"
+
+puts "📤 Загружаю скрипт активации блюд..."
+
+spawn scp -P $port -o StrictHostKeyChecking=no $local_file $user@$host:$remote_file
+
+expect {
+    "password:" {
+        send "$pass\r"
+        exp_continue
+    }
+    "yes/no" {
+        send "yes\r"
+        exp_continue
+    }
+    timeout {
+        puts "❌ Таймаут"
+        exit 1
+    }
+    eof {
+        puts "✅ Файл загружен!"
+    }
+}
+
+puts ""
+puts "✅ Скрипт загружен на сервер"
+puts "📝 Откройте в браузере: https://gustolocal.es/activate-all-dishes.php"
+puts "⚠️  После использования УДАЛИТЕ файл с сервера!"
+

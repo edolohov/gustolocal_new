@@ -94,11 +94,19 @@ function wmb_render_meta($post){
   $ing   = get_post_meta($post->ID,'wmb_ingredients',true);
   $alrg  = get_post_meta($post->ID,'wmb_allergens',true);
   $active= get_post_meta($post->ID,'wmb_active',true)==='1';
+  $shelf_life = get_post_meta($post->ID,'wmb_shelf_life',true);
+  $photo_url = get_post_meta($post->ID,'wmb_photo_url',true);
+  $photo_alt = get_post_meta($post->ID,'wmb_photo_alt',true);
+  $nutrition = get_post_meta($post->ID,'wmb_nutrition',true);
   wp_nonce_field('wmb_save_meta','wmb_meta_nonce');
   echo '<p><label>Цена (€)<br><input name="wmb_price" type="number" step="0.01" value="'.esc_attr($price).'" style="width:100%"></label></p>';
   echo '<p><label>Единица (текст)<br><input name="wmb_unit" type="text" value="'.esc_attr($unit).'" placeholder="200 г 2 порции" style="width:100%"></label></p>';
   echo '<p><label>Состав (текст)<br><textarea name="wmb_ingredients" rows="3" style="width:100%">'.esc_textarea($ing).'</textarea></label></p>';
   echo '<p><label>Аллергены (через запятую)<br><input name="wmb_allergens" type="text" value="'.esc_attr($alrg).'" placeholder="глютен, молоко, яйца" style="width:100%"></label></p>';
+  echo '<p><label>Срок хранения<br><input name="wmb_shelf_life" type="text" value="'.esc_attr($shelf_life).'" placeholder="2-3 дня, до 2х дней" style="width:100%"></label></p>';
+  echo '<p><label>Фото (URL)<br><input name="wmb_photo_url" type="url" value="'.esc_url($photo_url).'" placeholder="https://..." style="width:100%"></label></p>';
+  echo '<p><label>Alt текст для фото (SEO)<br><input name="wmb_photo_alt" type="text" value="'.esc_attr($photo_alt).'" placeholder="Описание фото для поисковиков" style="width:100%"></label></p>';
+  echo '<p><label>КБЖУ (100 г)<br><input name="wmb_nutrition" type="text" value="'.esc_attr($nutrition).'" placeholder="~120 ккал, Б ~3 г, Ж ~5 г, У ~15 г" style="width:100%"></label></p>';
   echo '<p><label><input type="checkbox" name="wmb_active" value="1" '.checked($active,true,false).'> Активно</label></p>';
 }
 add_action('save_post_wmb_dish', function($post_id){
@@ -109,6 +117,10 @@ add_action('save_post_wmb_dish', function($post_id){
   update_post_meta($post_id,'wmb_unit', sanitize_text_field($_POST['wmb_unit']??''));
   update_post_meta($post_id,'wmb_ingredients', sanitize_textarea_field($_POST['wmb_ingredients']??''));
   update_post_meta($post_id,'wmb_allergens', sanitize_text_field($_POST['wmb_allergens']??''));
+  update_post_meta($post_id,'wmb_shelf_life', sanitize_text_field($_POST['wmb_shelf_life']??''));
+  update_post_meta($post_id,'wmb_photo_url', esc_url_raw($_POST['wmb_photo_url']??''));
+  update_post_meta($post_id,'wmb_photo_alt', sanitize_text_field($_POST['wmb_photo_alt']??''));
+  update_post_meta($post_id,'wmb_nutrition', sanitize_text_field($_POST['wmb_nutrition']??''));
   update_post_meta($post_id,'wmb_active', !empty($_POST['wmb_active'])?'1':'0');
 });
 
@@ -134,11 +146,19 @@ function wmb_page_items(){
         $unit  = sanitize_text_field($row['unit']??'');
         $ing   = sanitize_textarea_field($row['ingredients']??'');
         $alrg  = sanitize_text_field($row['allergens']??'');
+        $shelf_life = sanitize_text_field($row['shelf_life']??'');
         $active= !empty($row['active']) ? '1' : '0';
+        $photo_url = esc_url_raw($row['photo_url']??'');
+        $photo_alt = sanitize_text_field($row['photo_alt']??'');
+        $nutrition = sanitize_text_field($row['nutrition']??'');
         update_post_meta($id,'wmb_price',$price);
         update_post_meta($id,'wmb_unit',$unit);
         update_post_meta($id,'wmb_ingredients',$ing);
         update_post_meta($id,'wmb_allergens',$alrg);
+        update_post_meta($id,'wmb_shelf_life',$shelf_life);
+        update_post_meta($id,'wmb_photo_url',$photo_url);
+        update_post_meta($id,'wmb_photo_alt',$photo_alt);
+        update_post_meta($id,'wmb_nutrition',$nutrition);
         update_post_meta($id,'wmb_active',$active);
         $section = sanitize_text_field($row['section']??'');
         if ($section!==''){
@@ -161,13 +181,21 @@ function wmb_page_items(){
       $unit  = sanitize_text_field($q['unit']??'');
       $ing   = sanitize_textarea_field($q['ingredients']??'');
       $alrg  = sanitize_text_field($q['allergens']??'');
+      $shelf_life = sanitize_text_field($q['shelf_life']??'');
       $active= !empty($q['active']) ? '1' : '0';
+      $photo_url = esc_url_raw($q['photo_url']??'');
+      $photo_alt = sanitize_text_field($q['photo_alt']??'');
+      $nutrition = sanitize_text_field($q['nutrition']??'');
       $id = wp_insert_post(['post_type'=>'wmb_dish','post_status'=>'publish','post_title'=>$title]);
       if (!is_wp_error($id)){
         update_post_meta($id,'wmb_price',$price);
         update_post_meta($id,'wmb_unit',$unit);
         update_post_meta($id,'wmb_ingredients',$ing);
         update_post_meta($id,'wmb_allergens',$alrg);
+        update_post_meta($id,'wmb_shelf_life',$shelf_life);
+        update_post_meta($id,'wmb_photo_url',$photo_url);
+        update_post_meta($id,'wmb_photo_alt',$photo_alt);
+        update_post_meta($id,'wmb_nutrition',$nutrition);
         update_post_meta($id,'wmb_active',$active);
         $section = sanitize_text_field($q['section']??'');
         if ($section){
@@ -188,9 +216,10 @@ function wmb_page_items(){
   echo '<div class="wrap wmb-admin"><h1>Блюда</h1>';
 
   echo '<style>
-    .wmb-admin .quick-grid{display:grid;grid-template-columns:1.5fr .6fr 1fr 1fr 1.5fr 1.2fr 1.4fr .9fr .6fr;gap:8px;align-items:center;margin:8px 0 14px}
-    .wmb-admin .quick-grid input[type=text]{width:100%}
-    .wmb-admin table.widefat input[type=text]{width:100%}
+    .wmb-admin .quick-grid{display:grid;grid-template-columns:repeat(auto-fit, minmax(150px, 1fr));gap:8px;align-items:center;margin:8px 0 14px}
+    .wmb-admin .quick-grid-row2{display:grid;grid-template-columns:repeat(auto-fit, minmax(200px, 1fr));gap:8px;align-items:center;margin:8px 0 14px}
+    .wmb-admin .quick-grid input[type=text], .wmb-admin .quick-grid input[type=url]{width:100%}
+    .wmb-admin table.widefat input[type=text], .wmb-admin table.widefat input[type=url]{width:100%}
     .wmb-admin .title-cell{display:flex;gap:6px;align-items:center}
     .wmb-admin .center{ text-align:center }
   </style>';
@@ -209,6 +238,12 @@ function wmb_page_items(){
     echo '<input type="text" name="quick[tags]" placeholder="Теги через запятую">';
     echo '<label class="center" style="display:flex;align-items:center;gap:6px;justify-content:center"><input type="checkbox" name="quick[active]" value="1"> Активно</label>';
     echo '<button class="button button-primary" style="justify-self:end">Создать</button>';
+  echo '</div>';
+  echo '<div class="quick-grid-row2">';
+    echo '<input type="text" name="quick[shelf_life]" placeholder="Срок хранения: 2-3 дня">';
+    echo '<input type="url" name="quick[photo_url]" placeholder="Фото (URL)">';
+    echo '<input type="text" name="quick[photo_alt]" placeholder="Alt текст для фото (SEO)">';
+    echo '<input type="text" name="quick[nutrition]" placeholder="КБЖУ: ~120 ккал, Б ~3 г, Ж ~5 г, У ~15 г">';
   echo '</div>';
 
   echo '<div style="display:flex;gap:8px;align-items:center;margin:8px 0">';
@@ -237,6 +272,10 @@ function wmb_page_items(){
     $ing   = get_post_meta($id,'wmb_ingredients',true);
     $alrg  = get_post_meta($id,'wmb_allergens',true);
     $active= get_post_meta($id,'wmb_active',true)==='1';
+    $shelf_life = get_post_meta($id,'wmb_shelf_life',true);
+    $photo_url = get_post_meta($id,'wmb_photo_url',true);
+    $photo_alt = get_post_meta($id,'wmb_photo_alt',true);
+    $nutrition = get_post_meta($id,'wmb_nutrition',true);
     $sec_terms = wp_get_post_terms($id,'wmb_section',['fields'=>'names']); $sec = $sec_terms ? $sec_terms[0] : '';
     $tags = wp_get_post_terms($id,'wmb_tag',['fields'=>'names']);
     $edit_url = admin_url('post.php?post='.$id.'&action=edit');
@@ -257,6 +296,10 @@ function wmb_page_items(){
         echo '<div class="more-grid">';
           echo '<label><strong>Состав</strong><br><textarea class="js-autosize" name="row['.$id.'][ingredients]" placeholder="Состав (текст)">'.esc_textarea($ing).'</textarea></label>';
           echo '<label><strong>Аллергены (через запятую)</strong><br><textarea class="js-autosize" name="row['.$id.'][allergens]" placeholder="глютен, молоко, яйца">'.esc_textarea($alrg).'</textarea></label>';
+          echo '<label><strong>Срок хранения</strong><br><input type="text" name="row['.$id.'][shelf_life]" value="'.esc_attr($shelf_life).'" placeholder="2-3 дня, до 2х дней"></label>';
+          echo '<label><strong>Фото (URL)</strong><br><input type="url" name="row['.$id.'][photo_url]" value="'.esc_url($photo_url).'" placeholder="https://..."></label>';
+          echo '<label><strong>Alt текст для фото (SEO)</strong><br><input type="text" name="row['.$id.'][photo_alt]" value="'.esc_attr($photo_alt).'" placeholder="Описание фото"></label>';
+          echo '<label><strong>КБЖУ (100 г)</strong><br><input type="text" name="row['.$id.'][nutrition]" value="'.esc_attr($nutrition).'" placeholder="~120 ккал, Б ~3 г, Ж ~5 г, У ~15 г"></label>';
         echo '</div>';
       echo '</td>';
     echo '</tr>';
@@ -319,9 +362,15 @@ function wmb_page_import(){
           ? gustolocal_map_category_by_alias($section_raw) 
           : $section_raw;
         $tags_str= trim($r[$map['Теги']]??'');
+        $shelf_life = isset($map['Срок хранения']) ? sanitize_text_field(trim((string)($r[$map['Срок хранения']]??''))) : '';
         $ing    = isset($map['Состав'])     ? trim((string)($r[$map['Состав']]??''))     : '';
         $alrg   = isset($map['Аллергены'])  ? trim((string)($r[$map['Аллергены']]??''))  : '';
-        $active = (string)trim($r[$map['Активно']]??'')==='1' ? '1' : '0';
+        $photo_url = isset($map['Фото']) ? esc_url_raw(trim((string)($r[$map['Фото']]??''))) : '';
+        $photo_alt = isset($map['Alt']) ? sanitize_text_field(trim((string)($r[$map['Alt']]??''))) : '';
+        $nutrition = isset($map['КБЖУ']) ? sanitize_text_field(trim((string)($r[$map['КБЖУ']]??''))) : '';
+        // Активно по умолчанию, если поле пустое или равно '1'. Только явный '0' делает неактивным.
+        $active_raw = trim($r[$map['Активно']]??'');
+        $active = ($active_raw === '' || $active_raw === '1' || strtolower($active_raw) === 'да' || strtolower($active_raw) === 'yes') ? '1' : '0';
 
         $existing = get_posts([
           'post_type'=>'wmb_dish','title'=>$title,
@@ -335,6 +384,9 @@ function wmb_page_import(){
         update_post_meta($id,'wmb_unit',$unit);
         update_post_meta($id,'wmb_ingredients',$ing);
         update_post_meta($id,'wmb_allergens',$alrg);
+        update_post_meta($id,'wmb_photo_url',$photo_url);
+        update_post_meta($id,'wmb_photo_alt',$photo_alt);
+        update_post_meta($id,'wmb_nutrition',$nutrition);
         update_post_meta($id,'wmb_active',$active);
 
         if ($section){
@@ -352,7 +404,8 @@ function wmb_page_import(){
   }
 
   echo '<div class="wrap"><h1>Импорт CSV</h1>';
-  echo '<p>Ожидаемые столбцы: <code>Название, Цена, Единица, Категория, Теги, Состав, Аллергены, Активно</code>. Кодировка UTF-8, разделитель — запятая.</p>';
+  echo '<p>Ожидаемые столбцы: <code>Название, Цена, Единица, Категория, Теги, Срок хранения, Состав, Аллергены, Фото, Alt, КБЖУ, Активно</code>. Кодировка UTF-8, разделитель — запятая.</p>';
+  echo '<p><small>Примечание: <code>Срок хранения</code> — например "2-3 дня", "до 2х дней", <code>Фото</code> — URL изображения, <code>Alt</code> — alt текст для SEO, <code>КБЖУ</code> — формат: ~120 ккал, Б ~3 г, Ж ~5 г, У ~15 г</small></p>';
   if ($report){
     echo '<div class="updated notice"><p>Создано: <strong>'.$report['created'].'</strong>, обновлено: <strong>'.$report['updated'].'</strong>, пропущено: <strong>'.$report['skipped'].'</strong>.</p></div>';
   }
@@ -362,7 +415,7 @@ function wmb_page_import(){
   echo '<form method="post" enctype="multipart/form-data" style="max-width:900px">';
   wp_nonce_field('wmb_import','wmb_import_nonce');
   echo '<h2>Вариант 1 — Загрузка файла</h2><input type="file" name="wmb_file" accept=".csv">';
-  echo '<h2>Вариант 2 — Вставить CSV текстом</h2><textarea name="wmb_text" rows="10" style="width:100%" placeholder="Название,Цена,Единица,Категория,Теги,Состав,Аллергены,Активно&#10;Борщ,6.5,500 мл,Суп,&quot;Для мам, Для детей&quot;,&quot;Бульон..., овощи...&quot;,&quot;глютен, молоко&quot;,1"></textarea>';
+  echo '<h2>Вариант 2 — Вставить CSV текстом</h2><textarea name="wmb_text" rows="10" style="width:100%" placeholder="Название,Цена,Единица,Категория,Теги,Состав,Аллергены,Фото,Alt,КБЖУ,Активно&#10;Борщ,6.5,500 мл,Суп,&quot;Для мам, Для детей&quot;,&quot;Бульон..., овощи...&quot;,&quot;глютен, молоко&quot;,https://example.com/photo.jpg,Борщ с овощами,&quot;~120 ккал, Б ~3 г, Ж ~5 г, У ~15 г&quot;,1"></textarea>';
   echo '<p><button class="button button-primary">Импортировать</button></p>';
   echo '</form></div>';
 }
@@ -478,6 +531,10 @@ add_action('rest_api_init', function () {
         $ingredients = (string) get_post_meta($p->ID, 'wmb_ingredients', true);
         $allergens_raw = (string) get_post_meta($p->ID, 'wmb_allergens', true);
         $allergens = array_values(array_filter(array_map('trim', explode(',', $allergens_raw))));
+        $shelf_life = (string) get_post_meta($p->ID, 'wmb_shelf_life', true);
+        $photo_url = (string) get_post_meta($p->ID, 'wmb_photo_url', true);
+        $photo_alt = (string) get_post_meta($p->ID, 'wmb_photo_alt', true);
+        $nutrition = (string) get_post_meta($p->ID, 'wmb_nutrition', true);
 
         $sec_terms = wp_get_post_terms($p->ID, 'wmb_section', ['fields' => 'names']);
         $sec = $sec_terms ? $sec_terms[0] : 'Прочее';
@@ -491,6 +548,10 @@ add_action('rest_api_init', function () {
           'ingredients' => $ingredients,
           'allergens'   => $allergens,
           'tags'        => wp_get_post_terms($p->ID, 'wmb_tag', ['fields' => 'names']),
+          'shelf_life'  => $shelf_life,
+          'photo_url'  => $photo_url,
+          'photo_alt'   => $photo_alt,
+          'nutrition'   => $nutrition,
           'kcal'        => 0,
         ];
       }

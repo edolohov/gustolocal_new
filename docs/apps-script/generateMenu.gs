@@ -18,9 +18,10 @@ var INSTRUCTION_CATEGORY_ORDER = [
   'Для запаса / в морозильник'
 ];
 var CATEGORY_DEFAULT = 'Основные блюда';
-var MENU_STYLE_NOTE = 'Категории допускаются только из списка и в таком порядке. Вес оставляем как указан в поле "Единица" (например, 1200 мл или 10 шт). ' +
-  'Теги копируем из исходного листа без изменений. Требуется аккуратное название, лаконичный состав (текст со строчной буквы, ингредиенты через запятую) и перечисление аллергенов. ' +
+var MENU_STYLE_NOTE = 'Вес оставляем как указан в поле "Единица" (например, 1200 мл или 10 шт). ' +
+  'Требуется аккуратное название, лаконичный состав (текст со строчной буквы, ингредиенты через запятую) и перечисление аллергенов. ' +
   'Исправляй грамматические опечатки (например "йцо" → "яйцо"). ' +
+  'Категории и теги проверяй на орфографию, но сохраняй их исходные значения. ' +
   'Никаких смайликов или вольных интерпретаций.';
 var COOKING_STYLE_NOTE = 'Блюда приходят как готовые, полуфабрикаты или заморозка. Объясняем, что вкуснее разогревать на плите/в аэрогриле, ' +
   'но при необходимости допустима микроволновка. Супы: бульон → зажарка → довести до лёгкого кипения. Паста: прогреть пасту и соус отдельно, затем объединить. ' +
@@ -62,40 +63,87 @@ function transformCurrentTabToCsv() {
     SpreadsheetApp.getActive().toast('Не найдено блюд после заголовка', 'CSV Transform', 5);
     return;
   }
-  var normalized = enhanceMenuRows(rows);
+  var normalized = enhanceMenuRows(rows, headers);
+  // Сортируем по названию (без привязки к фиксированному порядку категорий)
   normalized.sort(function(a, b){
-    var ai = categoryIndex(a.category);
-    var bi = categoryIndex(b.category);
-    if (ai === bi) return a.name.localeCompare(b.name);
-    return ai - bi;
+    return a.name.localeCompare(b.name);
   });
   var target = sheetName + '_CSV';
   var out = ss.getSheetByName(target) || ss.insertSheet(target);
   out.clear();
-  var outHeaders = ['Название','Цена','Единица','Категория','Теги','Состав','Аллергены','Активно'];
+  
+  // Используем все заголовки из исходника, добавляем "Активно" если его нет
+  var outHeaders = [];
+  for (var h = 0; h < headers.length; h++) {
+    var headerName = (headers[h] || '').toString().trim();
+    if (headerName) {
+      outHeaders.push(headerName);
+    }
+  }
+  // Добавляем "Активно" если его нет
+  if (outHeaders.indexOf('Активно') === -1) {
+    outHeaders.push('Активно');
+  }
+  
   out.getRange(1,1,1,outHeaders.length).setValues([outHeaders]);
-  var data = normalized.map(function(item){
-    return [
-      item.name,
-      item.price || '',
-      item.unit || '',
-      item.category,
-      item.tags || '',
-      item.composition || '',
-      item.allergens || '',
-      1
-    ];
+  
+  // Создаем маппинг заголовков для быстрого доступа
+  var headerMap = {};
+  headers.forEach(function(h, idx) {
+    headerMap[h.toString().trim().toLowerCase()] = idx;
   });
+  
+  var data = normalized.map(function(item){
+    var row = [];
+    for (var h = 0; h < outHeaders.length; h++) {
+      var headerName = outHeaders[h];
+      var headerLower = headerName.toLowerCase();
+      
+      if (headerLower === 'название' || headerLower === 'наименование' || headerLower === 'блюдо') {
+        row.push(item.name || '');
+      } else if (headerLower === 'цена' || headerLower === 'price') {
+        row.push(item.price || '');
+      } else if (headerLower === 'единица' || headerLower === 'вес/кол-во' || headerLower === 'кол-во/вес' || headerLower === 'кол-во' || headerLower === 'вес') {
+        row.push(item.unit || '');
+      } else if (headerLower === 'категория' || headerLower === 'category') {
+        row.push(item.category || '');
+      } else if (headerLower === 'теги') {
+        row.push(item.tags || '');
+      } else if (headerLower === 'состав') {
+        row.push(item.composition || '');
+      } else if (headerLower === 'аллергены') {
+        row.push(item.allergens || '');
+      } else if (headerLower === 'активно') {
+        // Если колонка "Активно" уже есть в исходнике, используем её значение (или 1 если пусто)
+        var origIdx = headerMap[headerLower];
+        if (origIdx !== undefined && item.originalRow && item.originalRow[origIdx] !== undefined && item.originalRow[origIdx] !== '') {
+          row.push(item.originalRow[origIdx]);
+        } else {
+          row.push(1);
+        }
+      } else {
+        // Для всех остальных колонок берем значение из исходника
+        var origIdx = headerMap[headerLower];
+        if (origIdx !== undefined && item.originalRow && item.originalRow[origIdx] !== undefined) {
+          row.push(item.originalRow[origIdx]);
+        } else {
+          row.push('');
+        }
+      }
+    }
+    return row;
+  });
+  
   out.getRange(2,1,data.length,outHeaders.length).setValues(data);
   out.setFrozenRows(1);
   SpreadsheetApp.getActive().toast('CSV sheet created: ' + target + ' (' + data.length + ' rows)', 'CSV Transform', 5);
 }
 
-function enhanceMenuRows(rows) {
+function enhanceMenuRows(rows, headers) {
   var apiKey = PropertiesService.getScriptProperties().getProperty('LLM_API_KEY');
   var model = PropertiesService.getScriptProperties().getProperty('LLM_MODEL') || 'gpt-4o-mini';
   if (!apiKey) {
-    return rows.map(basicNormalizeRow);
+    return rows.map(function(row) { return basicNormalizeRow(row, headers); });
   }
   var batchSize = 4;
   var result = [];
@@ -103,7 +151,7 @@ function enhanceMenuRows(rows) {
     var batch = rows.slice(i, i + batchSize);
     var enriched = requestMenuBatch(batch, apiKey, model);
     if (!enriched.length) {
-      Array.prototype.push.apply(result, batch.map(basicNormalizeRow));
+      Array.prototype.push.apply(result, batch.map(function(row) { return basicNormalizeRow(row, headers); }));
       continue;
     }
     for (var j = 0; j < batch.length; j++) {
@@ -113,15 +161,20 @@ function enhanceMenuRows(rows) {
       var finalName = entry.name && entry.name.trim() ? entry.name.trim() : prettifyName(source.name);
       // Аллергены: если LLM вернул - используем, иначе пытаемся взять из исходника
       var finalAllergens = (entry.allergens && entry.allergens.toString().trim()) || (source.allergens && source.allergens.toString().trim()) || '';
+      // Категория: проверяем орфографию через LLM, но сохраняем исходное значение (или исправленное от LLM)
+      var finalCategory = (entry.category && entry.category.trim()) || source.category || '';
+      // Теги: проверяем орфографию через LLM, но сохраняем исходное значение (или исправленное от LLM)
+      var finalTags = (entry.tags && entry.tags.toString().trim()) || source.tags || '';
       Logger.log('Row ' + j + ': name=' + finalName + ', allergens=' + finalAllergens);
       result.push({
         name: finalName,
-        price: entry.price || source.price,
+        price: entry.price || source.price || '',
         unit: formatUnit(source.unit || entry.unit || ''),
-        category: mapCategory(entry.category || source.category),
-        tags: source.tags, // всегда копируем из исходника
-        composition: formatComposition(entry.composition || source.composition),
-        allergens: finalAllergens
+        category: finalCategory,
+        tags: finalTags,
+        composition: formatComposition(entry.composition || source.composition || ''),
+        allergens: finalAllergens,
+        originalRow: source.originalRow // Сохраняем исходную строку для переноса всех колонок
       });
     }
   }
@@ -165,7 +218,6 @@ function requestMenuBatch(batch, apiKey, model) {
 
 function buildMenuPrompt(batch) {
   return 'Ты технолог общественного питания и шеф-редактор меню. Твоя задача — привести блюда к профессиональному формату для сайта.\n\n' +
-    MENU_STYLE_NOTE + '\n\n' +
     'КРИТИЧЕСКИ ВАЖНО — будь внимателен как технолог:\n\n' +
     '1. name (название блюда):\n' +
     '   - Внимательно проверь орфографию. Примеры исправлений:\n' +
@@ -175,7 +227,17 @@ function buildMenuPrompt(batch) {
     '     * "лапшс" → "лапшой" (полное слово)\n' +
     '   - Первая буква заглавная, остальные строчные (кроме собственных имен типа "Цезарь").\n' +
     '   - Если название обрезано — восстанови его логически (например, "Фикассе из курицы с грибами и сливками" → "Фрикассе из курицы с грибами и сливками").\n\n' +
-    '2. allergens (аллергены) — ОБЯЗАТЕЛЬНО анализируй состав как технолог:\n' +
+    '2. category (категория):\n' +
+    '   - ПРОВЕРЬ орфографию категории, но НЕ меняй её значение на другое.\n' +
+    '   - Исправь только опечатки: "салаты" → "Салаты", "завтрак" → "Завтрак", "десерт" → "Десерт".\n' +
+    '   - Сохрани исходное значение категории, только исправь орфографию и капитализацию.\n' +
+    '   - Если категория написана правильно — верни её без изменений.\n\n' +
+    '3. tags (теги):\n' +
+    '   - ПРОВЕРЬ орфографию тегов, но НЕ меняй их содержание.\n' +
+    '   - Исправь только опечатки и грамматические ошибки.\n' +
+    '   - Сохрани все теги из исходника, только исправь орфографию.\n' +
+    '   - Если теги написаны правильно — верни их без изменений.\n\n' +
+    '4. allergens (аллергены) — ОБЯЗАТЕЛЬНО анализируй состав как технолог:\n' +
     '   - ГЛЮТЕН: если в составе есть мука, хлеб, лепешка, сухари, панировочные сухари, паста, лапша, тесто — ОБЯЗАТЕЛЬНО укажи "глютен".\n' +
     '   - МОЛОКО: если есть молоко, сливки, сыр, сметана, масло сливочное, творог — укажи "молоко".\n' +
     '   - ЯЙЦА: если есть яйца, яичный порошок — укажи "яйца".\n' +
@@ -183,23 +245,31 @@ function buildMenuPrompt(batch) {
     '   - РЫБА/МОРЕПРОДУКТЫ: если есть рыба, морепродукты — укажи "рыба" или "морепродукты".\n' +
     '   - Если аллергенов нет — оставь пустую строку "".\n' +
     '   - НЕ пропускай это поле! Анализируй КАЖДЫЙ ингредиент в составе.\n\n' +
-    '3. composition (состав):\n' +
+    '5. composition (состав):\n' +
     '   - Исправь все грамматические ошибки: "йцо" → "яйцо", "картфоель" → "картофель", "моруовь" → "морковь", "пеерц" → "перец".\n' +
     '   - Все строчными буквами, ингредиенты через запятую.\n' +
     '   - Убери дубликаты, приведи к единому формату.\n\n' +
-    'Верни строго JSON-массив объектов {"name","price","unit","category","composition","allergens"}. Теги копируем из исходника — их менять нельзя.\n\n' +
+    '6. price (цена):\n' +
+    '   - Если цена указана в исходнике — верни её без изменений.\n' +
+    '   - Если цена не указана — верни пустую строку "".\n\n' +
+    '7. unit (единица):\n' +
+    '   - Верни единицу измерения как есть из исходника.\n' +
+    '   - Не добавляй "г" если его нет, не меняй формат.\n\n' +
+    'Верни строго JSON-массив объектов {"name","price","unit","category","tags","composition","allergens"}.\n' +
+    'ВАЖНО: категории и теги проверяй на орфографию, но сохраняй их исходные значения!\n\n' +
     'Входные данные:\n' + JSON.stringify(batch, null, 2);
 }
 
-function basicNormalizeRow(row) {
+function basicNormalizeRow(row, headers) {
   return {
     name: prettifyName(row.name),
-    price: row.price,
+    price: row.price || '',
     unit: formatUnit(row.unit),
-    category: mapCategory(row.category),
-    tags: row.tags,
+    category: row.category || '', // Не маппим категорию, оставляем как есть
+    tags: row.tags || '', // Оставляем теги как есть
     composition: formatComposition(row.composition || ''),
-    allergens: row.allergens || ''
+    allergens: row.allergens || '',
+    originalRow: row.originalRow // Сохраняем исходную строку
   };
 }
 
@@ -518,8 +588,9 @@ function parseMenuRow(headers, row) {
     unit: unit,
     category: category,
     tags: tags,
-    composition: formatComposition(composition),
-    allergens: allergens
+    composition: composition, // Не форматируем здесь, форматирование будет в LLM
+    allergens: allergens,
+    originalRow: row // Сохраняем всю исходную строку для переноса всех колонок
   };
 }
 
