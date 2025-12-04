@@ -699,7 +699,7 @@
         (photoUrl ? '<div class="wmb-card-image"><img src="'+escapeHtml(photoUrl)+'" alt="'+escapeHtml(photoAlt)+'" loading="lazy" class="wmb-photo-clickable" data-photo-url="'+escapeHtml(photoUrl)+'" data-photo-alt="'+escapeHtml(photoAlt)+'" data-photo-title="'+escapeHtml(item.name)+'"></div>' : ''),
         '<div class="wmb-card-content">',
         '<div class="wmb-card-title">',
-          escapeHtml(item.name),
+          '<span class="wmb-card-title-text">'+escapeHtml(item.name)+'</span>',
           (inCart ? '<span class="wmb-in-cart-badge">В корзине</span>' : ''),
           '<div class="wmb-card-buttons">',
             (hasIngredients ? '<button class="wmb-ing-btn" data-id="'+item.id+'" aria-label="Состав блюда '+escapeHtml(item.name)+'">Состав</button>' : ''),
@@ -758,7 +758,15 @@
         badge.className = 'wmb-in-cart-badge';
         badge.textContent = 'В корзине';
         var title = cardEl.querySelector('.wmb-card-title');
-        if(title) title.appendChild(badge);
+        if(title) {
+          // Добавляем после названия, но перед кнопками
+          var titleText = title.querySelector('.wmb-card-title-text');
+          if(titleText && titleText.nextSibling) {
+            title.insertBefore(badge, titleText.nextSibling);
+          } else {
+            title.appendChild(badge);
+          }
+        }
       }
     } else {
       cardEl.classList.remove('wmb-card-in-cart');
@@ -992,7 +1000,7 @@
         (photoUrl ? '<div class="wmb-card-image"><img src="'+escapeHtml(photoUrl)+'" alt="'+escapeHtml(photoAlt)+'" loading="lazy" class="wmb-photo-clickable" data-photo-url="'+escapeHtml(photoUrl)+'" data-photo-alt="'+escapeHtml(photoAlt)+'" data-photo-title="'+escapeHtml(item.name)+'"></div>' : ''),
         '<div class="wmb-card-content">',
           '<div class="wmb-card-title">',
-            escapeHtml(item.name),
+            '<span class="wmb-card-title-text">'+escapeHtml(item.name)+'</span>',
             '<div class="wmb-card-buttons">',
               (hasIngredients ? '<button class="wmb-ing-btn" data-id="'+item.id+'" aria-label="Состав блюда '+escapeHtml(item.name)+'">Состав</button>' : ''),
               (hasAllergens ? '<button class="wmb-allergens-btn" data-id="'+item.id+'" aria-label="Аллергены блюда '+escapeHtml(item.name)+'">Аллергены</button>' : ''),
