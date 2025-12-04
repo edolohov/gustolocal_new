@@ -1103,7 +1103,7 @@ function wmb_show_cart_addon_hints() {
     echo '<div style="display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap;">';
     echo '<div style="flex: 1; min-width: 200px;">';
     echo '<strong style="display: block; font-size: 18px; color: #1976d2; margin-bottom: 8px;">Добавьте товары из Mercat!</strong>';
-    echo '<p style="font-size: 14px; color: #555; margin: 0 0 12px 0; line-height: 1.5;">Вы можете добавить товары из раздела Mercat к вашему заказу Superfood. Доставка будет объединена на следующий день.</p>';
+    echo '<p style="font-size: 14px; color: #555; margin: 0 0 12px 0; line-height: 1.5;">Вы можете добавить товары из раздела Mercat к вашему заказу Superfood, и мы объединим заказ.</p>';
     echo '<a href="' . esc_url($menu_url) . '#mercat" style="display: inline-block; padding: 10px 20px; background: #2196f3; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; transition: all 0.2s;">Перейти к Mercat →</a>';
     echo '</div>';
     echo '</div>';
@@ -1113,7 +1113,7 @@ function wmb_show_cart_addon_hints() {
     echo '<div style="display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap;">';
     echo '<div style="flex: 1; min-width: 200px;">';
     echo '<strong style="display: block; font-size: 18px; color: #f57c00; margin-bottom: 8px;">Добавьте Superfood!</strong>';
-    echo '<p style="font-size: 14px; color: #555; margin: 0 0 12px 0; line-height: 1.5;">Вы можете добавить блюда из раздела Superfood к вашему заказу Mercat. Доставка будет объединена на следующий день.</p>';
+    echo '<p style="font-size: 14px; color: #555; margin: 0 0 12px 0; line-height: 1.5;">Вы можете добавить блюда из раздела Superfood к вашему заказу Mercat, и мы объединим заказ.</p>';
     echo '<a href="' . esc_url($menu_url) . '#smart_food" style="display: inline-block; padding: 10px 20px; background: #ff9800; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; transition: all 0.2s;">Перейти к Superfood →</a>';
     echo '</div>';
     echo '</div>';
@@ -1147,7 +1147,7 @@ function wmb_show_addon_hints() {
     if (!$menu_url) $menu_url = home_url('/menu/');
     echo '<div class="wmb-checkout-hint" style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 16px; margin-bottom: 20px; border-radius: 4px;">';
     echo '<strong>💡 Хотите добавить товары из Mercat?</strong><br>';
-    echo '<span style="font-size: 14px; color: #666;">Вы можете добавить товары из раздела Mercat к вашему заказу Smart Food. Доставка будет объединена на следующий день.</span><br>';
+    echo '<span style="font-size: 14px; color: #666;">Вы можете добавить товары из раздела Mercat к вашему заказу Smart Food, и мы объединим заказ.</span><br>';
     echo '<a href="' . esc_url($menu_url) . '#mercat" style="display: inline-block; margin-top: 8px; padding: 8px 16px; background: #2196f3; color: white; text-decoration: none; border-radius: 4px; font-weight: 600;">Перейти к Mercat →</a>';
     echo '</div>';
   } elseif ($has_mercat && !$has_smart_food) {
@@ -1155,7 +1155,7 @@ function wmb_show_addon_hints() {
     if (!$menu_url) $menu_url = home_url('/menu/');
     echo '<div class="wmb-checkout-hint" style="background: #fff3e0; border-left: 4px solid #ff9800; padding: 16px; margin-bottom: 20px; border-radius: 4px;">';
     echo '<strong>Хотите добавить Superfood?</strong><br>';
-    echo '<span style="font-size: 14px; color: #666;">Вы можете добавить блюда из раздела Superfood к вашему заказу Mercat. Доставка будет объединена на следующий день.</span><br>';
+    echo '<span style="font-size: 14px; color: #666;">Вы можете добавить блюда из раздела Superfood к вашему заказу Mercat, и мы объединим заказ.</span><br>';
     echo '<a href="' . esc_url($menu_url) . '#smart_food" style="display: inline-block; margin-top: 8px; padding: 8px 16px; background: #ff9800; color: white; text-decoration: none; border-radius: 4px; font-weight: 600;">Перейти к Superfood →</a>';
     echo '</div>';
   }
