@@ -995,11 +995,12 @@ function wmb_display_cart_item_details($name, $cart_item, $cart_item_key) {
           $item_nutrition = isset($item['nutrition']) ? trim($item['nutrition']) : '';
           $total_price = $item_price * $item_qty;
           
-          // Форматируем дочерние товары: "Название (единица) — цена [КБЖУ]"
+          // Форматируем дочерние товары: "Название (единица) — цена_за_единицу — количество — подытог [КБЖУ]"
           $unit_display = $item_unit ? ' (' . $item_unit . ')' : '';
           // Используем формат WooCommerce для цены (учитывает настройки валюты)
-          $formatted_price = function_exists('wc_price') ? strip_tags(wc_price($total_price)) : number_format($total_price, 2, ',', '') . ' €';
-          $detail_line = $item_name . $unit_display . ' — ' . $formatted_price;
+          $formatted_unit_price = function_exists('wc_price') ? strip_tags(wc_price($item_price)) : number_format($item_price, 2, ',', '') . ' €';
+          $formatted_total_price = function_exists('wc_price') ? strip_tags(wc_price($total_price)) : number_format($total_price, 2, ',', '') . ' €';
+          $detail_line = $item_name . $unit_display . ' — ' . $formatted_unit_price . ' — ' . $item_qty . ' — ' . $formatted_total_price;
           // Добавляем КБЖУ если есть
           if ($item_nutrition) {
             $detail_line .= ' <span class="wmb-cart-nutrition">' . esc_html($item_nutrition) . '</span>';
