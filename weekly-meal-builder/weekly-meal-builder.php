@@ -98,9 +98,21 @@ function wmb_render_meta($post){
   $photo_url = get_post_meta($post->ID,'wmb_photo_url',true);
   $photo_alt = get_post_meta($post->ID,'wmb_photo_alt',true);
   $nutrition = get_post_meta($post->ID,'wmb_nutrition',true);
+  $sale_type = get_post_meta($post->ID,'wmb_sale_type',true) ?: 'smart_food';
+  $available_on_glovo_uber = get_post_meta($post->ID,'wmb_available_on_glovo_uber',true)==='1';
+  $glovo_url = get_post_meta($post->ID,'wmb_glovo_url',true);
+  $uber_url = get_post_meta($post->ID,'wmb_uber_url',true);
   wp_nonce_field('wmb_save_meta','wmb_meta_nonce');
   echo '<p><label>Цена (€)<br><input name="wmb_price" type="number" step="0.01" value="'.esc_attr($price).'" style="width:100%"></label></p>';
   echo '<p><label>Единица (текст)<br><input name="wmb_unit" type="text" value="'.esc_attr($unit).'" placeholder="200 г 2 порции" style="width:100%"></label></p>';
+  echo '<p><label>Тип продажи<br><select name="wmb_sale_type" style="width:100%">';
+  echo '<option value="smart_food" '.selected($sale_type,'smart_food',false).'>Smart Food</option>';
+  echo '<option value="mercat" '.selected($sale_type,'mercat',false).'>Mercat</option>';
+  echo '<option value="both" '.selected($sale_type,'both',false).'>Оба (Smart Food + Mercat)</option>';
+  echo '</select></label></p>';
+  echo '<p><label><input type="checkbox" name="wmb_available_on_glovo_uber" value="1" '.checked($available_on_glovo_uber,true,false).'> Доступно на Glovo/Uber</label></p>';
+  echo '<p><label>Glovo URL<br><input name="wmb_glovo_url" type="url" value="'.esc_url($glovo_url).'" placeholder="https://glovoapp.com/..." style="width:100%"></label></p>';
+  echo '<p><label>Uber Eats URL<br><input name="wmb_uber_url" type="url" value="'.esc_url($uber_url).'" placeholder="https://ubereats.com/..." style="width:100%"></label></p>';
   echo '<p><label>Состав (текст)<br><textarea name="wmb_ingredients" rows="3" style="width:100%">'.esc_textarea($ing).'</textarea></label></p>';
   echo '<p><label>Аллергены (через запятую)<br><input name="wmb_allergens" type="text" value="'.esc_attr($alrg).'" placeholder="глютен, молоко, яйца" style="width:100%"></label></p>';
   echo '<p><label>Срок хранения<br><input name="wmb_shelf_life" type="text" value="'.esc_attr($shelf_life).'" placeholder="2-3 дня, до 2х дней" style="width:100%"></label></p>';
@@ -118,6 +130,10 @@ add_action('save_post_wmb_dish', function($post_id){
   update_post_meta($post_id,'wmb_ingredients', sanitize_textarea_field($_POST['wmb_ingredients']??''));
   update_post_meta($post_id,'wmb_allergens', sanitize_text_field($_POST['wmb_allergens']??''));
   update_post_meta($post_id,'wmb_shelf_life', sanitize_text_field($_POST['wmb_shelf_life']??''));
+  update_post_meta($post_id,'wmb_sale_type', sanitize_text_field($_POST['wmb_sale_type']??'smart_food'));
+  update_post_meta($post_id,'wmb_available_on_glovo_uber', !empty($_POST['wmb_available_on_glovo_uber'])?'1':'0');
+  update_post_meta($post_id,'wmb_glovo_url', esc_url_raw($_POST['wmb_glovo_url']??''));
+  update_post_meta($post_id,'wmb_uber_url', esc_url_raw($_POST['wmb_uber_url']??''));
   update_post_meta($post_id,'wmb_photo_url', esc_url_raw($_POST['wmb_photo_url']??''));
   update_post_meta($post_id,'wmb_photo_alt', sanitize_text_field($_POST['wmb_photo_alt']??''));
   update_post_meta($post_id,'wmb_nutrition', sanitize_text_field($_POST['wmb_nutrition']??''));
@@ -151,11 +167,19 @@ function wmb_page_items(){
         $photo_url = esc_url_raw($row['photo_url']??'');
         $photo_alt = sanitize_text_field($row['photo_alt']??'');
         $nutrition = sanitize_text_field($row['nutrition']??'');
+        $sale_type = sanitize_text_field($row['sale_type']??'smart_food');
+        $available_on_glovo_uber = !empty($row['available_on_glovo_uber']) ? '1' : '0';
+        $glovo_url = esc_url_raw($row['glovo_url']??'');
+        $uber_url = esc_url_raw($row['uber_url']??'');
         update_post_meta($id,'wmb_price',$price);
         update_post_meta($id,'wmb_unit',$unit);
         update_post_meta($id,'wmb_ingredients',$ing);
         update_post_meta($id,'wmb_allergens',$alrg);
         update_post_meta($id,'wmb_shelf_life',$shelf_life);
+        update_post_meta($id,'wmb_sale_type',$sale_type);
+        update_post_meta($id,'wmb_available_on_glovo_uber',$available_on_glovo_uber);
+        update_post_meta($id,'wmb_glovo_url',$glovo_url);
+        update_post_meta($id,'wmb_uber_url',$uber_url);
         update_post_meta($id,'wmb_photo_url',$photo_url);
         update_post_meta($id,'wmb_photo_alt',$photo_alt);
         update_post_meta($id,'wmb_nutrition',$nutrition);
@@ -181,22 +205,30 @@ function wmb_page_items(){
       $unit  = sanitize_text_field($q['unit']??'');
       $ing   = sanitize_textarea_field($q['ingredients']??'');
       $alrg  = sanitize_text_field($q['allergens']??'');
-      $shelf_life = sanitize_text_field($q['shelf_life']??'');
-      $active= !empty($q['active']) ? '1' : '0';
-      $photo_url = esc_url_raw($q['photo_url']??'');
-      $photo_alt = sanitize_text_field($q['photo_alt']??'');
-      $nutrition = sanitize_text_field($q['nutrition']??'');
-      $id = wp_insert_post(['post_type'=>'wmb_dish','post_status'=>'publish','post_title'=>$title]);
-      if (!is_wp_error($id)){
-        update_post_meta($id,'wmb_price',$price);
-        update_post_meta($id,'wmb_unit',$unit);
-        update_post_meta($id,'wmb_ingredients',$ing);
-        update_post_meta($id,'wmb_allergens',$alrg);
-        update_post_meta($id,'wmb_shelf_life',$shelf_life);
-        update_post_meta($id,'wmb_photo_url',$photo_url);
-        update_post_meta($id,'wmb_photo_alt',$photo_alt);
-        update_post_meta($id,'wmb_nutrition',$nutrition);
-        update_post_meta($id,'wmb_active',$active);
+        $shelf_life = sanitize_text_field($q['shelf_life']??'');
+        $active= !empty($q['active']) ? '1' : '0';
+        $photo_url = esc_url_raw($q['photo_url']??'');
+        $photo_alt = sanitize_text_field($q['photo_alt']??'');
+        $nutrition = sanitize_text_field($q['nutrition']??'');
+        $sale_type = sanitize_text_field($q['sale_type']??'smart_food');
+        $available_on_glovo_uber = !empty($q['available_on_glovo_uber']) ? '1' : '0';
+        $glovo_url = esc_url_raw($q['glovo_url']??'');
+        $uber_url = esc_url_raw($q['uber_url']??'');
+        $id = wp_insert_post(['post_type'=>'wmb_dish','post_status'=>'publish','post_title'=>$title]);
+        if (!is_wp_error($id)){
+          update_post_meta($id,'wmb_price',$price);
+          update_post_meta($id,'wmb_unit',$unit);
+          update_post_meta($id,'wmb_ingredients',$ing);
+          update_post_meta($id,'wmb_allergens',$alrg);
+          update_post_meta($id,'wmb_shelf_life',$shelf_life);
+          update_post_meta($id,'wmb_sale_type',$sale_type);
+          update_post_meta($id,'wmb_available_on_glovo_uber',$available_on_glovo_uber);
+          update_post_meta($id,'wmb_glovo_url',$glovo_url);
+          update_post_meta($id,'wmb_uber_url',$uber_url);
+          update_post_meta($id,'wmb_photo_url',$photo_url);
+          update_post_meta($id,'wmb_photo_alt',$photo_alt);
+          update_post_meta($id,'wmb_nutrition',$nutrition);
+          update_post_meta($id,'wmb_active',$active);
         $section = sanitize_text_field($q['section']??'');
         if ($section){
           $term = term_exists($section,'wmb_section') ?: wp_insert_term($section,'wmb_section');
@@ -244,6 +276,10 @@ function wmb_page_items(){
     echo '<input type="url" name="quick[photo_url]" placeholder="Фото (URL)">';
     echo '<input type="text" name="quick[photo_alt]" placeholder="Alt текст для фото (SEO)">';
     echo '<input type="text" name="quick[nutrition]" placeholder="КБЖУ: ~120 ккал, Б ~3 г, Ж ~5 г, У ~15 г">';
+    echo '<select name="quick[sale_type]" style="width:100%"><option value="smart_food">Smart Food</option><option value="mercat">Mercat</option><option value="both">Оба</option></select>';
+    echo '<label style="display:flex;align-items:center;gap:6px"><input type="checkbox" name="quick[available_on_glovo_uber]" value="1"> Glovo/Uber</label>';
+    echo '<input type="url" name="quick[glovo_url]" placeholder="Glovo URL">';
+    echo '<input type="url" name="quick[uber_url]" placeholder="Uber Eats URL">';
   echo '</div>';
 
   echo '<div style="display:flex;gap:8px;align-items:center;margin:8px 0">';
@@ -276,6 +312,10 @@ function wmb_page_items(){
     $photo_url = get_post_meta($id,'wmb_photo_url',true);
     $photo_alt = get_post_meta($id,'wmb_photo_alt',true);
     $nutrition = get_post_meta($id,'wmb_nutrition',true);
+    $sale_type = get_post_meta($id,'wmb_sale_type',true) ?: 'smart_food';
+    $available_on_glovo_uber = get_post_meta($id,'wmb_available_on_glovo_uber',true)==='1';
+    $glovo_url = get_post_meta($id,'wmb_glovo_url',true);
+    $uber_url = get_post_meta($id,'wmb_uber_url',true);
     $sec_terms = wp_get_post_terms($id,'wmb_section',['fields'=>'names']); $sec = $sec_terms ? $sec_terms[0] : '';
     $tags = wp_get_post_terms($id,'wmb_tag',['fields'=>'names']);
     $edit_url = admin_url('post.php?post='.$id.'&action=edit');
@@ -300,6 +340,14 @@ function wmb_page_items(){
           echo '<label><strong>Фото (URL)</strong><br><input type="url" name="row['.$id.'][photo_url]" value="'.esc_url($photo_url).'" placeholder="https://..."></label>';
           echo '<label><strong>Alt текст для фото (SEO)</strong><br><input type="text" name="row['.$id.'][photo_alt]" value="'.esc_attr($photo_alt).'" placeholder="Описание фото"></label>';
           echo '<label><strong>КБЖУ (100 г)</strong><br><input type="text" name="row['.$id.'][nutrition]" value="'.esc_attr($nutrition).'" placeholder="~120 ккал, Б ~3 г, Ж ~5 г, У ~15 г"></label>';
+          echo '<label><strong>Тип продажи</strong><br><select name="row['.$id.'][sale_type]" style="width:100%">';
+          echo '<option value="smart_food" '.selected($sale_type,'smart_food',false).'>Smart Food</option>';
+          echo '<option value="mercat" '.selected($sale_type,'mercat',false).'>Mercat</option>';
+          echo '<option value="both" '.selected($sale_type,'both',false).'>Оба (Smart Food + Mercat)</option>';
+          echo '</select></label>';
+          echo '<label style="display:flex;align-items:center;gap:6px"><input type="checkbox" name="row['.$id.'][available_on_glovo_uber]" value="1" '.checked($available_on_glovo_uber,true,false).'> Доступно на Glovo/Uber</label>';
+          echo '<label><strong>Glovo URL</strong><br><input type="url" name="row['.$id.'][glovo_url]" value="'.esc_url($glovo_url).'" placeholder="https://glovoapp.com/..."></label>';
+          echo '<label><strong>Uber Eats URL</strong><br><input type="url" name="row['.$id.'][uber_url]" value="'.esc_url($uber_url).'" placeholder="https://ubereats.com/..."></label>';
         echo '</div>';
       echo '</td>';
     echo '</tr>';
@@ -345,11 +393,31 @@ function wmb_page_import(){
 
     if (!$csv){ $errors[]='CSV не получен.'; }
     else {
-      $rows = array_map('str_getcsv', preg_split('/\r\n|\r|\n/',$csv));
-      $header = array_map('trim', array_shift($rows));
-      $map = array_flip($header);
+      // Парсим CSV с учетом кавычек - используем правильный парсер
+      $lines = preg_split('/\r\n|\r|\n/', trim($csv));
+      $rows = [];
+      foreach ($lines as $line) {
+        if (empty(trim($line))) continue;
+        // Используем str_getcsv с правильными параметрами для обработки кавычек
+        $parsed = str_getcsv($line, ',', '"', '');
+        if (!empty($parsed)) {
+          $rows[] = $parsed;
+        }
+      }
+      
+      if (empty($rows)) {
+        $errors[] = 'CSV файл пуст или не может быть распарсен.';
+      } else {
+        $header = array_map('trim', array_shift($rows));
+        $map = array_flip($header);
+        
+        // Отладочная информация
+        if (empty($map['Тип продажи'])) {
+          $errors[] = 'Внимание: колонка "Тип продажи" не найдена в CSV. Найденные колонки: ' . implode(', ', array_keys($map));
+        }
+      }
 
-      $updated=0; $created=0; $skipped=0;
+      $updated=0; $created=0; $skipped=0; $with_sale_type=0; $with_glovo_uber=0;
       foreach($rows as $r){
         if (!is_array($r) || count(array_filter($r))==0) { $skipped++; continue; }
         $title = trim($r[$map['Название']]??''); if(!$title){ $skipped++; continue; }
@@ -368,6 +436,57 @@ function wmb_page_import(){
         $photo_url = isset($map['Фото']) ? esc_url_raw(trim((string)($r[$map['Фото']]??''))) : '';
         $photo_alt = isset($map['Alt']) ? sanitize_text_field(trim((string)($r[$map['Alt']]??''))) : '';
         $nutrition = isset($map['КБЖУ']) ? sanitize_text_field(trim((string)($r[$map['КБЖУ']]??''))) : '';
+        // Обработка новых полей для типов продаж
+        $sale_type_raw = '';
+        if (isset($map['Тип продажи']) && isset($r[$map['Тип продажи']])) {
+          $sale_type_raw = trim((string)$r[$map['Тип продажи']]);
+        }
+        
+        // Если "Тип продажи" пустой, проверяем колонку "Glovo/Uber" (на случай ошибки в CSV)
+        if (empty($sale_type_raw) && isset($map['Glovo/Uber']) && isset($r[$map['Glovo/Uber']])) {
+          $glovo_uber_check = trim((string)$r[$map['Glovo/Uber']]);
+          $glovo_uber_lower = strtolower($glovo_uber_check);
+          // Если в "Glovo/Uber" написано название типа продажи, переносим его
+          if (in_array($glovo_uber_lower, ['mercat', 'smart_food', 'smart food', 'smartfood', 'both', 'оба'])) {
+            $sale_type_raw = $glovo_uber_check;
+            // Очищаем "Glovo/Uber", так как там было неправильное значение
+            $r[$map['Glovo/Uber']] = '';
+          }
+        }
+        
+        // Нормализуем значение (регистронезависимо, поддерживаем разные варианты написания)
+        $sale_type_normalized = strtolower($sale_type_raw);
+        if (in_array($sale_type_normalized, ['smart_food', 'smart food', 'smartfood'])) {
+          $sale_type = 'smart_food';
+        } elseif (in_array($sale_type_normalized, ['mercat'])) {
+          $sale_type = 'mercat';
+        } elseif (in_array($sale_type_normalized, ['both', 'оба', 'оба (smart food + mercat)'])) {
+          $sale_type = 'both';
+        } else {
+          $sale_type = 'smart_food'; // По умолчанию
+        }
+        
+        $available_on_glovo_uber_raw = '';
+        if (isset($map['Glovo/Uber']) && isset($r[$map['Glovo/Uber']])) {
+          $available_on_glovo_uber_raw = trim((string)$r[$map['Glovo/Uber']]);
+        }
+        // Проверяем, что это не название типа продажи (уже обработано выше)
+        $glovo_uber_lower = strtolower($available_on_glovo_uber_raw);
+        if (in_array($glovo_uber_lower, ['mercat', 'smart_food', 'smart food', 'smartfood', 'both', 'оба'])) {
+          $available_on_glovo_uber = '0'; // Это был тип продажи, а не флаг Glovo/Uber
+        } else {
+          $available_on_glovo_uber = ($available_on_glovo_uber_raw === '1' || $glovo_uber_lower === 'да' || $glovo_uber_lower === 'yes') ? '1' : '0';
+        }
+        
+        $glovo_url = '';
+        if (isset($map['Glovo URL']) && isset($r[$map['Glovo URL']])) {
+          $glovo_url = esc_url_raw(trim((string)$r[$map['Glovo URL']]));
+        }
+        
+        $uber_url = '';
+        if (isset($map['Uber URL']) && isset($r[$map['Uber URL']])) {
+          $uber_url = esc_url_raw(trim((string)$r[$map['Uber URL']]));
+        }
         // Активно по умолчанию, если поле пустое или равно '1'. Только явный '0' делает неактивным.
         $active_raw = trim($r[$map['Активно']]??'');
         $active = ($active_raw === '' || $active_raw === '1' || strtolower($active_raw) === 'да' || strtolower($active_raw) === 'yes') ? '1' : '0';
@@ -384,9 +503,14 @@ function wmb_page_import(){
         update_post_meta($id,'wmb_unit',$unit);
         update_post_meta($id,'wmb_ingredients',$ing);
         update_post_meta($id,'wmb_allergens',$alrg);
+        update_post_meta($id,'wmb_sale_type',$sale_type);
+        update_post_meta($id,'wmb_available_on_glovo_uber',$available_on_glovo_uber);
+        update_post_meta($id,'wmb_glovo_url',$glovo_url);
+        update_post_meta($id,'wmb_uber_url',$uber_url);
         update_post_meta($id,'wmb_photo_url',$photo_url);
         update_post_meta($id,'wmb_photo_alt',$photo_alt);
         update_post_meta($id,'wmb_nutrition',$nutrition);
+        update_post_meta($id,'wmb_shelf_life',$shelf_life);
         update_post_meta($id,'wmb_active',$active);
 
         if ($section){
@@ -399,15 +523,46 @@ function wmb_page_import(){
         }
         wp_set_object_terms($id,$tag_ids,'wmb_tag',false);
       }
-      $report = compact('updated','created','skipped');
+      $report = compact('updated','created','skipped','with_sale_type','with_glovo_uber');
+      if (!empty($errors)) {
+        $report['errors'] = $errors;
+      }
     }
   }
 
   echo '<div class="wrap"><h1>Импорт CSV</h1>';
-  echo '<p>Ожидаемые столбцы: <code>Название, Цена, Единица, Категория, Теги, Срок хранения, Состав, Аллергены, Фото, Alt, КБЖУ, Активно</code>. Кодировка UTF-8, разделитель — запятая.</p>';
+  if (!empty($report['errors'])) {
+    echo '<div class="error notice"><p><strong>Ошибки:</strong></p><ul>';
+    foreach ($report['errors'] as $err) {
+      echo '<li>'.esc_html($err).'</li>';
+    }
+    echo '</ul></div>';
+  }
+  echo '<p>Ожидаемые столбцы: <code>Название, Цена, Единица, Категория, Теги, Срок хранения, Состав, Аллергены, Фото, Alt, КБЖУ, Тип продажи, Glovo/Uber, Glovo URL, Uber URL, Активно</code>. Кодировка UTF-8, разделитель — запятая.</p>';
+  echo '<p><strong>Примечание:</strong></p>';
+  echo '<ul style="margin-left:20px">';
+  echo '<li><strong>Тип продажи</strong>: <code>smart_food</code> (Smart Food), <code>mercat</code> (Mercat), <code>both</code> (Оба). По умолчанию: <code>smart_food</code></li>';
+  echo '<li><strong>Glovo/Uber</strong>: <code>1</code> или <code>да</code> или <code>yes</code> — доступно на Glovo/Uber, <code>0</code> — нет. По умолчанию: <code>0</code></li>';
+  echo '<li><strong>Glovo URL</strong> и <strong>Uber URL</strong>: ссылки на внешние площадки (опционально)</li>';
+  echo '<li><strong>Срок хранения</strong>: например "2-3 дня", "до 2х дней"</li>';
+  echo '<li><strong>Фото</strong>: URL изображения</li>';
+  echo '<li><strong>Alt</strong>: alt текст для SEO</li>';
+  echo '<li><strong>КБЖУ</strong>: формат: ~120 ккал, Б ~3 г, Ж ~5 г, У ~15 г</li>';
+  echo '</ul>';
   echo '<p><small>Примечание: <code>Срок хранения</code> — например "2-3 дня", "до 2х дней", <code>Фото</code> — URL изображения, <code>Alt</code> — alt текст для SEO, <code>КБЖУ</code> — формат: ~120 ккал, Б ~3 г, Ж ~5 г, У ~15 г</small></p>';
   if ($report){
-    echo '<div class="updated notice"><p>Создано: <strong>'.$report['created'].'</strong>, обновлено: <strong>'.$report['updated'].'</strong>, пропущено: <strong>'.$report['skipped'].'</strong>.</p></div>';
+    echo '<div class="updated notice"><p>Создано: <strong>'.$report['created'].'</strong>, обновлено: <strong>'.$report['updated'].'</strong>, пропущено: <strong>'.$report['skipped'].'</strong>.</p>';
+    if (isset($report['with_sale_type']) || isset($report['with_glovo_uber'])) {
+      echo '<p><strong>Статистика по новым полям:</strong><br>';
+      if (isset($report['with_sale_type'])) {
+        echo 'Записей с типом продажи (не Smart Food): <strong>'.intval($report['with_sale_type']).'</strong><br>';
+      }
+      if (isset($report['with_glovo_uber'])) {
+        echo 'Записей доступных на Glovo/Uber: <strong>'.intval($report['with_glovo_uber']).'</strong>';
+      }
+      echo '</p>';
+    }
+    echo '</div>';
   }
   if ($errors){
     echo '<div class="error notice"><p>'.esc_html(implode(' ', $errors)).'</p></div>';
@@ -510,16 +665,51 @@ function wmb_page_purge(){
 
 /* ---------- REST: /wmb/v1/menu ---------- */
 add_action('rest_api_init', function () {
+  // Основной эндпоинт с фильтрацией по типу продажи
   register_rest_route('wmb/v1', '/menu', [
     'methods'             => 'GET',
     'permission_callback' => '__return_true',
-    'callback'            => function () {
+    'callback'            => function ($request) {
+      $sale_type = $request->get_param('sale_type') ?: 'smart_food'; // smart_food, mercat, glovo_uber
       $settings = wmb_get_settings();
+      
+      $meta_query = [
+        'relation' => 'AND',
+        [
+          'key'   => 'wmb_active',
+          'value' => '1',
+        ],
+      ];
+      
+      // Фильтрация по типу продажи
+      if ($sale_type === 'smart_food') {
+        $meta_query[] = [
+          'key'     => 'wmb_sale_type',
+          'value'   => ['smart_food', 'both'],
+          'compare' => 'IN',
+        ];
+      } elseif ($sale_type === 'mercat') {
+        $meta_query[] = [
+          'key'     => 'wmb_sale_type',
+          'value'   => ['mercat', 'both'],
+          'compare' => 'IN',
+        ];
+      } elseif ($sale_type === 'glovo_uber') {
+        $meta_query[] = [
+          'key'   => 'wmb_available_on_glovo_uber',
+          'value' => '1',
+        ];
+        $meta_query[] = [
+          'key'     => 'wmb_sale_type',
+          'value'   => ['smart_food', 'both'],
+          'compare' => 'IN',
+        ];
+      }
+      
       $posts = get_posts([
         'post_type'   => 'wmb_dish',
         'numberposts' => -1,
-        'meta_key'    => 'wmb_active',
-        'meta_value'  => '1',
+        'meta_query'  => $meta_query,
         'orderby'     => 'title',
         'order'       => 'ASC',
       ]);
@@ -535,24 +725,32 @@ add_action('rest_api_init', function () {
         $photo_url = (string) get_post_meta($p->ID, 'wmb_photo_url', true);
         $photo_alt = (string) get_post_meta($p->ID, 'wmb_photo_alt', true);
         $nutrition = (string) get_post_meta($p->ID, 'wmb_nutrition', true);
+        $sale_type = (string) get_post_meta($p->ID, 'wmb_sale_type', true) ?: 'smart_food';
+        $available_on_glovo_uber = get_post_meta($p->ID, 'wmb_available_on_glovo_uber', true) === '1';
+        $glovo_url = (string) get_post_meta($p->ID, 'wmb_glovo_url', true);
+        $uber_url = (string) get_post_meta($p->ID, 'wmb_uber_url', true);
 
         $sec_terms = wp_get_post_terms($p->ID, 'wmb_section', ['fields' => 'names']);
         $sec = $sec_terms ? $sec_terms[0] : 'Прочее';
         if (!isset($sections[$sec])) $sections[$sec] = [];
 
         $sections[$sec][] = [
-          'id'          => 'dish-' . $p->ID,
-          'name'        => get_the_title($p),
-          'price'       => $price,
-          'unit'        => $unit,
-          'ingredients' => $ingredients,
-          'allergens'   => $allergens,
-          'tags'        => wp_get_post_terms($p->ID, 'wmb_tag', ['fields' => 'names']),
-          'shelf_life'  => $shelf_life,
-          'photo_url'  => $photo_url,
-          'photo_alt'   => $photo_alt,
-          'nutrition'   => $nutrition,
-          'kcal'        => 0,
+          'id'                    => 'dish-' . $p->ID,
+          'name'                  => get_the_title($p),
+          'price'                 => $price,
+          'unit'                  => $unit,
+          'ingredients'           => $ingredients,
+          'allergens'             => $allergens,
+          'tags'                  => wp_get_post_terms($p->ID, 'wmb_tag', ['fields' => 'names']),
+          'shelf_life'            => $shelf_life,
+          'photo_url'             => $photo_url,
+          'photo_alt'             => $photo_alt,
+          'nutrition'             => $nutrition,
+          'sale_type'             => $sale_type,
+          'available_on_glovo_uber' => $available_on_glovo_uber,
+          'glovo_url'             => $glovo_url,
+          'uber_url'              => $uber_url,
+          'kcal'                  => 0,
         ];
       }
 
@@ -731,6 +929,14 @@ function wmb_display_cart_item_details($name, $cart_item, $cart_item_key) {
   if (isset($cart_item['wmb_payload'])) {
     $payload = json_decode($cart_item['wmb_payload'], true);
     if ($payload && isset($payload['items_list']) && is_array($payload['items_list'])) {
+      $sale_type = isset($payload['sale_type']) ? $payload['sale_type'] : 'smart_food';
+      $sale_type_label = '';
+      if ($sale_type === 'mercat') {
+        $sale_type_label = '<span class="wmb-sale-type-badge wmb-sale-type-mercat">Mercat</span>';
+      } elseif ($sale_type === 'smart_food') {
+        $sale_type_label = '<span class="wmb-sale-type-badge wmb-sale-type-smart-food">Smart Food</span>';
+      }
+      
       $details = [];
       foreach ($payload['items_list'] as $item) {
         if (isset($item['qty']) && $item['qty'] > 0) {
@@ -756,7 +962,7 @@ function wmb_display_cart_item_details($name, $cart_item, $cart_item_key) {
         
         // Основной товар отображаем без количества и цены, только название
         // Дочерние товары отображаем в столбик под основным товаром
-        $name = '<div class="wmb-product-name-main">' . esc_html($clean_name) . '</div>';
+        $name = '<div class="wmb-product-name-main">' . esc_html($clean_name) . ' ' . $sale_type_label . '</div>';
         $name .= '<div class="wmb-product-details">';
         $name .= implode('<br>', $details);
         $name .= '</div>';
@@ -788,6 +994,72 @@ add_action('woocommerce_checkout_create_order_line_item', function($item,$key,$v
     $item->add_meta_data('_wmb_payload', $json, false);
   }
 },10,3);
+
+// Подсказки при оформлении заказа о возможности дозаказа
+add_action('woocommerce_before_checkout_form', 'wmb_show_addon_hints');
+function wmb_show_addon_hints() {
+  if (!function_exists('WC') || !WC()->cart) return;
+  
+  $has_smart_food = false;
+  $has_mercat = false;
+  
+  foreach (WC()->cart->get_cart() as $cart_item) {
+    if (isset($cart_item['wmb_payload'])) {
+      $payload = json_decode($cart_item['wmb_payload'], true);
+      if ($payload && isset($payload['sale_type'])) {
+        if ($payload['sale_type'] === 'smart_food') {
+          $has_smart_food = true;
+        } elseif ($payload['sale_type'] === 'mercat') {
+          $has_mercat = true;
+        }
+      }
+    }
+  }
+  
+  if ($has_smart_food && !$has_mercat) {
+    $menu_url = get_permalink(get_page_by_path('menu'));
+    if (!$menu_url) $menu_url = home_url('/menu/');
+    echo '<div class="wmb-checkout-hint" style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 16px; margin-bottom: 20px; border-radius: 4px;">';
+    echo '<strong>💡 Хотите добавить товары из Mercat?</strong><br>';
+    echo '<span style="font-size: 14px; color: #666;">Вы можете добавить товары из раздела Mercat к вашему заказу Smart Food. Доставка будет объединена на следующий день.</span><br>';
+    echo '<a href="' . esc_url($menu_url) . '#mercat" style="display: inline-block; margin-top: 8px; padding: 8px 16px; background: #2196f3; color: white; text-decoration: none; border-radius: 4px; font-weight: 600;">Перейти к Mercat →</a>';
+    echo '</div>';
+  } elseif ($has_mercat && !$has_smart_food) {
+    $menu_url = get_permalink(get_page_by_path('menu'));
+    if (!$menu_url) $menu_url = home_url('/menu/');
+    echo '<div class="wmb-checkout-hint" style="background: #fff3e0; border-left: 4px solid #ff9800; padding: 16px; margin-bottom: 20px; border-radius: 4px;">';
+    echo '<strong>💡 Хотите добавить Smart Food?</strong><br>';
+    echo '<span style="font-size: 14px; color: #666;">Вы можете добавить блюда из раздела Smart Food к вашему заказу Mercat. Доставка будет объединена на следующий день.</span><br>';
+    echo '<a href="' . esc_url($menu_url) . '#smart_food" style="display: inline-block; margin-top: 8px; padding: 8px 16px; background: #ff9800; color: white; text-decoration: none; border-radius: 4px; font-weight: 600;">Перейти к Smart Food →</a>';
+    echo '</div>';
+  }
+}
+
+// Добавляем стили для бейджей типов продаж
+add_action('wp_head', function() {
+  if (is_cart() || is_checkout()) {
+    echo '<style>
+      .wmb-sale-type-badge {
+        display: inline-block;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+        margin-left: 8px;
+      }
+      .wmb-sale-type-smart-food {
+        background: #e3f2fd;
+        color: #1976d2;
+      }
+      .wmb-sale-type-mercat {
+        background: #fff3e0;
+        color: #f57c00;
+      }
+    </style>';
+  }
+});
 
 add_filter('woocommerce_hidden_order_itemmeta', function($hidden){
   $hidden[] = 'Meal plan payload';

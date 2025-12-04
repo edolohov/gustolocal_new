@@ -23,23 +23,49 @@
   }
 
   var menu = null;
-  var state = { week:"", qty:{}, filters:{ sections:[], tags:[] } };
+  var menuMercat = null;
+  var menuGlovoUber = null;
+  var state = { week:"", qty:{}, qtyMercat:{}, filters:{ sections:[], tags:[] }, activeTab: 'smart_food' };
   var countdownTimer = null;
 
-  function flatItems(){
-    return (menu && menu.sections ? menu.sections : [])
+  function flatItems(menuData){
+    menuData = menuData || menu;
+    return (menuData && menuData.sections ? menuData.sections : [])
       .flatMap(function(s){
         return (s.items||[]).map(function(it){
           return Object.assign({_sectionTitle:s.title}, it);
         });
       });
   }
-  function byId(id){ return flatItems().find(function(i){ return String(i.id)===String(id); }); }
-  function totalPortions(){ return Object.values(state.qty).reduce(function(a,b){return a+b},0); }
+  function getActiveMenu(){
+    if (state.activeTab === 'mercat') return menuMercat;
+    if (state.activeTab === 'glovo_uber') return menuGlovoUber;
+    return menu;
+  }
+  function getActiveQty(){
+    if (state.activeTab === 'mercat') return state.qtyMercat;
+    return state.qty;
+  }
+  function byId(id, menuData){ 
+    var allMenus = [menu, menuMercat, menuGlovoUber].filter(Boolean);
+    for (var i = 0; i < allMenus.length; i++) {
+      var found = flatItems(allMenus[i]).find(function(i){ return String(i.id)===String(id); });
+      if (found) return found;
+    }
+    return null;
+  }
+  function totalPortions(){ 
+    return Object.values(state.qty).reduce(function(a,b){return a+b},0) + 
+           Object.values(state.qtyMercat).reduce(function(a,b){return a+b},0);
+  }
   function totalPrice(){
-    return Object.entries(state.qty).reduce(function(sum, kv){
+    var smartFoodTotal = Object.entries(state.qty).reduce(function(sum, kv){
       var it=byId(kv[0]); return sum + (it ? (Number(it.price)||0)*kv[1] : 0);
     }, 0);
+    var mercatTotal = Object.entries(state.qtyMercat).reduce(function(sum, kv){
+      var it=byId(kv[0]); return sum + (it ? (Number(it.price)||0)*kv[1] : 0);
+    }, 0);
+    return smartFoodTotal + mercatTotal;
   }
   function persist(){ try{ localStorage.setItem(LS_KEY, JSON.stringify(state)); }catch(e){} }
   function restore(){
@@ -48,7 +74,9 @@
       var saved=JSON.parse(raw);
       if(saved && typeof saved==="object"){
         state.qty=saved.qty||{};
+        state.qtyMercat=saved.qtyMercat||{};
         state.filters=saved.filters||{sections:[],tags:[]};
+        state.activeTab=saved.activeTab||'smart_food';
       }
     }catch(e){}
   }
@@ -71,19 +99,25 @@
       
       var cartItems = result.data.items || [];
       var cartQty = {};
+      var cartQtyMercat = {};
       
       // Собираем товары из корзины
       cartItems.forEach(function(item){
         if (item.wmb_payload) {
           try{
             var payload = JSON.parse(item.wmb_payload);
-            if (payload.items) {
-              Object.entries(payload.items).forEach(function([id, qty]){
+            var saleType = payload.sale_type || 'smart_food';
+            var items = payload.items || {};
+            
+            Object.entries(items).forEach(function([id, qty]){
                 if (qty > 0) {
+                if (saleType === 'mercat') {
+                  cartQtyMercat[id] = qty;
+                } else {
                   cartQty[id] = qty;
                 }
-              });
             }
+            });
           }catch(e){
             console.error('Error parsing cart payload:', e);
           }
@@ -92,6 +126,7 @@
       
       // ВСЕГДА синхронизируем с корзиной
       state.qty = cartQty;
+      state.qtyMercat = cartQtyMercat;
       persist();
       
     }catch(e){
@@ -327,10 +362,18 @@
   }
 
   /* ======== FILTERS ======== */
-  function allSectionTitles(){ return (menu.sections||[]).map(function(s){return s.title}); }
-  function allTags(){
+  function allSectionTitles(menuData){
+    menuData = menuData || getActiveMenu();
+    return (menuData && menuData.sections ? menuData.sections : []).map(function(s){return s.title});
+  }
+  function allTags(menuData){
+    menuData = menuData || getActiveMenu();
     var set = new Set();
-    (menu.sections||[]).forEach(function(s){ (s.items||[]).forEach(function(it){ normalizeTags(it.tags).forEach(function(t){ set.add(t) }) }) });
+    (menuData && menuData.sections ? menuData.sections : []).forEach(function(s){ 
+      (s.items||[]).forEach(function(it){ 
+        normalizeTags(it.tags).forEach(function(t){ set.add(t) }) 
+      }) 
+    });
     return Array.from(set).sort(function(a,b){return a.localeCompare(b)});
   }
   function itemPasses(item, sectionTitle){
@@ -347,18 +390,27 @@
 
   /* ======== UI RENDER ======== */
   function render(root){
-    if (!menu) { root.innerHTML = '<div class="wmb-loading">Загрузка меню…</div>'; return; }
+    var activeMenu = getActiveMenu();
+    if (!activeMenu && state.activeTab !== 'glovo_uber') { 
+      root.innerHTML = '<div class="wmb-loading">Загрузка меню…</div>'; 
+      return; 
+    }
 
     // Модальные окна создаем лениво (только при первом использовании)
     // ensureIngredientsModal() вызывается при первом клике
 
-    var secTitles = allSectionTitles();
-    var tags = allTags();
-    var dcfg = menu.delivery_config || null;
+    var secTitles = allSectionTitles(activeMenu);
+    var tags = allTags(activeMenu);
+    var dcfg = menu && menu.delivery_config ? menu.delivery_config : null;
     var delivery = dcfg ? computeDelivery(dcfg) : null;
 
     root.innerHTML = [
       '<div class="wmb-wrapper">',
+        '<div class="wmb-tabs">',
+          '<button class="wmb-tab' + (state.activeTab === 'smart_food' ? ' wmb-tab-active' : '') + '" data-tab="smart_food">Smart Food</button>',
+          '<button class="wmb-tab' + (state.activeTab === 'mercat' ? ' wmb-tab-active' : '') + '" data-tab="mercat">Mercat</button>',
+          '<button class="wmb-tab' + (state.activeTab === 'glovo_uber' ? ' wmb-tab-active' : '') + '" data-tab="glovo_uber">Glovo / Uber</button>',
+        '</div>',
         '<div class="wmb-header">',
           '<div>',
             // описание убрано — текст вводится на странице
@@ -395,7 +447,9 @@
 
         '<div class="wmb-body">',
           '<div class="wmb-catalog">',
-            (menu.sections||[]).map(renderSection).join('') || '<div class="wmb-empty">Прямо сейчас мы разрабатываем новое меню для вас, скоро оно появится здесь.</div>',
+            (state.activeTab === 'glovo_uber' ? renderGlovoUber(menuGlovoUber) : 
+             (activeMenu && activeMenu.sections ? activeMenu.sections.map(renderSection).join('') : 
+              '<div class="wmb-empty">Прямо сейчас мы разрабатываем новое меню для вас, скоро оно появится здесь.</div>')),
           '</div>',
           '<aside class="wmb-sidebar">',
             '<div class="wmb-summary">',
@@ -417,6 +471,23 @@
     ].join("");
 
     if (delivery && dcfg){ renderBanner(el('#wmb-banner', root), dcfg, delivery); }
+
+    // Переключение табов
+    els('.wmb-tab', root).forEach(function(tab){
+      tab.addEventListener('click', function(){
+        var newTab = tab.getAttribute('data-tab');
+        if (newTab && newTab !== state.activeTab) {
+          state.activeTab = newTab;
+          persist();
+          // Обновляем URL hash для возможности поделиться ссылкой
+          if (history.pushState) {
+            var newUrl = window.location.pathname + '#' + newTab;
+            history.pushState(null, '', newUrl);
+          }
+          render(root);
+        }
+      });
+    });
 
     // фильтры
     els('.wmb-chip', root).forEach(function(chip){
@@ -484,7 +555,8 @@
   }
 
   function renderCard(item){
-    var q = state.qty[item.id] || 0;
+    var activeQty = getActiveQty();
+    var q = activeQty[item.id] || 0;
     var unit = item.unit || item.unit_text || item.unit_label || "";
     var tags = normalizeTags(item.tags);
     var allergens = Array.isArray(item.allergens) ? item.allergens : [];
@@ -500,25 +572,25 @@
       '<div class="wmb-card' + (inCart ? ' wmb-card-in-cart' : '') + '" data-item-id="' + escapeHtml(item.id) + '">',
         (photoUrl ? '<div class="wmb-card-image"><img src="'+escapeHtml(photoUrl)+'" alt="'+escapeHtml(photoAlt)+'" loading="lazy" class="wmb-photo-clickable" data-photo-url="'+escapeHtml(photoUrl)+'" data-photo-alt="'+escapeHtml(photoAlt)+'" data-photo-title="'+escapeHtml(item.name)+'"></div>' : ''),
         '<div class="wmb-card-content">',
-          '<div class="wmb-card-title">',
-            escapeHtml(item.name),
-            (inCart ? '<span class="wmb-in-cart-badge">В корзине</span>' : ''),
-            '<div class="wmb-card-buttons">',
-              (hasIngredients ? '<button class="wmb-ing-btn" data-id="'+item.id+'" aria-label="Состав блюда '+escapeHtml(item.name)+'">Состав</button>' : ''),
-              (hasAllergens ? '<button class="wmb-allergens-btn" data-id="'+item.id+'" aria-label="Аллергены блюда '+escapeHtml(item.name)+'">Аллергены</button>' : ''),
-            '</div>',
+        '<div class="wmb-card-title">',
+          escapeHtml(item.name),
+          (inCart ? '<span class="wmb-in-cart-badge">В корзине</span>' : ''),
+          '<div class="wmb-card-buttons">',
+            (hasIngredients ? '<button class="wmb-ing-btn" data-id="'+item.id+'" aria-label="Состав блюда '+escapeHtml(item.name)+'">Состав</button>' : ''),
+            (hasAllergens ? '<button class="wmb-allergens-btn" data-id="'+item.id+'" aria-label="Аллергены блюда '+escapeHtml(item.name)+'">Аллергены</button>' : ''),
           '</div>',
-          '<div class="wmb-card-meta">',
-            '<span>'+money(Number(item.price)||0)+'</span>',
-            (unit ? '<span class="wmb-unit">'+escapeHtml(unit)+'</span>' : ''),
-          '</div>',
+        '</div>',
+        '<div class="wmb-card-meta">',
+          '<span>'+money(Number(item.price)||0)+'</span>',
+          (unit ? '<span class="wmb-unit">'+escapeHtml(unit)+'</span>' : ''),
+        '</div>',
           (nutrition ? '<div class="wmb-card-nutrition">'+escapeHtml(nutrition)+'</div>' : ''),
           (shelfLife ? '<div class="wmb-card-shelf-life">'+escapeHtml(shelfLife)+'</div>' : ''),
-          (tags.length? '<div class="wmb-card-tags">'+tags.map(function(t){return '<span class="wmb-tag">'+escapeHtml(t)+'</span>'}).join('')+'</div>' : ''),
-          '<div class="wmb-qty">',
-            '<button class="wmb-qty-dec" data-id="'+item.id+'" '+(q===0?'disabled':'')+' aria-label="Уменьшить">–</button>',
-            '<span class="wmb-qty-value" aria-live="polite">'+q+'</span>',
-            '<button class="wmb-qty-inc" data-id="'+item.id+'" aria-label="Увеличить">+</button>',
+        (tags.length? '<div class="wmb-card-tags">'+tags.map(function(t){return '<span class="wmb-tag">'+escapeHtml(t)+'</span>'}).join('')+'</div>' : ''),
+        '<div class="wmb-qty">',
+          '<button class="wmb-qty-dec" data-id="'+item.id+'" '+(q===0?'disabled':'')+' aria-label="Уменьшить">–</button>',
+          '<span class="wmb-qty-value" aria-live="polite">'+q+'</span>',
+          '<button class="wmb-qty-inc" data-id="'+item.id+'" aria-label="Увеличить">+</button>',
           '</div>',
         '</div>',
       '</div>'
@@ -565,12 +637,13 @@
   }
 
   function changeQty(id, delta, root){
-    var cur = state.qty[id] || 0;
+    var activeQty = getActiveQty();
+    var cur = activeQty[id] || 0;
     var next = cur + delta;
     if (next < 0) next = 0;
     if (next !== cur) {
-      state.qty[id] = next;
-      if (next === 0) delete state.qty[id];
+      activeQty[id] = next;
+      if (next === 0) delete activeQty[id];
       persist();
       
       // Обновляем только нужную карточку и summary, без полного перерендера
@@ -584,6 +657,86 @@
       }
       updateSummary();
     }
+  }
+  
+  function renderGlovoUber(menuData){
+    if (!menuData || !menuData.sections) return '<div class="wmb-empty">Загрузка меню…</div>';
+    
+    var items = flatItems(menuData);
+    if (!items.length) return '<div class="wmb-empty">Пока нет доступных позиций на Glovo/Uber.</div>';
+    
+    // Находим общие ссылки на Glovo и Uber Eats (берем из первого товара, у которого они есть)
+    var glovoUrl = '';
+    var uberUrl = '';
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].glovo_url && !glovoUrl) glovoUrl = items[i].glovo_url;
+      if (items[i].uber_url && !uberUrl) uberUrl = items[i].uber_url;
+      if (glovoUrl && uberUrl) break;
+    }
+    
+    // Используем renderSection для отображения по категориям, но с модифицированным renderCard
+    var sectionsHtml = (menuData.sections || []).map(function(section) {
+      var sectionItems = (section.items || [])
+        .map(function(it) { return Object.assign({_sectionTitle: section.title}, it); })
+        .filter(function(it) { return itemPasses(it, section.title); });
+      
+      if (!sectionItems.length) return '';
+      
+      return [
+        '<section class="wmb-section">',
+          '<h2 class="wmb-section-title">'+escapeHtml(section.title)+'</h2>',
+          '<div class="wmb-grid">',
+            sectionItems.map(renderGlovoUberCard).join(''),
+          '</div>',
+        '</section>'
+      ].join('');
+    }).join('');
+    
+    return [
+      '<div class="wmb-glovo-uber-intro">',
+        '<p>Заказывайте наши блюда через Glovo и Uber Eats. Доставка день в день!</p>',
+        '<div class="wmb-glovo-uber-main-buttons">',
+          (glovoUrl ? '<a href="'+escapeHtml(glovoUrl)+'" target="_blank" rel="noopener noreferrer" class="wmb-external-link wmb-glovo-link">Заказать на Glovo</a>' : ''),
+          (uberUrl ? '<a href="'+escapeHtml(uberUrl)+'" target="_blank" rel="noopener noreferrer" class="wmb-external-link wmb-uber-link">Заказать на Uber Eats</a>' : ''),
+        '</div>',
+      '</div>',
+      sectionsHtml
+    ].join('');
+  }
+  
+  function renderGlovoUberCard(item){
+    // Та же карточка, что и обычная, но без кнопок добавления в корзину
+    var unit = item.unit || item.unit_text || item.unit_label || "";
+    var tags = normalizeTags(item.tags);
+    var allergens = Array.isArray(item.allergens) ? item.allergens : [];
+    var hasIngredients = !!(item.ingredients && String(item.ingredients).trim().length);
+    var hasAllergens = allergens.length > 0;
+    var photoUrl = item.photo_url || '';
+    var photoAlt = item.photo_alt || item.name || '';
+    var nutrition = item.nutrition || '';
+    var shelfLife = item.shelf_life || '';
+
+    return [
+      '<div class="wmb-card wmb-card-glovo-uber" data-item-id="' + escapeHtml(item.id) + '">',
+        (photoUrl ? '<div class="wmb-card-image"><img src="'+escapeHtml(photoUrl)+'" alt="'+escapeHtml(photoAlt)+'" loading="lazy" class="wmb-photo-clickable" data-photo-url="'+escapeHtml(photoUrl)+'" data-photo-alt="'+escapeHtml(photoAlt)+'" data-photo-title="'+escapeHtml(item.name)+'"></div>' : ''),
+        '<div class="wmb-card-content">',
+          '<div class="wmb-card-title">',
+            escapeHtml(item.name),
+            '<div class="wmb-card-buttons">',
+              (hasIngredients ? '<button class="wmb-ing-btn" data-id="'+item.id+'" aria-label="Состав блюда '+escapeHtml(item.name)+'">Состав</button>' : ''),
+              (hasAllergens ? '<button class="wmb-allergens-btn" data-id="'+item.id+'" aria-label="Аллергены блюда '+escapeHtml(item.name)+'">Аллергены</button>' : ''),
+            '</div>',
+          '</div>',
+          '<div class="wmb-card-meta">',
+            '<span>'+money(Number(item.price)||0)+'</span>',
+            (unit ? '<span class="wmb-unit">'+escapeHtml(unit)+'</span>' : ''),
+          '</div>',
+          (nutrition ? '<div class="wmb-card-nutrition">'+escapeHtml(nutrition)+'</div>' : ''),
+          (shelfLife ? '<div class="wmb-card-shelf-life">'+escapeHtml(shelfLife)+'</div>' : ''),
+          (tags.length? '<div class="wmb-card-tags">'+tags.map(function(t){return '<span class="wmb-tag">'+escapeHtml(t)+'</span>'}).join('')+'</div>' : ''),
+        '</div>',
+      '</div>'
+    ].join('');
   }
 
   /* ======== DESKTOP STICKY ======== */
@@ -794,25 +947,63 @@
   async function onCheckout(deliveryInfo){
     try{
       // Проверяем, что у нас есть товары для добавления
-      if (Object.keys(state.qty).length === 0) {
+      var hasSmartFood = Object.keys(state.qty).length > 0;
+      var hasMercat = Object.keys(state.qtyMercat).length > 0;
+      
+      if (!hasSmartFood && !hasMercat) {
         alert('Добавьте товары перед оформлением заказа');
         return;
       }
       
+      // Добавляем Smart Food товары
+      if (hasSmartFood) {
       var payload = {
         week: state.week || "",
         items: Object.fromEntries(Object.entries(state.qty).map(function(kv){return [kv[0], Number(kv[1])]})),
-        total_portions: totalPortions(),
-        total_price: Number((Math.round(totalPrice()*100)/100).toFixed(2))
-      };
-      
-      // Проверяем, что payload корректный
-      if (payload.total_price <= 0) {
-        alert('Ошибка: некорректная сумма заказа');
-        return;
+          total_portions: Object.values(state.qty).reduce(function(a,b){return a+b},0),
+          total_price: Object.entries(state.qty).reduce(function(sum, kv){
+            var it=byId(kv[0]); return sum + (it ? (Number(it.price)||0)*kv[1] : 0);
+          }, 0),
+          sale_type: 'smart_food'
+        };
+        
+        await addToCart(payload, CFG.product_id);
       }
       
-      // Сначала проверяем, есть ли уже набор в корзине
+      // Добавляем Mercat товары отдельным продуктом
+      if (hasMercat) {
+        var mercatPayload = {
+          week: "",
+          items: Object.fromEntries(Object.entries(state.qtyMercat).map(function(kv){return [kv[0], Number(kv[1])]})),
+          total_portions: Object.values(state.qtyMercat).reduce(function(a,b){return a+b},0),
+          total_price: Object.entries(state.qtyMercat).reduce(function(sum, kv){
+            var it=byId(kv[0]); return sum + (it ? (Number(it.price)||0)*kv[1] : 0);
+          }, 0),
+          sale_type: 'mercat'
+        };
+        
+        // Используем тот же product_id или отдельный для Mercat
+        // TODO: создать отдельный продукт для Mercat или использовать тот же
+        await addToCart(mercatPayload, CFG.product_id);
+      }
+      
+      // Перенаправляем на страницу корзины
+      window.location.href = '/cart/';
+      return;
+    }catch(e){
+      alert('ОШИБКА: ' + e.message);
+      console.error('Ошибка в onCheckout:', e);
+    }
+  }
+  
+  async function addToCart(payload, productId){
+    try {
+      // Проверяем, что payload корректный
+      if (payload.total_price <= 0) {
+        throw new Error('Некорректная сумма заказа');
+      }
+      
+      // Сначала проверяем, есть ли уже товар того же типа в корзине
       var cartResponse = await fetch(CFG.ajax_url, {
         method: 'POST',
         headers: {'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},
@@ -825,9 +1016,15 @@
         try {
           var cartResult = await cartResponse.json();
           if (cartResult.success && cartResult.data && cartResult.data.items) {
-            // Ищем существующий товар meal builder
+            // Ищем существующий товар того же типа продажи
             existingCartItem = cartResult.data.items.find(function(item) {
-              return item.wmb_payload && item.product_id == CFG.product_id;
+              if (!item.wmb_payload || item.product_id != productId) return false;
+              try {
+                var itemPayload = JSON.parse(item.wmb_payload);
+                return itemPayload.sale_type === payload.sale_type;
+              } catch(e) {
+                return false;
+              }
             });
           }
         } catch (parseError) {
@@ -835,9 +1032,8 @@
         }
       }
       
-      // Если есть существующий товар, сначала удаляем его
+      // Если есть существующий товар того же типа, сначала удаляем его
       if (existingCartItem) {
-        // Используем наш собственный AJAX для удаления товара
         var removeResponse = await fetch(CFG.ajax_url, {
           method: 'POST',
           headers: {'Content-Type':'application/x-www-form-urlencoded; charset=UTF-8'},
@@ -853,7 +1049,7 @@
       var body = new URLSearchParams();
       body.append('action', 'wmb_add_to_cart');
       body.append('nonce', CFG.nonce);
-      body.append('product_id', String(CFG.product_id));
+      body.append('product_id', String(productId));
       body.append('payload', JSON.stringify(payload));
 
       var res = await fetch(CFG.ajax_url, {
@@ -873,17 +1069,8 @@
         var errorMsg = json && json.data ? json.data : 'Неизвестная ошибка сервера';
         throw new Error(errorMsg);
       }
-      
-      // НЕ очищаем локальное состояние - оставляем синхронизированным с корзиной
-      
-      if (json.data && json.data.redirect) {
-        window.location.href = json.data.redirect;
-      } else {
-        alert('Обновлено в корзине, но ссылка на корзину не получена.');
-      }
-    }catch(e){
-      alert('ОШИБКА: ' + e.message);
-      console.error('Ошибка в onCheckout:', e);
+    } catch(e) {
+      throw e;
     }
   }
 
@@ -891,19 +1078,44 @@
     var root = document.getElementById('meal-builder-root');
     if (!root) return;
 
-    // Параллельно загружаем меню и синхронизируемся с корзиной
-    var menuPromise = fetch(MENU_URL, {credentials:'same-origin'}).then(function(res){
+    // Проверяем hash в URL для открытия нужной вкладки
+    var hash = window.location.hash.replace('#', '');
+    if (hash && ['smart_food', 'mercat', 'glovo_uber'].indexOf(hash) !== -1) {
+      state.activeTab = hash;
+      persist();
+    }
+
+    // Параллельно загружаем все меню и синхронизируемся с корзиной
+    var menuPromise = fetch(MENU_URL + '?sale_type=smart_food', {credentials:'same-origin'}).then(function(res){
       if (!res.ok) throw new Error('HTTP '+res.status);
       return res.json();
     }).catch(function(e){
-      console.error('Не удалось загрузить меню из', MENU_URL, e);
+      console.error('Не удалось загрузить меню Smart Food из', MENU_URL, e);
+      return { description:'', sections: [] };
+    });
+    
+    var menuMercatPromise = fetch(MENU_URL + '?sale_type=mercat', {credentials:'same-origin'}).then(function(res){
+      if (!res.ok) throw new Error('HTTP '+res.status);
+      return res.json();
+    }).catch(function(e){
+      console.error('Не удалось загрузить меню Mercat из', MENU_URL, e);
+      return { description:'', sections: [] };
+    });
+    
+    var menuGlovoUberPromise = fetch(MENU_URL + '?sale_type=glovo_uber', {credentials:'same-origin'}).then(function(res){
+      if (!res.ok) throw new Error('HTTP '+res.status);
+      return res.json();
+    }).catch(function(e){
+      console.error('Не удалось загрузить меню Glovo/Uber из', MENU_URL, e);
       return { description:'', sections: [] };
     });
     
     var cartPromise = syncWithCart();
     
-    // Ждем оба запроса параллельно
+    // Ждем все запросы параллельно
     menu = await menuPromise;
+    menuMercat = await menuMercatPromise;
+    menuGlovoUber = await menuGlovoUberPromise;
     await cartPromise;
     
     restore();

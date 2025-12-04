@@ -52,6 +52,52 @@ html,body{overflow:visible !important}
 @supports(padding:max(0px)){
   .wmb-wrapper{padding-left:0;padding-right:0}
 }
+.wmb-tabs{
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  border-bottom: 2px solid #e0e0e0;
+  padding-bottom: 0;
+}
+.wmb-tab{
+  background: none;
+  border: none;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #666;
+  cursor: pointer;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s ease;
+  position: relative;
+}
+.wmb-tab:hover{
+  color: #2d5a3d;
+  background-color: #f5f5f5;
+}
+.wmb-tab.wmb-tab-active{
+  color: #2d5a3d;
+  border-bottom-color: #2d5a3d;
+  font-weight: 600;
+}
+@media (max-width: 768px){
+  .wmb-tabs{
+    gap: 4px;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .wmb-tabs::-webkit-scrollbar{
+    display: none;
+  }
+  .wmb-tab{
+    padding: 10px 16px;
+    font-size: 14px;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+}
 .wmb-header{margin:12px 0 16px}
 .wmb-sub{display:none}
 .wmb-banner{margin-top:8px;color:#333;line-height:1.4}
@@ -381,6 +427,82 @@ body:has(#meal-builder-root) .wp-block-post-content > p{ margin:6px 0 10px !impo
   content:"⏱";
   font-size:14px;
   line-height:1;
+}
+/* Glovo/Uber карточки */
+.wmb-card-glovo-uber{
+  border: 2px solid #e0e0e0;
+}
+.wmb-glovo-uber-intro{
+  margin-bottom: 32px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  color: #666;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.wmb-glovo-uber-main-buttons{
+  display: flex;
+  gap: 16px;
+  margin-top: 20px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.wmb-glovo-uber-links{
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.wmb-external-link{
+  display: inline-block;
+  padding: 10px 20px;
+  border-radius: 8px;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  text-align: center;
+  transition: all 0.2s ease;
+  flex: 1;
+  min-width: 140px;
+}
+.wmb-glovo-uber-main-buttons .wmb-external-link{
+  padding: 14px 32px;
+  font-size: 16px;
+  min-width: 200px;
+  flex: 0 1 auto;
+}
+.wmb-glovo-link{
+  background: #00a082;
+  color: white;
+}
+.wmb-glovo-link:hover{
+  background: #008f75;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,160,130,0.3);
+}
+.wmb-uber-link{
+  background: #000000;
+  color: white;
+}
+.wmb-uber-link:hover{
+  background: #333333;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+}
+@media (max-width: 560px){
+  .wmb-external-link{
+    flex: 1 1 100%;
+  }
+  .wmb-glovo-uber-main-buttons{
+    flex-direction: column;
+  }
+  .wmb-glovo-uber-main-buttons .wmb-external-link{
+    width: 100%;
+    min-width: auto;
+  }
 }
 /* Исправление верстки для длинных текстов */
 .wmb-card{
