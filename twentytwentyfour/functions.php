@@ -190,24 +190,10 @@ add_action('parse_request', 'handle_language_urls_early', 1);
 function handle_language_urls_early($wp) {
     $request = $wp->request;
     
-    // Отладка
-    if (current_user_can('manage_options')) {
-        add_action('wp_footer', function() use ($request) {
-            echo "<!-- DEBUG: handle_language_urls_early called with request: $request -->";
-        });
-    }
-    
     // Проверяем, есть ли языковой префикс
     if (preg_match('/^(es|en)\/(.*)/', $request, $matches)) {
         $lang = $matches[1];
         $path = $matches[2];
-        
-        // Отладка
-        if (current_user_can('manage_options')) {
-            add_action('wp_footer', function() use ($lang, $path) {
-                echo "<!-- DEBUG: Found language prefix: $lang, path: $path -->";
-            });
-        }
         
         // Специальная обработка для WooCommerce страниц
         if (strpos($path, 'checkout/order-received') !== false) {
@@ -223,13 +209,6 @@ function handle_language_urls_early($wp) {
             // Устанавливаем флаги для WooCommerce
             $wp->query_vars['woocommerce'] = true;
             $wp->query_vars['checkout'] = true;
-            
-            // Отладка
-            if (current_user_can('manage_options')) {
-                add_action('wp_footer', function() use ($wp) {
-                    echo "<!-- DEBUG: Set query vars: " . print_r($wp->query_vars, true) . " -->";
-                });
-            }
         }
     }
 }
@@ -243,17 +222,7 @@ function force_flush_rewrite_rules() {
     }
 }
 
-// Отладка rewrite rules
-add_action('wp_footer', 'debug_rewrite_rules');
-function debug_rewrite_rules() {
-    if (current_user_can('manage_options')) {
-        global $wp_rewrite;
-        echo "<!-- DEBUG: Current rewrite rules -->";
-        echo "<!-- DEBUG: " . print_r($wp_rewrite->rules, true) . " -->";
-        echo "<!-- DEBUG: Current URL: " . $_SERVER['REQUEST_URI'] . " -->";
-        echo "<!-- DEBUG: Query vars: " . print_r($GLOBALS['wp_query']->query_vars, true) . " -->";
-    }
-}
+// Отладка rewrite rules - удалено для производительности
 
 function setup_language_routing() {
     // Добавляем rewrite rules для испанской версии
@@ -335,18 +304,6 @@ function simple_page_lookup($query) {
     
     $pagename = get_query_var('pagename');
     
-    // Отладка
-    if (current_user_can('manage_options')) {
-        add_action('wp_footer', function() use ($lang, $pagename) {
-            echo "<!-- DEBUG: simple_page_lookup called with lang=$lang, pagename=$pagename -->";
-            echo "<!-- DEBUG: is_checkout=" . (is_checkout() ? 'true' : 'false') . " -->";
-            echo "<!-- DEBUG: is_cart=" . (is_cart() ? 'true' : 'false') . " -->";
-            echo "<!-- DEBUG: is_404=" . (is_404() ? 'true' : 'false') . " -->";
-            echo "<!-- DEBUG: current URL=" . $_SERVER['REQUEST_URI'] . " -->";
-            echo "<!-- DEBUG: query vars=" . print_r($GLOBALS['wp_query']->query_vars, true) . " -->";
-        });
-    }
-    
     // Если это главная страница с языковым префиксом
     if (empty($pagename)) {
         $homepage_id = get_option('page_on_front');
@@ -355,14 +312,6 @@ function simple_page_lookup($query) {
             if ($homepage) {
                 $lang_slug = $homepage->post_name . '-' . $lang;
                 $lang_page = get_page_by_path($lang_slug);
-                
-                // Отладка
-                if (current_user_can('manage_options')) {
-                    add_action('wp_footer', function() use ($lang_slug, $lang_page) {
-                        $found = $lang_page ? "YES (ID: {$lang_page->ID})" : "NO";
-                        echo "<!-- DEBUG: Looking for homepage slug: $lang_slug, found: $found -->";
-                    });
-                }
                 
                 if ($lang_page) {
                     $query->set('page_id', $lang_page->ID);
@@ -391,28 +340,7 @@ function simple_page_lookup($query) {
     }
 }
 
-// Диагностика пользователя и прав доступа
-add_action('wp_footer', 'debug_user_permissions');
-function debug_user_permissions() {
-    if (!is_user_logged_in()) {
-        echo "<!-- DEBUG: Пользователь НЕ авторизован -->";
-        return;
-    }
-    
-    $user = wp_get_current_user();
-    $user_id = $user->ID;
-    $user_roles = $user->roles;
-    $can_edit_pages = current_user_can('edit_pages');
-    $can_edit_posts = current_user_can('edit_posts');
-    $can_manage_options = current_user_can('manage_options');
-    
-    echo "<!-- DEBUG USER: ID=$user_id, Roles=" . implode(',', $user_roles) . " -->";
-    echo "<!-- DEBUG PERMISSIONS: edit_pages=$can_edit_pages, edit_posts=$can_edit_posts, manage_options=$can_manage_options -->";
-    
-    if (!$can_edit_pages && !$can_edit_posts) {
-        echo "<!-- DEBUG ERROR: У пользователя нет прав на редактирование! -->";
-    }
-}
+// Диагностика пользователя и прав доступа - удалено для производительности
 
 // Принудительное включение REST API
 add_filter('rest_authentication_errors', 'allow_rest_api_access');
@@ -581,12 +509,12 @@ function add_simple_language_switcher() {
 	<?php
 }
 
-// JavaScript для сохранения языка
+// JavaScript для сохранения языка (оптимизировано)
 add_action('wp_footer', 'add_language_persistence_script');
 
 function add_language_persistence_script() {
     ?>
-    <script>
+    <script defer>
     // Функция для установки cookie
     function setCookie(name, value, days) {
         var expires = "";
@@ -602,69 +530,28 @@ function add_language_persistence_script() {
     function showLanguageLoader() {
         var loader = document.createElement('div');
         loader.id = 'language-loader';
-        loader.style.cssText = `
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(255, 255, 255, 0.9);
-            z-index: 99999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-family: Arial, sans-serif;
-        `;
-        loader.innerHTML = `
-            <div style="text-align: center;">
-                <div style="
-                    width: 40px;
-                    height: 40px;
-                    border: 4px solid #f3f3f3;
-                    border-top: 4px solid #007cba;
-                    border-radius: 50%;
-                    animation: spin 1s linear infinite;
-                    margin: 0 auto 20px;
-                "></div>
-                <div style="color: #333; font-size: 16px;">Переключение языка...</div>
-            </div>
-        `;
-        
-        // Добавляем CSS для анимации
+        loader.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(255,255,255,0.9);z-index:99999;display:flex;align-items:center;justify-content:center;font-family:Arial,sans-serif';
+        loader.innerHTML = '<div style="text-align:center"><div style="width:40px;height:40px;border:4px solid #f3f3f3;border-top:4px solid #007cba;border-radius:50%;animation:spin 1s linear infinite;margin:0 auto 20px"></div><div style="color:#333;font-size:16px">Переключение языка...</div></div>';
         var style = document.createElement('style');
-        style.textContent = `
-            @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-            }
-        `;
+        style.textContent = '@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}';
         document.head.appendChild(style);
         document.body.appendChild(loader);
     }
     
-    // Проверяем язык сразу, не дожидаясь DOMContentLoaded
+    // Проверяем язык сразу, не дожидаясь DOMContentLoaded (убраны console.log для производительности)
     (function() {
         var savedLang = localStorage.getItem('user_language');
         var currentUrl = window.location.href;
         var currentLang = getCurrentLangFromUrl(currentUrl);
         
-        // Отладочная информация
-        console.log('Language Debug:', {
-            savedLang: savedLang,
-            currentUrl: currentUrl,
-            currentLang: currentLang
-        });
-        
         // Если нет сохраненного языка, определяем язык браузера
         if (!savedLang) {
             var browserLang = getBrowserLanguage();
-            console.log('No saved language, browser lang:', browserLang);
             if (browserLang && browserLang !== 'ru') {
                 localStorage.setItem('user_language', browserLang);
                 setCookie('user_language', browserLang, 365);
                 var newUrl = switchLanguageInUrl(currentUrl, browserLang);
                 if (newUrl !== currentUrl) {
-                    console.log('Redirecting to browser language:', newUrl);
                     showLanguageLoader();
                     window.location.href = newUrl;
                     return;
@@ -672,7 +559,6 @@ function add_language_persistence_script() {
             } else {
                 localStorage.setItem('user_language', 'ru');
                 setCookie('user_language', 'ru', 365);
-                console.log('Set default language to ru');
             }
         }
         
@@ -680,14 +566,11 @@ function add_language_persistence_script() {
         if (savedLang && savedLang !== currentLang) {
             var newUrl = switchLanguageInUrl(currentUrl, savedLang);
             if (newUrl !== currentUrl) {
-                console.log('Redirecting to saved language:', newUrl);
                 showLanguageLoader();
                 window.location.href = newUrl;
                 return;
             }
         }
-        
-        console.log('No redirect needed');
     })();
     
     document.addEventListener('DOMContentLoaded', function() {
@@ -960,7 +843,7 @@ function translate_page_title($title) {
     return $title;
 }
 
-// JavaScript для перевода страницы 404
+// JavaScript для перевода страницы 404 (оптимизировано с defer)
 add_action('wp_footer', 'translate_404_with_javascript');
 function translate_404_with_javascript() {
     if (!is_404()) {
@@ -974,7 +857,7 @@ function translate_404_with_javascript() {
     
     $translations = get_translations($current_lang);
     ?>
-    <script>
+    <script defer>
     document.addEventListener('DOMContentLoaded', function() {
         var translations = <?php echo json_encode($translations); ?>;
         
@@ -1385,21 +1268,72 @@ function show_minimum_order_notice() {
 }
 */
 
-// Hide shipping fields on checkout since we're using fixed delivery
-add_filter('woocommerce_checkout_fields', 'hide_shipping_fields');
-function hide_shipping_fields($fields) {
-    // Hide shipping address fields
-    unset($fields['shipping']['shipping_first_name']);
-    unset($fields['shipping']['shipping_last_name']);
-    unset($fields['shipping']['shipping_company']);
-    unset($fields['shipping']['shipping_address_1']);
-    unset($fields['shipping']['shipping_address_2']);
-    unset($fields['shipping']['shipping_city']);
-    unset($fields['shipping']['shipping_postcode']);
-    unset($fields['shipping']['shipping_country']);
-    unset($fields['shipping']['shipping_state']);
+// Simplify checkout form - максимально упрощенная форма как на оригинале
+add_filter('woocommerce_checkout_fields', 'simplify_checkout_fields');
+function simplify_checkout_fields($fields) {
+    // Полностью скрываем shipping поля
+    unset($fields['shipping']);
+    
+    // Упрощаем billing поля - оставляем только самое необходимое
+    unset($fields['billing']['billing_company']);
+    unset($fields['billing']['billing_country']); // По умолчанию Испания
+    unset($fields['billing']['billing_state']); // По умолчанию Валенсия
+    unset($fields['billing']['billing_postcode']); // Не критично для доставки
+    
+    // Переименовываем поля для простоты
+    if (isset($fields['billing']['billing_first_name'])) {
+        $fields['billing']['billing_first_name']['label'] = 'Ваше имя';
+        $fields['billing']['billing_first_name']['placeholder'] = '';
+    }
+    
+    if (isset($fields['billing']['billing_last_name'])) {
+        $fields['billing']['billing_last_name']['label'] = 'и фамилия';
+        $fields['billing']['billing_last_name']['placeholder'] = '';
+    }
+    
+    if (isset($fields['billing']['billing_address_1'])) {
+        $fields['billing']['billing_address_1']['label'] = 'Ваш адрес';
+        $fields['billing']['billing_address_1']['placeholder'] = '';
+    }
+    
+    if (isset($fields['billing']['billing_address_2'])) {
+        $fields['billing']['billing_address_2']['required'] = false;
+        $fields['billing']['billing_address_2']['label'] = 'Как к вам попасть (необязательно)';
+        $fields['billing']['billing_address_2']['placeholder'] = 'Укажите домофон, этаж и квартиру';
+    }
+    
+    if (isset($fields['billing']['billing_email'])) {
+        $fields['billing']['billing_email']['required'] = false;
+        $fields['billing']['billing_email']['label'] = 'Email (необязательно)';
+    }
+    
+    if (isset($fields['billing']['billing_phone'])) {
+        $fields['billing']['billing_phone']['label'] = 'Как с вами связаться';
+        $fields['billing']['billing_phone']['placeholder'] = 'телеграм, whatsApp, телефон или факс';
+    }
+    
+    // Скрываем город - не нужен для доставки в Валенсии
+    unset($fields['billing']['billing_city']);
     
     return $fields;
+}
+
+// Устанавливаем значения по умолчанию для скрытых полей
+add_filter('woocommerce_checkout_get_value', 'set_default_checkout_values', 10, 2);
+function set_default_checkout_values($value, $input) {
+    if (empty($value)) {
+        switch ($input) {
+            case 'billing_country':
+                return 'ES';
+            case 'billing_state':
+                return 'VC';
+            case 'billing_city':
+                return 'Валенсия';
+            case 'billing_postcode':
+                return '46000';
+        }
+    }
+    return $value;
 }
 
 // Set default shipping address to Valencia
@@ -1521,10 +1455,10 @@ function remove_weekly_meal_plan_links() {
 }
 add_action('wp_head', 'remove_weekly_meal_plan_links');
 
-// JavaScript to prevent clicks on Weekly Meal Plan links
+// JavaScript to prevent clicks on Weekly Meal Plan links (оптимизировано)
 function prevent_weekly_meal_plan_clicks() {
     ?>
-    <script>
+    <script defer>
     document.addEventListener('DOMContentLoaded', function() {
         // Find all links to Weekly Meal Plan
         var links = document.querySelectorAll('a[href*="weekly-meal-plan"], a[href*="product/weekly-meal-plan"]');
@@ -1706,6 +1640,205 @@ function contact_form_7_styling() {
 }
 add_action('wp_head', 'contact_form_7_styling');
 
+// SMTP Configuration for Contact Form 7
+function configure_smtp_for_contact_form() {
+    // Настройки SMTP для отправки почты через Contact Form 7
+    add_action('phpmailer_init', 'configure_phpmailer_smtp');
+}
+add_action('init', 'configure_smtp_for_contact_form');
+
+function configure_phpmailer_smtp($phpmailer) {
+    // Получаем настройки SMTP из опций WordPress
+    $smtp_host = get_option('smtp_host', 'smtp.gmail.com');
+    $smtp_port = get_option('smtp_port', 587);
+    $smtp_username = get_option('smtp_username', '');
+    $smtp_password = get_option('smtp_password', '');
+    $smtp_encryption = get_option('smtp_encryption', 'tls');
+    $smtp_from_email = get_option('smtp_from_email', get_option('admin_email'));
+    $smtp_from_name = get_option('smtp_from_name', get_option('blogname'));
+    
+    // Если настройки SMTP не заданы, используем альтернативный метод
+    if (empty($smtp_username) || empty($smtp_password)) {
+        // Используем wp_mail с базовыми настройками
+        $phpmailer->isMail();
+        $phpmailer->setFrom($smtp_from_email, $smtp_from_name);
+        return;
+    }
+    
+    // Настройка SMTP
+    $phpmailer->isSMTP();
+    $phpmailer->Host = $smtp_host;
+    $phpmailer->SMTPAuth = true;
+    $phpmailer->Port = $smtp_port;
+    $phpmailer->Username = $smtp_username;
+    $phpmailer->Password = $smtp_password;
+    $phpmailer->SMTPSecure = $smtp_encryption;
+    $phpmailer->setFrom($smtp_from_email, $smtp_from_name);
+    
+    // Дополнительные настройки для надежности
+    $phpmailer->SMTPDebug = 0; // Отключить отладку в продакшене
+    $phpmailer->SMTPKeepAlive = true;
+    $phpmailer->Timeout = 30;
+}
+
+// Добавляем страницу настроек SMTP в админку
+function add_smtp_settings_page() {
+    add_options_page(
+        'SMTP Settings',
+        'SMTP Settings',
+        'manage_options',
+        'smtp-settings',
+        'smtp_settings_page'
+    );
+}
+add_action('admin_menu', 'add_smtp_settings_page');
+
+function smtp_settings_page() {
+    if (isset($_POST['submit'])) {
+        update_option('smtp_host', sanitize_text_field($_POST['smtp_host']));
+        update_option('smtp_port', intval($_POST['smtp_port']));
+        update_option('smtp_username', sanitize_text_field($_POST['smtp_username']));
+        update_option('smtp_password', sanitize_text_field($_POST['smtp_password']));
+        update_option('smtp_encryption', sanitize_text_field($_POST['smtp_encryption']));
+        update_option('smtp_from_email', sanitize_email($_POST['smtp_from_email']));
+        update_option('smtp_from_name', sanitize_text_field($_POST['smtp_from_name']));
+        echo '<div class="notice notice-success"><p>Настройки SMTP сохранены!</p></div>';
+    }
+    
+    // Обработка тестового письма
+    if (isset($_POST['test_email']) && isset($_POST['test_email_address'])) {
+        $test_email = sanitize_email($_POST['test_email_address']);
+        $subject = 'Тест отправки почты - ' . get_option('blogname');
+        $message = 'Это тестовое письмо для проверки настроек SMTP. Если вы получили это письмо, значит настройки работают корректно.';
+        $headers = array('Content-Type: text/html; charset=UTF-8');
+        
+        $result = wp_mail($test_email, $subject, $message, $headers);
+        
+        if ($result) {
+            echo '<div class="notice notice-success"><p>Тестовое письмо успешно отправлено на ' . esc_html($test_email) . '!</p></div>';
+        } else {
+            echo '<div class="notice notice-error"><p>Ошибка отправки тестового письма. Проверьте настройки SMTP и логи ошибок.</p></div>';
+        }
+    }
+    
+    $smtp_host = get_option('smtp_host', 'smtp.gmail.com');
+    $smtp_port = get_option('smtp_port', 587);
+    $smtp_username = get_option('smtp_username', '');
+    $smtp_password = get_option('smtp_password', '');
+    $smtp_encryption = get_option('smtp_encryption', 'tls');
+    $smtp_from_email = get_option('smtp_from_email', get_option('admin_email'));
+    $smtp_from_name = get_option('smtp_from_name', get_option('blogname'));
+    ?>
+    <div class="wrap">
+        <h1>Настройки SMTP</h1>
+        <p>Настройте SMTP для отправки почты через Contact Form 7 и другие формы.</p>
+        
+        <form method="post" action="">
+            <table class="form-table">
+                <tr>
+                    <th scope="row">SMTP Host</th>
+                    <td><input type="text" name="smtp_host" value="<?php echo esc_attr($smtp_host); ?>" class="regular-text" /></td>
+                </tr>
+                <tr>
+                    <th scope="row">SMTP Port</th>
+                    <td><input type="number" name="smtp_port" value="<?php echo esc_attr($smtp_port); ?>" class="small-text" /></td>
+                </tr>
+                <tr>
+                    <th scope="row">SMTP Username</th>
+                    <td><input type="text" name="smtp_username" value="<?php echo esc_attr($smtp_username); ?>" class="regular-text" /></td>
+                </tr>
+                <tr>
+                    <th scope="row">SMTP Password</th>
+                    <td><input type="password" name="smtp_password" value="<?php echo esc_attr($smtp_password); ?>" class="regular-text" /></td>
+                </tr>
+                <tr>
+                    <th scope="row">Encryption</th>
+                    <td>
+                        <select name="smtp_encryption">
+                            <option value="none" <?php selected($smtp_encryption, 'none'); ?>>None</option>
+                            <option value="ssl" <?php selected($smtp_encryption, 'ssl'); ?>>SSL</option>
+                            <option value="tls" <?php selected($smtp_encryption, 'tls'); ?>>TLS</option>
+                        </select>
+                    </td>
+                </tr>
+                <tr>
+                    <th scope="row">From Email</th>
+                    <td><input type="email" name="smtp_from_email" value="<?php echo esc_attr($smtp_from_email); ?>" class="regular-text" /></td>
+                </tr>
+                <tr>
+                    <th scope="row">From Name</th>
+                    <td><input type="text" name="smtp_from_name" value="<?php echo esc_attr($smtp_from_name); ?>" class="regular-text" /></td>
+                </tr>
+            </table>
+            
+            <p class="submit">
+                <input type="submit" name="submit" class="button-primary" value="Сохранить настройки" />
+            </p>
+        </form>
+        
+        <div class="card" style="max-width: 600px; margin-top: 20px;">
+            <h3>Популярные SMTP провайдеры:</h3>
+            <ul>
+                <li><strong>Gmail:</strong> smtp.gmail.com, порт 587, TLS</li>
+                <li><strong>Yahoo:</strong> smtp.mail.yahoo.com, порт 587, TLS</li>
+                <li><strong>Outlook:</strong> smtp-mail.outlook.com, порт 587, TLS</li>
+                <li><strong>Mailgun:</strong> smtp.mailgun.org, порт 587, TLS</li>
+                <li><strong>SendGrid:</strong> smtp.sendgrid.net, порт 587, TLS</li>
+            </ul>
+            <p><strong>Важно:</strong> Для Gmail нужно включить "Менее безопасные приложения" или использовать пароль приложения.</p>
+        </div>
+        
+        <div class="card" style="max-width: 600px; margin-top: 20px;">
+            <h3>Тест отправки почты</h3>
+            <p>Отправьте тестовое письмо, чтобы проверить настройки SMTP:</p>
+            <form method="post" action="">
+                <input type="hidden" name="test_email" value="1" />
+                <p>
+                    <label>Email для теста:</label><br>
+                    <input type="email" name="test_email_address" value="<?php echo esc_attr(get_option('admin_email')); ?>" class="regular-text" required />
+                </p>
+                <p class="submit">
+                    <input type="submit" name="submit_test" class="button-secondary" value="Отправить тестовое письмо" />
+                </p>
+            </form>
+        </div>
+    </div>
+    <?php
+}
+
+// Альтернативный способ отправки через webhook (если SMTP не работает)
+function contact_form_7_webhook_fallback($contact_form, &$abort, $submission) {
+    // Проверяем, есть ли настройки webhook
+    $webhook_url = get_option('cf7_webhook_url', '');
+    
+    if (empty($webhook_url)) {
+        return;
+    }
+    
+    // Получаем данные формы
+    $posted_data = $submission->get_posted_data();
+    $form_data = array(
+        'form_id' => $contact_form->id(),
+        'form_title' => $contact_form->title(),
+        'submission_time' => current_time('mysql'),
+        'data' => $posted_data
+    );
+    
+    // Отправляем данные на webhook
+    $response = wp_remote_post($webhook_url, array(
+        'body' => json_encode($form_data),
+        'headers' => array(
+            'Content-Type' => 'application/json',
+        ),
+        'timeout' => 30
+    ));
+    
+    if (is_wp_error($response)) {
+        error_log('CF7 Webhook Error: ' . $response->get_error_message());
+    }
+}
+add_action('wpcf7_before_send_mail', 'contact_form_7_webhook_fallback', 10, 3);
+
 // Add delivery options styling
 add_action('wp_head', 'delivery_options_styling');
 function delivery_options_styling() {
@@ -1858,7 +1991,7 @@ function update_delivery_type() {
     }
 }
 
-// Enqueue delivery options script
+// Enqueue delivery options script (оптимизировано)
 add_action('wp_enqueue_scripts', 'enqueue_delivery_options_script');
 function enqueue_delivery_options_script() {
     if (is_cart() || is_checkout()) {
@@ -1875,5 +2008,53 @@ function enqueue_delivery_options_script() {
             'ajax_url' => admin_url('admin-ajax.php'),
             'delivery_nonce' => wp_create_nonce('delivery_type_nonce')
         ));
+        
+        // Добавляем defer для неблокирующей загрузки
+        add_filter('script_loader_tag', function($tag, $handle) {
+            if ($handle === 'delivery-options') {
+                return str_replace(' src', ' defer src', $tag);
+            }
+            return $tag;
+        }, 10, 2);
     }
 }
+
+// Оптимизация производительности: Lazy loading для изображений
+add_filter('wp_get_attachment_image_attributes', 'add_lazy_loading_to_images', 10, 3);
+function add_lazy_loading_to_images($attr, $attachment, $size) {
+    // Добавляем loading="lazy" для всех изображений кроме первого на странице
+    if (!isset($attr['loading'])) {
+        $attr['loading'] = 'lazy';
+    }
+    return $attr;
+}
+
+// Оптимизация: добавляем defer для всех неблокирующих скриптов
+add_filter('script_loader_tag', 'optimize_script_loading', 10, 3);
+function optimize_script_loading($tag, $handle, $src) {
+    // Список скриптов, которые можно загружать с defer
+    $defer_scripts = array('jquery-migrate', 'wmb-app');
+    
+    // Не добавляем defer для критичных скриптов (jquery, woocommerce)
+    $critical_scripts = array('jquery', 'woocommerce', 'wc-cart', 'wc-checkout');
+    
+    if (in_array($handle, $defer_scripts) && !in_array($handle, $critical_scripts)) {
+        // Проверяем, не добавлен ли уже defer
+        if (strpos($tag, ' defer') === false && strpos($tag, 'defer=') === false) {
+            $tag = str_replace(' src', ' defer src', $tag);
+        }
+    }
+    
+    return $tag;
+}
+
+// Включение Application Passwords для мобильного приложения WooCommerce
+// Это необходимо для работы мобильного приложения WooCommerce
+add_filter('wp_is_application_passwords_available', '__return_true', 10);
+
+// Дополнительно: разрешаем Application Passwords даже без HTTPS (если нужно)
+// ВНИМАНИЕ: Это менее безопасно, рекомендуется использовать HTTPS
+// Раскомментируйте следующую строку только если сайт не использует HTTPS:
+// add_filter('wp_is_application_passwords_available', function($available) {
+//     return true;
+// }, 10);

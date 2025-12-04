@@ -1,0 +1,29 @@
+#!/usr/bin/expect -f
+set timeout 30
+set host "82.29.185.42"
+set port "65002"
+set user "u850527203"
+set pass "hiLKov15!"
+
+spawn sftp -P $port -o StrictHostKeyChecking=no $user@$host
+
+expect {
+    "password:" {
+        send "$pass\r"
+        exp_continue
+    }
+    "sftp>" {
+        send "cd domains/gustolocal.es/public_html\r"
+        expect "sftp>"
+        send "rm setup-catering.php\r"
+        expect "sftp>"
+        send "quit\r"
+    }
+    timeout {
+        puts "Connection timeout"
+        exit 1
+    }
+}
+
+expect eof
+

@@ -10,9 +10,15 @@ if (!defined('ABSPATH')) {
 }
 
 /**
- * Получить все переводы для указанного языка
+ * Получить все переводы для указанного языка (с кэшированием)
  */
 function get_translations($lang) {
+    // Кэширование переводов для производительности
+    static $cache = array();
+    if (isset($cache[$lang])) {
+        return $cache[$lang];
+    }
+    
     $translations = array(
         'ru' => array(
             // WooCommerce основные строки
@@ -249,7 +255,9 @@ function get_translations($lang) {
         )
     );
     
-    return isset($translations[$lang]) ? $translations[$lang] : array();
+    $result = isset($translations[$lang]) ? $translations[$lang] : array();
+    $cache[$lang] = $result; // Сохраняем в кэш
+    return $result;
 }
 
 /**

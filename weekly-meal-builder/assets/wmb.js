@@ -361,7 +361,7 @@
 
         '<div class="wmb-body">',
           '<div class="wmb-catalog">',
-            (menu.sections||[]).map(renderSection).join('') || '<div class="wmb-empty">Пока нет блюд.</div>',
+            (menu.sections||[]).map(renderSection).join('') || '<div class="wmb-empty">Прямо сейчас мы разрабатываем новое меню для вас, скоро оно появится здесь.</div>',
           '</div>',
           '<aside class="wmb-sidebar">',
             '<div class="wmb-summary">',

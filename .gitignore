@@ -24,3 +24,26 @@ wp-content/mu-plugins/
 # Server-specific files (should not be committed)
 .htaccess
 wp-config.php
+
+# Credentials - НИКОГДА не коммитить!
+.env.local
+.env.production
+.env.staging
+*.env
+secrets/
+credentials/
+
+# WordPress configs с паролями
+wp-config-local.php
+wp-config-production.php
+
+# SSH keys
+*.pem
+*.key
+id_rsa*
+known_hosts
+
+# Database dumps с данными
+*.sql
+*.dump
+!database/schema.sql  # только схемы без данных
