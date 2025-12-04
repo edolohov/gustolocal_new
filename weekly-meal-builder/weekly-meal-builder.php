@@ -909,11 +909,12 @@ function wmb_ajax_add_to_cart(){
       $name=get_the_title($post_id); 
       $price=floatval(get_post_meta($post_id,'wmb_price',true)); 
       $unit=get_post_meta($post_id,'wmb_unit',true);
+      $nutrition=get_post_meta($post_id,'wmb_nutrition',true); // КБЖУ
       $kcal=0; 
     }
-    else { $name=$id; $price=0; $unit=''; $kcal=0; }
+    else { $name=$id; $price=0; $unit=''; $nutrition=''; $kcal=0; }
     $total_price += $price*$qty;
-    $items_list[] = ['id'=>$id,'name'=>$name,'unit'=>$unit,'kcal'=>$kcal,'price'=>$price,'qty'=>$qty];
+    $items_list[] = ['id'=>$id,'name'=>$name,'unit'=>$unit,'nutrition'=>$nutrition,'kcal'=>$kcal,'price'=>$price,'qty'=>$qty];
   }
   $payload['items_list']=$items_list;
   $payload['total_portions']=$total_portions;
@@ -928,6 +929,53 @@ function wmb_ajax_add_to_cart(){
 }
 
 /* ---------- WooCommerce integration ---------- */
+// Функция для парсинга КБЖУ из строки (например "~120 ккал, Б ~3 г, Ж ~5 г, У ~15 г")
+function wmb_parse_nutrition($nutrition_str) {
+  if (empty($nutrition_str)) return ['kcal' => 0, 'protein' => 0, 'fat' => 0, 'carbs' => 0];
+  
+  $result = ['kcal' => 0, 'protein' => 0, 'fat' => 0, 'carbs' => 0];
+  
+  // Парсим ккал
+  if (preg_match('/(?:~|≈)?\s*(\d+)\s*ккал/i', $nutrition_str, $matches)) {
+    $result['kcal'] = floatval($matches[1]);
+  }
+  
+  // Парсим белки (Б)
+  if (preg_match('/Б\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*г/i', $nutrition_str, $matches)) {
+    $result['protein'] = floatval(str_replace(',', '.', $matches[1]));
+  }
+  
+  // Парсим жиры (Ж)
+  if (preg_match('/Ж\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*г/i', $nutrition_str, $matches)) {
+    $result['fat'] = floatval(str_replace(',', '.', $matches[1]));
+  }
+  
+  // Парсим углеводы (У)
+  if (preg_match('/У\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*г/i', $nutrition_str, $matches)) {
+    $result['carbs'] = floatval(str_replace(',', '.', $matches[1]));
+  }
+  
+  return $result;
+}
+
+// Функция для форматирования КБЖУ
+function wmb_format_nutrition($nutrition) {
+  $parts = [];
+  if ($nutrition['kcal'] > 0) {
+    $parts[] = '~' . round($nutrition['kcal']) . ' ккал';
+  }
+  if ($nutrition['protein'] > 0) {
+    $parts[] = 'Б ~' . round($nutrition['protein'], 1) . ' г';
+  }
+  if ($nutrition['fat'] > 0) {
+    $parts[] = 'Ж ~' . round($nutrition['fat'], 1) . ' г';
+  }
+  if ($nutrition['carbs'] > 0) {
+    $parts[] = 'У ~' . round($nutrition['carbs'], 1) . ' г';
+  }
+  return implode(', ', $parts);
+}
+
 // Улучшенное отображение деталей заказа в корзине и на checkout
 add_filter('woocommerce_cart_item_name', 'wmb_display_cart_item_details', 10, 3);
 function wmb_display_cart_item_details($name, $cart_item, $cart_item_key) {
@@ -944,13 +992,19 @@ function wmb_display_cart_item_details($name, $cart_item, $cart_item_key) {
           $item_unit = isset($item['unit']) ? esc_html($item['unit']) : '';
           $item_price = isset($item['price']) ? floatval($item['price']) : 0;
           $item_qty = intval($item['qty']);
+          $item_nutrition = isset($item['nutrition']) ? trim($item['nutrition']) : '';
           $total_price = $item_price * $item_qty;
           
-          // Форматируем дочерние товары: "Название (единица) × количество — цена"
+          // Форматируем дочерние товары: "Название (единица) — цена [КБЖУ]"
           $unit_display = $item_unit ? ' (' . $item_unit . ')' : '';
           // Используем формат WooCommerce для цены (учитывает настройки валюты)
           $formatted_price = function_exists('wc_price') ? strip_tags(wc_price($total_price)) : number_format($total_price, 2, ',', '') . ' €';
-          $details[] = $item_name . $unit_display . ' × ' . $item_qty . ' — ' . $formatted_price;
+          $detail_line = $item_name . $unit_display . ' — ' . $formatted_price;
+          // Добавляем КБЖУ если есть
+          if ($item_nutrition) {
+            $detail_line .= ' <span class="wmb-cart-nutrition">' . esc_html($item_nutrition) . '</span>';
+          }
+          $details[] = $detail_line;
         }
       }
       if (!empty($details)) {
@@ -960,11 +1014,36 @@ function wmb_display_cart_item_details($name, $cart_item, $cart_item_key) {
         $clean_name = preg_replace('/\s*×\s*\d+\s*—\s*[€$]?[\d,\.]+\s*$/', '', $clean_name);
         $clean_name = trim($clean_name);
         
+        // Получаем общую цену и подытог для добавления в детали
+        $total_item_price = 0;
+        $total_item_subtotal = 0;
+        foreach ($payload['items_list'] as $item) {
+          if (isset($item['qty']) && $item['qty'] > 0) {
+            $item_price = isset($item['price']) ? floatval($item['price']) : 0;
+            $item_qty = intval($item['qty']);
+            $total_item_price += $item_price;
+            $total_item_subtotal += $item_price * $item_qty;
+          }
+        }
+        
         // Основной товар отображаем без количества и цены, только название
         // Дочерние товары отображаем в столбик под основным товаром
         $name = '<div class="wmb-product-name-main">' . esc_html($clean_name) . ' ' . $sale_type_label . '</div>';
         $name .= '<div class="wmb-product-details">';
         $name .= implode('<br>', $details);
+        // Добавляем общую цену и подытог в конец деталей
+        if ($total_item_price > 0 || $total_item_subtotal > 0) {
+          $name .= '<div class="wmb-product-price-summary">';
+          if ($total_item_price > 0) {
+            $formatted_price = function_exists('wc_price') ? strip_tags(wc_price($total_item_price)) : number_format($total_item_price, 2, ',', '') . ' €';
+            $name .= '<span class="wmb-price-label">Цена: </span><span class="wmb-price-value">' . $formatted_price . '</span>';
+          }
+          if ($total_item_subtotal > 0) {
+            $formatted_subtotal = function_exists('wc_price') ? strip_tags(wc_price($total_item_subtotal)) : number_format($total_item_subtotal, 2, ',', '') . ' €';
+            $name .= ' <span class="wmb-subtotal-label">Подытог: </span><span class="wmb-subtotal-value">' . $formatted_subtotal . '</span>';
+          }
+          $name .= '</div>';
+        }
         $name .= '</div>';
       }
     }
@@ -1126,16 +1205,26 @@ add_action('woocommerce_order_item_meta_end', function($item_id, $item, $order, 
     $qty  = isset($row['qty']) ? intval($row['qty']) : 0;
     $price= isset($row['price']) ? floatval($row['price']) : 0.0;
     $unit = isset($row['unit']) ? trim($row['unit']) : '';
+    $nutrition = isset($row['nutrition']) ? trim($row['nutrition']) : '';
     if (empty($name) || $qty <= 0) continue;
     $subtotal = $price * $qty;
     $unit_display = $unit ? " ({$unit})" : '';
-    $lines[] = sprintf('%s%s × %d — %s', $name, $unit_display, $qty, strip_tags(wc_price($subtotal)));
+    $line = sprintf('%s%s — %s', $name, $unit_display, strip_tags(wc_price($subtotal)));
+    // Добавляем КБЖУ если есть
+    if ($nutrition) {
+      if ($plain_text) {
+        $line .= ' [' . $nutrition . ']';
+      } else {
+        $line .= ' <span class="wmb-cart-nutrition">' . esc_html($nutrition) . '</span>';
+      }
+    }
+    $lines[] = $line;
   }
   if (!$lines) return;
   if ($plain_text){
     echo "\n" . implode("\n", $lines) . "\n";
   } else {
-    $html = implode('<br>', array_map('esc_html', $lines));
+    $html = implode('<br>', $lines);
     echo '<div class="wmb-order-breakdown">'.$html.'</div>';
   }
 }, 10, 4);
@@ -1153,13 +1242,19 @@ add_action('woocommerce_after_order_itemmeta', function($item_id, $item, $produc
     $qty  = isset($row['qty']) ? intval($row['qty']) : 0;
     $price= isset($row['price']) ? floatval($row['price']) : 0.0;
     $unit = isset($row['unit']) ? trim($row['unit']) : '';
+    $nutrition = isset($row['nutrition']) ? trim($row['nutrition']) : '';
     if (empty($name) || $qty <= 0) continue;
     $subtotal = $price * $qty;
     $unit_display = $unit ? " ({$unit})" : '';
-    $lines[] = sprintf('%s%s × %d — %s', $name, $unit_display, $qty, strip_tags(wc_price($subtotal)));
+    $line = sprintf('%s%s — %s', $name, $unit_display, strip_tags(wc_price($subtotal)));
+    // Добавляем КБЖУ если есть
+    if ($nutrition) {
+      $line .= ' <span class="wmb-cart-nutrition">' . esc_html($nutrition) . '</span>';
+    }
+    $lines[] = $line;
   }
   if (!$lines) return;
-  $html = implode('<br>', array_map('esc_html', $lines));
+  $html = implode('<br>', $lines);
   echo '<div class="wmb-order-breakdown" style="margin-top:6px;">'.$html.'</div>';
 }, 10, 3);
 
@@ -1175,14 +1270,1119 @@ add_filter('woocommerce_email_order_items_args', function($args){
   return $args;
 }, 10, 1);
 
-// Global tweak for WooCommerce cart/checkout tables on mobile
+// Скрываем колонку количества в корзине и чекауте
+add_filter('woocommerce_cart_item_quantity', '__return_empty_string', 10, 3);
+add_filter('woocommerce_checkout_cart_item_quantity', '__return_empty_string', 10, 3);
+
+// Скрываем колонки цены и подытога для товаров с wmb_payload (они уже в wmb-product-details)
+add_filter('woocommerce_cart_item_price', 'wmb_hide_cart_item_price', 10, 3);
+function wmb_hide_cart_item_price($price, $cart_item, $cart_item_key) {
+  if (isset($cart_item['wmb_payload'])) {
+    return ''; // Возвращаем пустую строку, цена уже в wmb-product-details
+  }
+  return $price;
+}
+
+add_filter('woocommerce_cart_item_subtotal', 'wmb_hide_cart_item_subtotal', 10, 3);
+function wmb_hide_cart_item_subtotal($subtotal, $cart_item, $cart_item_key) {
+  if (isset($cart_item['wmb_payload'])) {
+    return ''; // Возвращаем пустую строку, подытог уже в wmb-product-details
+  }
+  return $subtotal;
+}
+
+// Добавляем общее КБЖУ в корзине - внутри таблицы, перед строкой с actions (купон и доставка)
+// Используем woocommerce_cart_contents, который срабатывает ПЕРЕД строкой с actions
+add_action('woocommerce_cart_contents', 'wmb_display_total_nutrition');
+function wmb_display_total_nutrition() {
+  if (!function_exists('WC') || !WC()->cart) return;
+  
+  $total_nutrition = ['kcal' => 0, 'protein' => 0, 'fat' => 0, 'carbs' => 0];
+  $has_nutrition = false;
+  
+  foreach (WC()->cart->get_cart() as $cart_item) {
+    if (isset($cart_item['wmb_payload'])) {
+      $payload = json_decode($cart_item['wmb_payload'], true);
+      if ($payload && isset($payload['items_list']) && is_array($payload['items_list'])) {
+        foreach ($payload['items_list'] as $item) {
+          if (isset($item['qty']) && $item['qty'] > 0 && !empty($item['nutrition'])) {
+            $nutrition = wmb_parse_nutrition($item['nutrition']);
+            $qty = intval($item['qty']);
+            $total_nutrition['kcal'] += $nutrition['kcal'] * $qty;
+            $total_nutrition['protein'] += $nutrition['protein'] * $qty;
+            $total_nutrition['fat'] += $nutrition['fat'] * $qty;
+            $total_nutrition['carbs'] += $nutrition['carbs'] * $qty;
+            $has_nutrition = true;
+          }
+        }
+      }
+    }
+  }
+  
+  if ($has_nutrition && ($total_nutrition['kcal'] > 0 || $total_nutrition['protein'] > 0 || $total_nutrition['fat'] > 0 || $total_nutrition['carbs'] > 0)) {
+    $formatted = wmb_format_nutrition($total_nutrition);
+    if (!empty($formatted)) {
+      // Добавляем как строку таблицы внутри tbody, перед строкой с actions
+      echo '<tr class="wmb-total-nutrition-row">';
+      echo '<td colspan="5" class="wmb-total-nutrition-cell">';
+      echo '<div class="wmb-total-nutrition-summary">';
+      echo '<strong>' . esc_html__('Общее КБЖУ:', 'woocommerce') . '</strong> ';
+      echo '<span class="wmb-total-nutrition-value">' . esc_html($formatted) . '</span>';
+      echo '</div>';
+      echo '</td>';
+      echo '</tr>';
+    }
+  }
+}
+
+// Скрываем заголовок колонки количества через CSS
 add_action('wp_enqueue_scripts', function(){
   if (function_exists('is_cart') && (is_cart() || is_checkout())){
-    $css = 'html,body{overflow-x:hidden} .woocommerce .cart, .woocommerce table.shop_table{table-layout:fixed; width:100%} .woocommerce table.shop_table td, .woocommerce table.shop_table th{word-wrap:break-word;white-space:normal}';
+    // Увеличиваем приоритет, чтобы стили загружались после темы
+    $css = '
+      html,body{overflow-x:hidden} 
+      /* Критично: убираем все ограничения для контейнеров корзины (только корзина!) */
+      .woocommerce.woocommerce-cart .cart,
+      .woocommerce.woocommerce-cart .woocommerce-cart-form,
+      .woocommerce.woocommerce-cart .woocommerce-cart-form form {
+        overflow-x:visible !important;
+        overflow-y:visible !important;
+        max-width:100% !important;
+        width:100% !important;
+        box-sizing:border-box !important;
+      }
+      /* Критично: исправляем обрезку именно в woocommerce-cart-form - максимальная специфичность */
+      /* На мобильных устройствах убираем min-width: 100% */
+      @media (max-width: 768px) {
+        form.woocommerce-cart-form,
+        .woocommerce-cart-form,
+        .woocommerce-cart form.woocommerce-cart-form,
+        .woocommerce.woocommerce-cart form.woocommerce-cart-form,
+        .woocommerce.woocommerce-cart .woocommerce-cart-form {
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          overflow:visible !important;
+          max-width:100% !important;
+          width:100% !important;
+          min-width:0 !important;
+          box-sizing:border-box !important;
+        }
+        form.woocommerce-cart-form table,
+        .woocommerce-cart-form table,
+        .woocommerce-cart form.woocommerce-cart-form table,
+        .woocommerce.woocommerce-cart form.woocommerce-cart-form table,
+        .woocommerce.woocommerce-cart .woocommerce-cart-form table {
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          overflow:visible !important;
+          max-width:100% !important;
+          width:100% !important;
+          min-width:0 !important;
+          table-layout:fixed !important;
+          box-sizing:border-box !important;
+          border:0 !important;
+          border-width:0 !important;
+          border-style:none !important;
+          border-collapse:collapse !important;
+          border-spacing:0 !important;
+          padding:0 !important;
+          margin:0 !important;
+        }
+        form.woocommerce-cart-form table tbody,
+        .woocommerce-cart-form table tbody,
+        .woocommerce-cart form.woocommerce-cart-form table tbody,
+        .woocommerce.woocommerce-cart form.woocommerce-cart-form table tbody,
+        .woocommerce.woocommerce-cart .woocommerce-cart-form table tbody {
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          overflow:visible !important;
+          max-width:100% !important;
+          width:100% !important;
+          min-width:0 !important;
+          display:table-row-group !important;
+          box-sizing:border-box !important;
+        }
+      }
+      /* На десктопе оставляем min-width: 100% */
+      @media (min-width: 769px) {
+        form.woocommerce-cart-form,
+        .woocommerce-cart-form,
+        .woocommerce-cart form.woocommerce-cart-form,
+        .woocommerce.woocommerce-cart form.woocommerce-cart-form,
+        .woocommerce.woocommerce-cart .woocommerce-cart-form {
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          overflow:visible !important;
+          max-width:none !important;
+          width:100% !important;
+          min-width:100% !important;
+          box-sizing:border-box !important;
+        }
+        form.woocommerce-cart-form table,
+        .woocommerce-cart-form table,
+        .woocommerce-cart form.woocommerce-cart-form table,
+        .woocommerce.woocommerce-cart form.woocommerce-cart-form table,
+        .woocommerce.woocommerce-cart .woocommerce-cart-form table {
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          overflow:visible !important;
+          max-width:none !important;
+          width:100% !important;
+          min-width:100% !important;
+          table-layout:auto !important;
+        }
+        form.woocommerce-cart-form table tbody,
+        .woocommerce-cart-form table tbody,
+        .woocommerce-cart form.woocommerce-cart-form table tbody,
+        .woocommerce.woocommerce-cart form.woocommerce-cart-form table tbody,
+        .woocommerce.woocommerce-cart .woocommerce-cart-form table tbody {
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          overflow:visible !important;
+          max-width:none !important;
+          width:auto !important;
+          min-width:100% !important;
+          display:table-row-group !important;
+        }
+      }
+      form.woocommerce-cart-form table tbody tr,
+      .woocommerce-cart form.woocommerce-cart-form table tbody tr {
+        overflow-x:visible !important;
+        overflow-y:visible !important;
+        max-width:100% !important;
+        width:100% !important;
+      }
+      form.woocommerce-cart-form table tbody td,
+      .woocommerce-cart form.woocommerce-cart-form table tbody td {
+        overflow-x:visible !important;
+        overflow-y:visible !important;
+        overflow:visible !important;
+        max-width:100% !important;
+        width:auto !important;
+        min-width:0 !important;
+        box-sizing:border-box !important;
+        word-wrap:break-word !important;
+        overflow-wrap:break-word !important;
+        word-break:break-word !important;
+        white-space:normal !important;
+        text-overflow:clip !important;
+      }
+      /* Меняем table-layout на fixed для мобильных, убираем border */
+      @media (max-width: 768px) {
+        .woocommerce .cart, 
+        .woocommerce table.shop_table,
+        .woocommerce-cart-form table,
+        form.woocommerce-cart-form table,
+        .woocommerce table.cart,
+        .woocommerce-cart-form table.shop_table {
+          table-layout:fixed !important;
+          width:100% !important;
+          max-width:100% !important;
+          min-width:0 !important;
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          border-collapse:collapse !important;
+          border-spacing:0 !important;
+          border:0 !important;
+          border-width:0 !important;
+          border-style:none !important;
+          box-sizing:border-box !important;
+          padding:0 !important;
+          margin:0 !important;
+        }
+      }
+      @media (min-width: 769px) {
+        .woocommerce .cart, 
+        .woocommerce table.shop_table,
+        .woocommerce-cart-form table,
+        form.woocommerce-cart-form table,
+        .woocommerce table.cart,
+        .woocommerce-cart-form table.shop_table {
+          table-layout:auto !important;
+          width:100% !important;
+          max-width:none !important;
+          min-width:100% !important;
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          border-collapse:separate !important;
+          border-spacing:0 !important;
+        }
+      }
+      .woocommerce table.shop_table td, 
+      .woocommerce table.shop_table th,
+      .woocommerce-cart-form table td,
+      .woocommerce-cart-form table th {
+        word-wrap:break-word !important;
+        overflow-wrap:break-word !important;
+        word-break:break-word !important;
+        white-space:normal !important;
+        overflow:visible !important;
+        overflow-x:visible !important;
+        overflow-y:visible !important;
+        max-width:100% !important;
+        box-sizing:border-box !important;
+        padding-left:8px !important;
+        padding-right:8px !important;
+      }
+      /* Критично: убираем все ограничения overflow для корзины (только специфичные элементы, БЕЗ универсального селектора!) */
+      @media (max-width: 768px) {
+        .woocommerce-cart-form table,
+        form.woocommerce-cart-form table,
+        .woocommerce.woocommerce-cart .woocommerce-cart-form table,
+        .woocommerce.woocommerce-cart form.woocommerce-cart-form table {
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          overflow:visible !important;
+          max-width:100% !important;
+          width:100% !important;
+          min-width:0 !important;
+          table-layout:auto !important;
+          box-sizing:border-box !important;
+        }
+        /* Критично: tbody должен расширяться, а не иметь фиксированную ширину - максимальная специфичность */
+        .woocommerce-cart-form table tbody,
+        form.woocommerce-cart-form table tbody,
+        .woocommerce table.cart tbody,
+        .woocommerce.woocommerce-cart form.woocommerce-cart-form table tbody,
+        .woocommerce.woocommerce-cart .woocommerce-cart-form table tbody,
+        .woocommerce.woocommerce-cart .woocommerce-cart-form table.shop_table tbody,
+        form.woocommerce-cart-form table.shop_table tbody,
+        .woocommerce.woocommerce-cart form.woocommerce-cart-form table.shop_table.cart tbody,
+        .woocommerce.woocommerce-cart .woocommerce-cart-form table.shop_table.cart.woocommerce-cart-form__contents tbody {
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          overflow:visible !important;
+          max-width:100% !important;
+          width:100% !important;
+          min-width:0 !important;
+          box-sizing:border-box !important;
+          display:table-row-group !important;
+        }
+      }
+      @media (min-width: 769px) {
+        .woocommerce-cart-form table,
+        form.woocommerce-cart-form table,
+        .woocommerce.woocommerce-cart .woocommerce-cart-form table,
+        .woocommerce.woocommerce-cart form.woocommerce-cart-form table {
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          overflow:visible !important;
+          max-width:none !important;
+          width:100% !important;
+          min-width:100% !important;
+          table-layout:auto !important;
+          box-sizing:border-box !important;
+        }
+        /* Критично: tbody должен расширяться, а не иметь фиксированную ширину - максимальная специфичность */
+        .woocommerce-cart-form table tbody,
+        form.woocommerce-cart-form table tbody,
+        .woocommerce table.cart tbody,
+        .woocommerce.woocommerce-cart form.woocommerce-cart-form table tbody,
+        .woocommerce.woocommerce-cart .woocommerce-cart-form table tbody,
+        .woocommerce.woocommerce-cart .woocommerce-cart-form table.shop_table tbody,
+        form.woocommerce-cart-form table.shop_table tbody,
+        .woocommerce.woocommerce-cart form.woocommerce-cart-form table.shop_table.cart tbody,
+        .woocommerce.woocommerce-cart .woocommerce-cart-form table.shop_table.cart.woocommerce-cart-form__contents tbody {
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          overflow:visible !important;
+          max-width:none !important;
+          width:auto !important;
+          min-width:100% !important;
+          box-sizing:border-box !important;
+          display:table-row-group !important;
+        }
+      }
+      .woocommerce-cart-form table tbody tr,
+      form.woocommerce-cart-form table tbody tr,
+      .woocommerce table.cart tbody tr {
+        overflow-x:visible !important;
+        overflow-y:visible !important;
+        max-width:100% !important;
+        width:100% !important;
+        box-sizing:border-box !important;
+      }
+      .woocommerce-cart-form table tbody td,
+      form.woocommerce-cart-form table tbody td,
+      .woocommerce table.cart tbody td {
+        overflow-x:visible !important;
+        overflow-y:visible !important;
+        max-width:100% !important;
+        box-sizing:border-box !important;
+      }
+      /* Только для элементов внутри td.product-name корзины - максимальная специфичность */
+      form.woocommerce-cart-form table tbody td.product-name,
+      .woocommerce-cart form.woocommerce-cart-form table tbody td.product-name,
+      .woocommerce.woocommerce-cart form.woocommerce-cart-form table tbody td.product-name,
+      .woocommerce table.cart tbody td.product-name {
+        overflow-x:visible !important;
+        overflow-y:visible !important;
+        overflow:visible !important;
+        max-width:100% !important;
+        width:100% !important;
+        min-width:0 !important;
+        box-sizing:border-box !important;
+        word-wrap:break-word !important;
+        overflow-wrap:break-word !important;
+        word-break:break-word !important;
+        white-space:normal !important;
+        text-overflow:clip !important;
+      }
+      /* Специфичные элементы внутри product-name - максимальная специфичность */
+      form.woocommerce-cart-form table tbody td.product-name .wmb-product-name-main,
+      .woocommerce-cart form.woocommerce-cart-form table tbody td.product-name .wmb-product-name-main,
+      form.woocommerce-cart-form table tbody td.product-name .wmb-product-details,
+      .woocommerce-cart form.woocommerce-cart-form table tbody td.product-name .wmb-product-details,
+      form.woocommerce-cart-form table tbody td.product-name .wmb-product-price-summary,
+      .woocommerce-cart form.woocommerce-cart-form table tbody td.product-name .wmb-product-price-summary,
+      form.woocommerce-cart-form table tbody td.product-name .wmb-cart-nutrition,
+      .woocommerce-cart form.woocommerce-cart-form table tbody td.product-name .wmb-cart-nutrition,
+      .woocommerce table.cart tbody td.product-name .wmb-product-name-main,
+      .woocommerce table.cart tbody td.product-name .wmb-product-details,
+      .woocommerce table.cart tbody td.product-name .wmb-product-price-summary,
+      .woocommerce table.cart tbody td.product-name .wmb-cart-nutrition {
+        overflow-x:visible !important;
+        overflow-y:visible !important;
+        overflow:visible !important;
+        max-width:100% !important;
+        width:100% !important;
+        min-width:0 !important;
+        box-sizing:border-box !important;
+        word-wrap:break-word !important;
+        overflow-wrap:break-word !important;
+        word-break:break-word !important;
+        white-space:normal !important;
+        text-overflow:clip !important;
+      }
+      /* Скрываем колонку количества - аккуратно, чтобы не сломать верстку */
+      .woocommerce-cart-form thead .product-quantity,
+      .woocommerce table.cart thead .product-quantity,
+      .woocommerce-checkout-review-order-table thead .product-quantity,
+      .woocommerce-cart-form tbody .product-quantity,
+      .woocommerce table.cart tbody .product-quantity,
+      .woocommerce-checkout-review-order-table tbody .product-quantity {
+        display:none !important;
+        visibility:hidden !important;
+        width:0 !important;
+        min-width:0 !important;
+        max-width:0 !important;
+        padding:0 !important;
+        margin:0 !important;
+        border:none !important;
+      }
+      /* Скрываем колонки цены и подытога для товаров с wmb_payload */
+      .woocommerce-cart-form thead .product-price,
+      .woocommerce table.cart thead .product-price,
+      .woocommerce-checkout-review-order-table thead .product-price,
+      .woocommerce-cart-form tbody .product-price,
+      .woocommerce table.cart tbody .product-price,
+      .woocommerce-checkout-review-order-table tbody .product-price,
+      .woocommerce-cart-form thead .product-subtotal,
+      .woocommerce table.cart thead .product-subtotal,
+      .woocommerce-checkout-review-order-table thead .product-subtotal,
+      .woocommerce-cart-form tbody .product-subtotal,
+      .woocommerce table.cart tbody .product-subtotal,
+      .woocommerce-checkout-review-order-table tbody .product-subtotal {
+        display:none !important;
+        visibility:hidden !important;
+        width:0 !important;
+        min-width:0 !important;
+        max-width:0 !important;
+        padding:0 !important;
+        margin:0 !important;
+        border:none !important;
+      }
+      /* Расширяем колонку товара максимально - более агрессивно */
+      .woocommerce-cart-form thead .product-name,
+      .woocommerce table.cart thead .product-name,
+      .woocommerce-checkout-review-order-table thead .product-name,
+      .woocommerce-cart-form tbody .product-name,
+      .woocommerce table.cart tbody .product-name,
+      .woocommerce-checkout-review-order-table tbody .product-name {
+        width:auto !important;
+        min-width:65% !important;
+        max-width:none !important;
+        overflow:visible !important;
+        overflow-x:visible !important;
+        overflow-y:visible !important;
+        word-wrap:break-word !important;
+        overflow-wrap:break-word !important;
+        word-break:break-word !important;
+        white-space:normal !important;
+      }
+      /* Уменьшаем отступы в деталях товара - более агрессивно */
+      .woocommerce-cart-form .product-name .wmb-product-details,
+      .woocommerce table.cart .product-name .wmb-product-details,
+      .woocommerce-checkout-review-order-table .product-name .wmb-product-details {
+        margin-top:0.4rem !important;
+        margin-bottom:0 !important;
+        line-height:1.4 !important;
+        width:100% !important;
+        max-width:100% !important;
+        overflow:visible !important;
+        overflow-x:visible !important;
+        overflow-y:visible !important;
+        word-wrap:break-word !important;
+        overflow-wrap:break-word !important;
+        word-break:break-word !important;
+        white-space:normal !important;
+        box-sizing:border-box !important;
+        display:block !important;
+      }
+      /* Только для наших элементов внутри wmb-product-details - БЕЗ универсального селектора */
+      .woocommerce-cart-form .product-name .wmb-product-details br,
+      .woocommerce table.cart .product-name .wmb-product-details br,
+      .woocommerce-checkout-review-order-table .product-name .wmb-product-details br {
+        margin:0.15em 0 !important;
+        line-height:1.4 !important;
+        display:block !important;
+      }
+      /* Для текстовых элементов после br */
+      .woocommerce-cart-form .product-name .wmb-product-details br + span,
+      .woocommerce table.cart .product-name .wmb-product-details br + span,
+      .woocommerce-checkout-review-order-table .product-name .wmb-product-details br + span {
+        margin:0.15em 0 !important;
+        line-height:1.4 !important;
+        width:100% !important;
+        max-width:100% !important;
+        overflow:visible !important;
+        word-wrap:break-word !important;
+        overflow-wrap:break-word !important;
+        word-break:break-word !important;
+        white-space:normal !important;
+        box-sizing:border-box !important;
+        display:block !important;
+      }
+      .woocommerce-cart-form .product-name .wmb-product-name-main,
+      .woocommerce table.cart .product-name .wmb-product-name-main,
+      .woocommerce-checkout-review-order-table .product-name .wmb-product-name-main {
+        margin-bottom:0.3rem !important;
+        line-height:1.3 !important;
+      }
+      /* Уменьшаем отступы в абзацах внутри товара */
+      .woocommerce-cart-form .product-name p,
+      .woocommerce table.cart .product-name p,
+      .woocommerce-checkout-review-order-table .product-name p {
+        margin:0.2em 0 !important;
+        line-height:1.4 !important;
+      }
+      /* Убираем универсальный селектор - не нужен */
+      /* Уменьшаем колонки Цена и Подытог */
+      .woocommerce-cart-form thead .product-price,
+      .woocommerce table.cart thead .product-price,
+      .woocommerce-checkout-review-order-table thead .product-price,
+      .woocommerce-cart-form tbody .product-price,
+      .woocommerce table.cart tbody .product-price,
+      .woocommerce-checkout-review-order-table tbody .product-price {
+        width:auto !important;
+        min-width:12% !important;
+        max-width:18% !important;
+        text-align:right !important;
+      }
+      .woocommerce-cart-form thead .product-subtotal,
+      .woocommerce table.cart thead .product-subtotal,
+      .woocommerce-checkout-review-order-table thead .product-subtotal,
+      .woocommerce-cart-form tbody .product-subtotal,
+      .woocommerce table.cart tbody .product-subtotal,
+      .woocommerce-checkout-review-order-table tbody .product-subtotal {
+        width:auto !important;
+        min-width:12% !important;
+        max-width:18% !important;
+        text-align:right !important;
+      }
+      /* На мобильных устройствах - улучшаем отображение */
+      @media (max-width:768px) {
+        .woocommerce-cart-form .product-quantity,
+        .woocommerce table.cart .product-quantity,
+        .woocommerce-checkout-review-order-table .product-quantity {
+          display:none !important;
+        }
+        /* На мобилке таблица становится блочной, исправляем overflow и отступы */
+        .woocommerce-cart .woocommerce-cart-form,
+        form.woocommerce-cart-form {
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          max-width:100% !important;
+          width:100% !important;
+          min-width:0 !important;
+          box-sizing:border-box !important;
+        }
+        .woocommerce-cart .woocommerce-cart-form table,
+        form.woocommerce-cart-form table {
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          max-width:100% !important;
+          width:100% !important;
+          min-width:0 !important;
+          box-sizing:border-box !important;
+        }
+        /* Критично: исправляем flex-контейнеры на мобилке */
+        .woocommerce-cart .shop_table tbody td {
+          flex-shrink:1 !important;
+          flex-grow:1 !important;
+          flex-basis:auto !important;
+          min-width:0 !important;
+          max-width:100% !important;
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+        }
+        .woocommerce-cart .shop_table tbody td.product-name {
+          display:block !important;
+          width:100% !important;
+          max-width:100% !important;
+          min-width:0 !important;
+          padding:0.5rem 0 !important;
+          margin-bottom:0.4rem !important;
+          overflow:visible !important;
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
+          word-break:break-word !important;
+          white-space:normal !important;
+          box-sizing:border-box !important;
+          flex-direction:column !important;
+          align-items:flex-start !important;
+          justify-content:flex-start !important;
+          flex-shrink:1 !important;
+          flex-grow:1 !important;
+          flex-basis:auto !important;
+          text-overflow:clip !important;
+        }
+        /* Убираем ::before для product-name, чтобы не было меток */
+        .woocommerce-cart .shop_table tbody td.product-name::before {
+          display:none !important;
+          content:none !important;
+        }
+        .woocommerce-cart .shop_table .product-name .wmb-product-name-main {
+          margin-bottom:0.3rem !important;
+          font-size:0.95rem !important;
+          line-height:1.3 !important;
+          width:100% !important;
+          max-width:100% !important;
+          overflow:visible !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
+        }
+        .woocommerce-cart .shop_table .product-name .wmb-product-details {
+          margin-top:0.3rem !important;
+          margin-bottom:0 !important;
+          line-height:1.4 !important;
+          width:100% !important;
+          max-width:100% !important;
+          overflow:visible !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
+        }
+        /* Убираем универсальный селектор - используем специфичные селекторы */
+        .woocommerce-cart .shop_table .product-name .wmb-product-details br,
+        .woocommerce-cart .shop_table .product-name .wmb-product-details br + span {
+          margin:0.15em 0 !important;
+          line-height:1.4 !important;
+          width:100% !important;
+          max-width:100% !important;
+          overflow:visible !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
+          display:block !important;
+        }
+        .woocommerce-cart .shop_table .product-name .wmb-cart-nutrition {
+          margin-top:0.15rem !important;
+          margin-bottom:0 !important;
+          font-size:11px !important;
+          line-height:1.3 !important;
+          width:100% !important;
+          max-width:100% !important;
+          overflow:visible !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
+        }
+        /* Убираем ограничения ширины только для наших элементов внутри product-name - БЕЗ универсального селектора */
+        .woocommerce-cart .shop_table .product-name .wmb-product-name-main,
+        .woocommerce-cart .shop_table .product-name .wmb-product-details,
+        .woocommerce-cart .shop_table .product-name .wmb-product-price-summary,
+        .woocommerce-cart .shop_table .product-name .wmb-cart-nutrition {
+          max-width:100% !important;
+          overflow:visible !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
+          box-sizing:border-box !important;
+        }
+        /* Исправляем обрезку текста на мобилке - только для элементов корзины */
+        .woocommerce-cart .shop_table,
+        .woocommerce-cart .woocommerce-cart-form,
+        form.woocommerce-cart-form {
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          max-width:100% !important;
+          width:100% !important;
+          min-width:0 !important;
+          box-sizing:border-box !important;
+        }
+        /* Критично: tbody на мобилке должен расширяться */
+        /* УБИРАЕМ BORDER чтобы таблица не расширялась за счет border (417.797 + 1px + 1px = 419.8px) */
+        .woocommerce-cart .woocommerce-cart-form table,
+        form.woocommerce-cart-form table {
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          max-width:100% !important;
+          width:100% !important;
+          min-width:0 !important;
+          table-layout:fixed !important;
+          box-sizing:border-box !important;
+          border:0 !important;
+          border-width:0 !important;
+          border-style:none !important;
+          border-collapse:collapse !important;
+          border-spacing:0 !important;
+          padding:0 !important;
+          margin:0 !important;
+        }
+        .woocommerce-cart .woocommerce-cart-form table tbody,
+        form.woocommerce-cart-form table tbody,
+        .woocommerce.woocommerce-cart form.woocommerce-cart-form table tbody {
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          max-width:100% !important;
+          width:100% !important;
+          min-width:0 !important;
+          display:table-row-group !important;
+          box-sizing:border-box !important;
+        }
+        .woocommerce-cart .woocommerce-cart-form table tbody tr,
+        form.woocommerce-cart-form table tbody tr {
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          max-width:100% !important;
+          width:100% !important;
+        }
+        /* Только для td в корзине */
+        .woocommerce-cart .shop_table tbody td,
+        .woocommerce-cart .woocommerce-cart-form table tbody td,
+        form.woocommerce-cart-form table tbody td {
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          max-width:100% !important;
+          box-sizing:border-box !important;
+        }
+        /* Убираем все ограничения padding для мобильных */
+        .woocommerce-cart .shop_table tbody td {
+          padding-left:0.5rem !important;
+          padding-right:0.5rem !important;
+        }
+        .woocommerce-cart .shop_table tbody td {
+          overflow:visible !important;
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
+          word-break:break-word !important;
+          hyphens:auto !important;
+          max-width:100% !important;
+          width:auto !important;
+          box-sizing:border-box !important;
+        }
+        .woocommerce-cart .shop_table .product-name,
+        .woocommerce-cart .shop_table .wmb-product-details,
+        .woocommerce-cart .shop_table .wmb-product-price-summary {
+          overflow:visible !important;
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
+          word-break:break-word !important;
+          hyphens:auto !important;
+          max-width:100% !important;
+          width:100% !important;
+          box-sizing:border-box !important;
+          white-space:normal !important;
+          text-overflow:clip !important;
+          min-width:0 !important;
+        }
+        /* Только для наших элементов внутри - БЕЗ универсального селектора */
+        .woocommerce-cart .shop_table .wmb-product-name-main,
+        .woocommerce-cart .shop_table .wmb-product-details > br,
+        .woocommerce-cart .shop_table .wmb-cart-nutrition,
+        .woocommerce-cart .shop_table .wmb-price-label,
+        .woocommerce-cart .shop_table .wmb-price-value,
+        .woocommerce-cart .shop_table .wmb-subtotal-label,
+        .woocommerce-cart .shop_table .wmb-subtotal-value {
+          overflow:visible !important;
+          overflow-x:visible !important;
+          overflow-y:visible !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
+          word-break:break-word !important;
+          hyphens:auto !important;
+          max-width:100% !important;
+          box-sizing:border-box !important;
+          white-space:normal !important;
+        }
+        /* Критично: для всех текстовых элементов убираем обрезку на мобилке */
+        .woocommerce-cart .shop_table .wmb-product-details {
+          display:block !important;
+          width:100% !important;
+          max-width:100% !important;
+          overflow:visible !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
+          word-break:break-word !important;
+          white-space:normal !important;
+          box-sizing:border-box !important;
+        }
+        /* Убираем универсальный селектор - используем специфичные селекторы */
+        .woocommerce-cart .shop_table .wmb-product-details br,
+        .woocommerce-cart .shop_table .wmb-product-details br + span {
+          display:block !important;
+          width:100% !important;
+          max-width:100% !important;
+          overflow:visible !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
+          word-break:break-word !important;
+          white-space:normal !important;
+          box-sizing:border-box !important;
+        }
+        .woocommerce-cart .shop_table .wmb-product-price-summary {
+          display:block !important;
+          width:100% !important;
+          max-width:100% !important;
+          overflow:visible !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
+          word-break:break-word !important;
+          white-space:normal !important;
+          box-sizing:border-box !important;
+        }
+        .woocommerce-cart .shop_table .wmb-cart-nutrition,
+        .woocommerce-cart .shop_table .wmb-price-label,
+        .woocommerce-cart .shop_table .wmb-price-value,
+        .woocommerce-cart .shop_table .wmb-subtotal-label,
+        .woocommerce-cart .shop_table .wmb-subtotal-value {
+          display:inline !important;
+          white-space:normal !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
+          word-break:break-word !important;
+          overflow:visible !important;
+          max-width:none !important;
+        }
+        /* Критично: убираем все ограничения для текста */
+        .woocommerce-cart .shop_table .wmb-product-details,
+        .woocommerce-cart .shop_table .wmb-cart-nutrition,
+        .woocommerce-cart .shop_table .wmb-price-label,
+        .woocommerce-cart .shop_table .wmb-price-value,
+        .woocommerce-cart .shop_table .wmb-subtotal-label,
+        .woocommerce-cart .shop_table .wmb-subtotal-value {
+          display:inline-block !important;
+          max-width:100% !important;
+          width:auto !important;
+          overflow:visible !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
+          word-break:break-word !important;
+          white-space:normal !important;
+        }
+        /* Улучшаем отображение цены и подытога на мобилке */
+        .woocommerce-cart .shop_table tbody td.product-price,
+        .woocommerce-cart .shop_table tbody td.product-subtotal {
+          font-size:0.95rem !important;
+          padding:0.4rem 0 !important;
+          flex-wrap:wrap !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
+        }
+      }
+      /* Стили для КБЖУ в корзине - более агрессивно */
+      .woocommerce-cart-form .wmb-cart-nutrition,
+      .woocommerce table.cart .wmb-cart-nutrition,
+      .woocommerce-checkout-review-order-table .wmb-cart-nutrition,
+      .wmb-cart-nutrition {
+        display:block !important;
+        font-size:12px !important;
+        color:#666 !important;
+        margin-top:0.2rem !important;
+        margin-bottom:0 !important;
+        font-weight:400 !important;
+        line-height:1.3 !important;
+      }
+      .woocommerce-cart-form .wmb-product-details,
+      .woocommerce table.cart .wmb-product-details,
+      .woocommerce-checkout-review-order-table .wmb-product-details,
+      .wmb-product-details {
+        margin-top:0.4rem !important;
+        margin-bottom:0 !important;
+        line-height:1.4 !important;
+      }
+      .woocommerce-cart-form .wmb-product-details .wmb-cart-nutrition,
+      .woocommerce table.cart .wmb-product-details .wmb-cart-nutrition,
+      .woocommerce-checkout-review-order-table .wmb-product-details .wmb-cart-nutrition,
+      .wmb-product-details .wmb-cart-nutrition {
+        margin-top:0.15rem !important;
+        margin-bottom:0 !important;
+      }
+      /* Стили для блока с ценой и подытогом в деталях товара */
+      .woocommerce-cart-form .wmb-product-price-summary,
+      .woocommerce table.cart .wmb-product-price-summary,
+      .woocommerce-checkout-review-order-table .wmb-product-price-summary {
+        margin-top:0.5rem !important;
+        padding-top:0.5rem !important;
+        border-top:1px solid #f0f0f0 !important;
+        font-size:0.9rem !important;
+        line-height:1.5 !important;
+        width:100% !important;
+        max-width:100% !important;
+        overflow:visible !important;
+        word-wrap:break-word !important;
+        overflow-wrap:break-word !important;
+        box-sizing:border-box !important;
+      }
+      .woocommerce-cart-form .wmb-product-price-summary .wmb-price-label,
+      .woocommerce table.cart .wmb-product-price-summary .wmb-price-label,
+      .woocommerce-checkout-review-order-table .wmb-product-price-summary .wmb-price-label,
+      .woocommerce-cart-form .wmb-product-price-summary .wmb-subtotal-label,
+      .woocommerce table.cart .wmb-product-price-summary .wmb-subtotal-label,
+      .woocommerce-checkout-review-order-table .wmb-product-price-summary .wmb-subtotal-label {
+        color:#666 !important;
+        margin-right:0.5rem !important;
+        display:inline !important;
+        white-space:normal !important;
+        word-wrap:break-word !important;
+        overflow-wrap:break-word !important;
+      }
+      .woocommerce-cart-form .wmb-product-price-summary .wmb-price-value,
+      .woocommerce table.cart .wmb-product-price-summary .wmb-price-value,
+      .woocommerce-checkout-review-order-table .wmb-product-price-summary .wmb-price-value {
+        font-weight:500 !important;
+        color:#333 !important;
+        display:inline !important;
+        white-space:normal !important;
+        word-wrap:break-word !important;
+        overflow-wrap:break-word !important;
+      }
+      .woocommerce-cart-form .wmb-product-price-summary .wmb-subtotal-value,
+      .woocommerce table.cart .wmb-product-price-summary .wmb-subtotal-value,
+      .woocommerce-checkout-review-order-table .wmb-product-price-summary .wmb-subtotal-value {
+        font-weight:600 !important;
+        color:#4caf50 !important;
+        display:inline !important;
+        white-space:normal !important;
+        word-wrap:break-word !important;
+        overflow-wrap:break-word !important;
+      }
+      /* Критично: убираем обрезку для всех элементов - правильный подход */
+      .woocommerce-cart-form .wmb-product-details,
+      .woocommerce table.cart .wmb-product-details {
+        display:block !important;
+        width:100% !important;
+        max-width:100% !important;
+        overflow:visible !important;
+        overflow-x:visible !important;
+        overflow-y:visible !important;
+        word-wrap:break-word !important;
+        overflow-wrap:break-word !important;
+        word-break:break-word !important;
+        white-space:normal !important;
+        box-sizing:border-box !important;
+      }
+      /* Для строк внутри wmb-product-details */
+      /* Убираем универсальный селектор - используем специфичные селекторы */
+      .woocommerce-cart-form .wmb-product-details br,
+      .woocommerce table.cart .wmb-product-details br,
+      .woocommerce-cart-form .wmb-product-details br + span,
+      .woocommerce table.cart .wmb-product-details br + span {
+        display:block !important;
+        width:100% !important;
+        max-width:100% !important;
+        overflow:visible !important;
+        word-wrap:break-word !important;
+        overflow-wrap:break-word !important;
+        word-break:break-word !important;
+        white-space:normal !important;
+        box-sizing:border-box !important;
+      }
+      /* Для блока с ценой и подытогом */
+      .woocommerce-cart-form .wmb-product-price-summary,
+      .woocommerce table.cart .wmb-product-price-summary {
+        display:block !important;
+        width:100% !important;
+        max-width:100% !important;
+        overflow:visible !important;
+        word-wrap:break-word !important;
+        overflow-wrap:break-word !important;
+        word-break:break-word !important;
+        white-space:normal !important;
+        box-sizing:border-box !important;
+      }
+      /* Для inline элементов внутри блока с ценой - оставляем inline */
+      .woocommerce-cart-form .wmb-product-price-summary .wmb-price-label,
+      .woocommerce table.cart .wmb-product-price-summary .wmb-price-label,
+      .woocommerce-cart-form .wmb-product-price-summary .wmb-price-value,
+      .woocommerce table.cart .wmb-product-price-summary .wmb-price-value,
+      .woocommerce-cart-form .wmb-product-price-summary .wmb-subtotal-label,
+      .woocommerce table.cart .wmb-product-price-summary .wmb-subtotal-label,
+      .woocommerce-cart-form .wmb-product-price-summary .wmb-subtotal-value,
+      .woocommerce table.cart .wmb-product-price-summary .wmb-subtotal-value {
+        display:inline !important;
+        white-space:normal !important;
+        word-wrap:break-word !important;
+        overflow-wrap:break-word !important;
+        word-break:break-word !important;
+        overflow:visible !important;
+        max-width:none !important;
+      }
+      /* Стили для общего КБЖУ - внутри таблицы */
+      .wmb-total-nutrition-row {
+        border-top:2px solid #e5e5e5 !important;
+      }
+      .wmb-total-nutrition-cell {
+        padding:12px 0 !important;
+        border:none !important;
+      }
+      .wmb-total-nutrition-summary {
+        margin:0 !important;
+        padding:12px 16px;
+        background:#f8f9fa;
+        border-radius:8px;
+        border-left:4px solid #4caf50;
+        font-size:15px;
+        line-height:1.5;
+        width:100%;
+        box-sizing:border-box;
+      }
+      .wmb-total-nutrition-summary strong {
+        color:#2d5a3d;
+        font-weight:600;
+        margin-right:8px;
+      }
+      .wmb-total-nutrition-value {
+        color:#333;
+        font-weight:500;
+      }
+      /* На мобилке общее КБЖУ */
+      @media (max-width:768px) {
+        .wmb-total-nutrition-cell {
+          display:block !important;
+          width:100% !important;
+          padding:0.75rem 0 !important;
+        }
+        .wmb-total-nutrition-cell::before {
+          display:none !important;
+        }
+        .wmb-total-nutrition-summary {
+          margin:0 !important;
+          padding:10px 12px !important;
+          font-size:14px !important;
+        }
+      }
+    ';
     wp_register_style('wmb-cart-fix', false);
     wp_enqueue_style('wmb-cart-fix');
     wp_add_inline_style('wmb-cart-fix', $css);
+    // Также добавляем стили через wp_head для максимального приоритета
+    add_action('wp_head', function() use ($css) {
+      echo '<style id="wmb-cart-fix-head">' . $css . '</style>';
+    }, 999);
+    // И еще раз через wp_footer для гарантии
+    add_action('wp_footer', function() use ($css) {
+      if (function_exists('is_cart') && is_cart()) {
+        echo '<style id="wmb-cart-fix-footer">' . $css . '</style>';
+        // JavaScript для принудительного изменения ширины на мобильных
+        echo '<script>
+        (function() {
+          function fixCartFormWidth() {
+            var isMobile = window.innerWidth <= 768;
+            
+            // Находим все возможные варианты таблицы
+            var tableSelectors = [
+              "form.woocommerce-cart-form table.shop_table",
+              "form.woocommerce-cart-form table.shop_table_responsive",
+              "form.woocommerce-cart-form table.woocommerce-cart-form__contents",
+              "form.woocommerce-cart-form table.shop_table.shop_table_responsive.cart.woocommerce-cart-form__contents",
+              ".woocommerce-cart-form table.shop_table",
+              ".woocommerce-cart-form table.shop_table_responsive",
+              ".woocommerce-cart-form table.woocommerce-cart-form__contents",
+              ".woocommerce-cart-form table.shop_table.shop_table_responsive.cart.woocommerce-cart-form__contents",
+              "form.woocommerce-cart-form table",
+              ".woocommerce-cart-form table"
+            ];
+            
+            var formSelectors = [
+              "form.woocommerce-cart-form",
+              ".woocommerce-cart-form"
+            ];
+            
+            var tbodySelectors = [
+              "form.woocommerce-cart-form table tbody",
+              ".woocommerce-cart-form table tbody"
+            ];
+            
+            // Применяем стили ко всем найденным элементам
+            function applyStyles(elements, isMobile) {
+              elements.forEach(function(el) {
+                if (el) {
+                  if (isMobile) {
+                    el.style.setProperty("min-width", "0", "important");
+                    el.style.setProperty("max-width", "100%", "important");
+                    el.style.setProperty("width", "100%", "important");
+                    el.style.setProperty("box-sizing", "border-box", "important");
+                  } else {
+                    el.style.removeProperty("min-width");
+                    el.style.removeProperty("max-width");
+                    el.style.removeProperty("width");
+                    el.style.removeProperty("box-sizing");
+                  }
+                }
+              });
+            }
+            
+            // Находим все формы
+            var forms = [];
+            formSelectors.forEach(function(selector) {
+              var el = document.querySelector(selector);
+              if (el) forms.push(el);
+            });
+            
+            // Находим все таблицы
+            var tables = [];
+            tableSelectors.forEach(function(selector) {
+              var el = document.querySelector(selector);
+              if (el && tables.indexOf(el) === -1) tables.push(el);
+            });
+            
+            // Находим все tbody
+            var tbodies = [];
+            tbodySelectors.forEach(function(selector) {
+              var el = document.querySelector(selector);
+              if (el && tbodies.indexOf(el) === -1) tbodies.push(el);
+            });
+            
+            // Применяем стили
+            applyStyles(forms, isMobile);
+            applyStyles(tables, isMobile);
+            applyStyles(tbodies, isMobile);
+          }
+          
+          // Выполняем сразу
+          fixCartFormWidth();
+          // И после загрузки DOM
+          if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", fixCartFormWidth);
+          } else {
+            fixCartFormWidth();
+          }
+          // И после полной загрузки
+          window.addEventListener("load", fixCartFormWidth);
+          // И при изменении размера окна
+          window.addEventListener("resize", fixCartFormWidth);
+          // И через небольшую задержку для гарантии
+          setTimeout(fixCartFormWidth, 100);
+          setTimeout(fixCartFormWidth, 500);
+        })();
+        </script>';
+      }
+    }, 999);
   }
-}, 100);
+}, 999);
 ?>
 
