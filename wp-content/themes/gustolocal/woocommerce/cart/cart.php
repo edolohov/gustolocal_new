@@ -128,7 +128,7 @@ do_action( 'woocommerce_before_cart' ); ?>
 							<label class="delivery-option">
 								<input type="radio" name="delivery_type" value="pickup" <?php checked( $current_delivery, 'pickup' ); ?>>
 								<span class="delivery-label">
-									<strong><?php esc_html_e( 'Самовывоз', 'woocommerce' ); ?></strong>
+									<strong><?php esc_html_e( 'Самовывоз (Amado Granell 40)', 'woocommerce' ); ?></strong>
 									<span class="delivery-price"><?php esc_html_e( 'Бесплатно', 'woocommerce' ); ?></span>
 								</span>
 							</label>

@@ -100,7 +100,7 @@ html,body{overflow:visible !important}
 }
 .wmb-header{margin:12px 0 16px}
 .wmb-sub{display:none}
-.wmb-banner{display:none !important; /* Баннер доставки временно скрыт */}
+.wmb-banner{margin-top:8px;color:#333;line-height:1.4}
 /* Выделение дат и времени в баннере доставки */
 .wmb-banner strong{color:#2d5a3d;font-weight:700}
 .wmb-banner em{color:#e74c3c;font-weight:700;font-style:normal}
@@ -1164,94 +1164,5 @@ aside.wmb-sidebar{
   .wp-site-blocks .wmb-wrapper,
   .wp-block-post-content .wmb-wrapper {
     min-height: 100vh !important;
-  }
-}
-
-/* ============ Исправление обрезания формы корзины на маленьких экранах ============ */
-@media (max-width: 768px) {
-  /* Критично: родительские контейнеры должны иметь правильную ширину */
-  .woocommerce.woocommerce-cart,
-  body .woocommerce.woocommerce-cart {
-    max-width: 100% !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-  }
-  
-  /* Критично: убираем min-width: 100% на мобильных, чтобы форма не обрезалась */
-  /* Максимальная специфичность для всех возможных селекторов */
-  form.woocommerce-cart-form,
-  .woocommerce-cart-form,
-  .woocommerce.woocommerce-cart .woocommerce-cart-form,
-  .woocommerce.woocommerce-cart form.woocommerce-cart-form,
-  body .woocommerce.woocommerce-cart .woocommerce-cart-form,
-  body .woocommerce.woocommerce-cart form.woocommerce-cart-form {
-    min-width: 0 !important;
-    max-width: 100% !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-    overflow-x: visible !important;
-    overflow-y: visible !important;
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-  }
-  
-  /* Критично: таблица с максимальной специфичностью, включая все классы */
-  /* Используем table-layout: fixed чтобы таблица не расширялась по содержимому */
-  /* УБИРАЕМ BORDER на мобильных, чтобы таблица не расширялась за счет border */
-  form.woocommerce-cart-form table,
-  .woocommerce-cart-form table,
-  .woocommerce.woocommerce-cart .woocommerce-cart-form table,
-  .woocommerce.woocommerce-cart form.woocommerce-cart-form table,
-  form.woocommerce-cart-form table.shop_table,
-  .woocommerce-cart-form table.shop_table,
-  form.woocommerce-cart-form table.shop_table_responsive,
-  .woocommerce-cart-form table.shop_table_responsive,
-  form.woocommerce-cart-form table.woocommerce-cart-form__contents,
-  .woocommerce-cart-form table.woocommerce-cart-form__contents,
-  form.woocommerce-cart-form table.shop_table.shop_table_responsive.cart.woocommerce-cart-form__contents,
-  .woocommerce-cart-form table.shop_table.shop_table_responsive.cart.woocommerce-cart-form__contents,
-  .woocommerce.woocommerce-cart form.woocommerce-cart-form table.shop_table,
-  .woocommerce.woocommerce-cart .woocommerce-cart-form table.shop_table,
-  body .woocommerce.woocommerce-cart form.woocommerce-cart-form table.shop_table,
-  body .woocommerce.woocommerce-cart .woocommerce-cart-form table.shop_table {
-    min-width: 0 !important;
-    max-width: 100% !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-    overflow-x: visible !important;
-    overflow-y: visible !important;
-    table-layout: fixed !important;
-    border-collapse: collapse !important;
-    border-spacing: 0 !important;
-    border: 0 !important;
-    border-width: 0 !important;
-    border-style: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-  
-  form.woocommerce-cart-form table tbody,
-  .woocommerce-cart-form table tbody,
-  .woocommerce.woocommerce-cart form.woocommerce-cart-form table tbody,
-  .woocommerce.woocommerce-cart .woocommerce-cart-form table tbody,
-  form.woocommerce-cart-form table.shop_table tbody,
-  .woocommerce-cart-form table.shop_table tbody,
-  form.woocommerce-cart-form table.shop_table_responsive tbody,
-  .woocommerce-cart-form table.shop_table_responsive tbody,
-  body .woocommerce.woocommerce-cart form.woocommerce-cart-form table.shop_table tbody,
-  body .woocommerce.woocommerce-cart .woocommerce-cart-form table.shop_table tbody {
-    min-width: 0 !important;
-    max-width: 100% !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-    overflow-x: visible !important;
-    overflow-y: visible !important;
-    display: table-row-group !important;
   }
 }

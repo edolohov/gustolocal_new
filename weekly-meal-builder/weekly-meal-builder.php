@@ -55,40 +55,6 @@ function wmb_get_settings(){
   return $out;
 }
 
-/* ---------- Category order settings ---------- */
-function wmb_get_category_order($sale_type = 'smart_food'){
-  $default_smart_food = [
-    'Авторские сэндвичи',
-    'Готовые салаты',
-    'Роллы кимпаб',
-    'Протеины',
-    'Готовые боулы',
-    'Паста ручной работы (требует доготовки)',
-    'Десерты',
-  ];
-  $default_mercat = [
-    'Завтраки',
-    'Салаты',
-    'Заморозка (требует доготовки)',
-  ];
-  
-  $order_json = get_option('wmb_category_order', '');
-  if ($order_json) {
-    $order_arr = json_decode($order_json, true);
-    if (is_array($order_arr)) {
-      if ($sale_type === 'smart_food' && isset($order_arr['smart_food']) && is_array($order_arr['smart_food'])) {
-        return $order_arr['smart_food'];
-      }
-      if ($sale_type === 'mercat' && isset($order_arr['mercat']) && is_array($order_arr['mercat'])) {
-        return $order_arr['mercat'];
-      }
-    }
-  }
-  
-  // Возвращаем значения по умолчанию
-  return $sale_type === 'mercat' ? $default_mercat : $default_smart_food;
-}
-
 /* ---------- admin menu ---------- */
 add_action('admin_menu', function(){
   add_menu_page('Meal Builder','Meal Builder','manage_options','wmb_root','wmb_page_root','dashicons-carrot',56);
@@ -108,23 +74,16 @@ add_action('init', function(){
       'search_items'=>'Искать блюдо','menu_name'=>'Блюда',
     ],
     'public'=>false,'show_ui'=>true,'show_in_menu'=>false,'supports'=>['title'],'capability_type'=>'post',
-    'taxonomies'=>[], // Отключаем стандартные категории WooCommerce
   ]);
   register_taxonomy('wmb_section','wmb_dish',[
     'labels'=>['name'=>'Категории','singular_name'=>'Категория'],
-    'public'=>false,'show_ui'=>false,'hierarchical'=>false, // Отключаем UI, используем только для хранения
+    'public'=>false,'show_ui'=>true,'hierarchical'=>false,
   ]);
   register_taxonomy('wmb_tag','wmb_dish',[
     'labels'=>['name'=>'Теги','singular_name'=>'Тег'],
     'public'=>false,'show_ui'=>true,'hierarchical'=>false,
   ]);
 });
-
-// Отключаем стандартные категории WooCommerce для блюд
-add_action('admin_menu', function(){
-  remove_meta_box('product_catdiv', 'wmb_dish', 'side');
-  remove_meta_box('tagsdiv-product_tag', 'wmb_dish', 'side');
-}, 99);
 
 /* ---------- meta box ---------- */
 add_action('add_meta_boxes_wmb_dish', function(){
@@ -231,34 +190,12 @@ function wmb_page_items(){
           $term = term_exists($section,'wmb_section') ?: wp_insert_term($section,'wmb_section');
           if (!is_wp_error($term)) wp_set_object_terms($id,(int)($term['term_id']??$term),'wmb_section',false);
         } else { wp_set_object_terms($id,[], 'wmb_section', false); }
-        // Очищаем старые теги перед установкой новых
-        wp_set_object_terms($id, [], 'wmb_tag', false);
-        
-        $tags_str = (string)($row['tags']??''); 
-        $tag_ids=[];
+        $tags_str = (string)($row['tags']??''); $tag_ids=[];
         foreach(array_filter(array_map('trim', explode(',', $tags_str))) as $t){
-          $t = trim($t);
-          if (empty($t)) continue;
-          
-          // Ищем термин по точному названию (не по slug)
-          $existing_term = get_term_by('name', $t, 'wmb_tag');
-          
-          if ($existing_term) {
-            $tag_ids[] = $existing_term->term_id;
-            // Обновляем название, если оно изменилось
-            if ($existing_term->name !== $t) {
-              wp_update_term($existing_term->term_id, 'wmb_tag', ['name' => $t]);
-            }
-          } else {
-            $term = wp_insert_term($t, 'wmb_tag', [
-              'slug' => sanitize_title($t) . '-' . time()
-            ]);
-            if (!is_wp_error($term)) {
-              $tag_ids[] = (int)($term['term_id'] ?? $term);
-            }
-          }
+          $term = term_exists($t,'wmb_tag') ?: wp_insert_term($t,'wmb_tag');
+          if (!is_wp_error($term)) $tag_ids[]=(int)($term['term_id']??$term);
         }
-        wp_set_object_terms($id, $tag_ids, 'wmb_tag', false);
+        wp_set_object_terms($id,$tag_ids,'wmb_tag',false);
       }
       echo '<div class="updated notice"><p>Изменения сохранены.</p></div>';
     }
@@ -298,33 +235,11 @@ function wmb_page_items(){
           $term = term_exists($section,'wmb_section') ?: wp_insert_term($section,'wmb_section');
           if (!is_wp_error($term)) wp_set_object_terms($id,(int)($term['term_id']??$term),'wmb_section',false);
         }
-        // Очищаем старые теги перед установкой новых
-        wp_set_object_terms($id, [], 'wmb_tag', false);
-        
-        $tag_ids=[];
-        foreach(array_filter(array_map('trim', explode(',', (string)($q['tags']??'')))) as $t){
-          $t = trim($t);
-          if (empty($t)) continue;
-          
-          // Ищем термин по точному названию (не по slug)
-          $existing_term = get_term_by('name', $t, 'wmb_tag');
-          
-          if ($existing_term) {
-            $tag_ids[] = $existing_term->term_id;
-            // Обновляем название, если оно изменилось
-            if ($existing_term->name !== $t) {
-              wp_update_term($existing_term->term_id, 'wmb_tag', ['name' => $t]);
-            }
-          } else {
-            $term = wp_insert_term($t, 'wmb_tag', [
-              'slug' => sanitize_title($t) . '-' . time()
-            ]);
-            if (!is_wp_error($term)) {
-              $tag_ids[] = (int)($term['term_id'] ?? $term);
-            }
-          }
+        $tag_ids=[]; foreach(array_filter(array_map('trim', explode(',', (string)($q['tags']??'')))) as $t){
+          $term = term_exists($t,'wmb_tag') ?: wp_insert_term($t,'wmb_tag');
+          if (!is_wp_error($term)) $tag_ids[]=(int)($term['term_id']??$term);
         }
-        wp_set_object_terms($id, $tag_ids, 'wmb_tag', false);
+        wp_set_object_terms($id,$tag_ids,'wmb_tag',false);
         echo '<div class="updated notice"><p>Блюдо «'.esc_html($title).'» создано.</p></div>';
       } else { echo '<div class="error notice"><p>Не удалось создать «'.esc_html($title).'».</p></div>'; }
     }
@@ -511,9 +426,10 @@ function wmb_page_import(){
         $unit  = trim($r[$map['Единица']]??'');
         $section_raw = trim($r[$map['Категория']]??'');
         
-        // НЕ используем маппинг категорий - используем точные названия из CSV
-        // Отключено: gustolocal_map_category_by_alias может преобразовывать названия неправильно
-        $section = $section_raw;
+        // Маппинг категории через функцию темы, если доступна
+        $section = function_exists('gustolocal_map_category_by_alias') 
+          ? gustolocal_map_category_by_alias($section_raw) 
+          : $section_raw;
         $tags_str= trim($r[$map['Теги']]??'');
         $shelf_life = isset($map['Срок хранения']) ? sanitize_text_field(trim((string)($r[$map['Срок хранения']]??''))) : '';
         $ing    = isset($map['Состав'])     ? trim((string)($r[$map['Состав']]??''))     : '';
@@ -541,15 +457,14 @@ function wmb_page_import(){
         
         // Нормализуем значение (регистронезависимо, поддерживаем разные варианты написания)
         $sale_type_normalized = strtolower($sale_type_raw);
-        if (in_array($sale_type_normalized, ['smart_food', 'smart food', 'smartfood', '1'])) {
-          // "1" интерпретируем как smart_food (для обратной совместимости со старыми CSV)
+        if (in_array($sale_type_normalized, ['smart_food', 'smart food', 'smartfood'])) {
           $sale_type = 'smart_food';
         } elseif (in_array($sale_type_normalized, ['mercat'])) {
           $sale_type = 'mercat';
         } elseif (in_array($sale_type_normalized, ['both', 'оба', 'оба (smart food + mercat)'])) {
           $sale_type = 'both';
         } else {
-          $sale_type = 'smart_food'; // По умолчанию, если пусто или неизвестное значение
+          $sale_type = 'smart_food'; // По умолчанию
         }
         
         $available_on_glovo_uber_raw = '';
@@ -603,35 +518,11 @@ function wmb_page_import(){
           $term = term_exists($section,'wmb_section') ?: wp_insert_term($section,'wmb_section');
           if (!is_wp_error($term)) wp_set_object_terms($id,(int)($term['term_id']??$term),'wmb_section',false);
         }
-        // Очищаем старые теги перед установкой новых
-        wp_set_object_terms($id, [], 'wmb_tag', false);
-        
-        $tag_ids=[];
-        foreach(array_filter(array_map('trim', explode(',', $tags_str))) as $t){
-          $t = trim($t);
-          if (empty($t)) continue;
-          
-          // Ищем термин по точному названию (не по slug)
-          $existing_term = get_term_by('name', $t, 'wmb_tag');
-          
-          if ($existing_term) {
-            // Используем существующий термин
-            $tag_ids[] = $existing_term->term_id;
-            // Обновляем название, если оно изменилось (например, регистр)
-            if ($existing_term->name !== $t) {
-              wp_update_term($existing_term->term_id, 'wmb_tag', ['name' => $t]);
-            }
-          } else {
-            // Создаем новый термин с явным указанием slug для сохранения регистра
-            $term = wp_insert_term($t, 'wmb_tag', [
-              'slug' => sanitize_title($t) . '-' . time() // Уникальный slug
-            ]);
-            if (!is_wp_error($term)) {
-              $tag_ids[] = (int)($term['term_id'] ?? $term);
-            }
-          }
+        $tag_ids=[]; foreach(array_filter(array_map('trim', explode(',', $tags_str))) as $t){
+          $term = term_exists($t,'wmb_tag') ?: wp_insert_term($t,'wmb_tag');
+          if (!is_wp_error($term)) $tag_ids[]=(int)($term['term_id']??$term);
         }
-        wp_set_object_terms($id, $tag_ids, 'wmb_tag', false);
+        wp_set_object_terms($id,$tag_ids,'wmb_tag',false);
       }
       $report = compact('updated','created','skipped','with_sale_type','with_glovo_uber');
       if (!empty($errors)) {
@@ -693,25 +584,20 @@ function wmb_page_settings(){
   $delivery = $settings['delivery'];
 
   if (!empty($_POST['wmb_settings_nonce']) && wp_verify_nonce($_POST['wmb_settings_nonce'],'wmb_settings_save')){
-    // Настройки доставки временно отключены - не сохраняем
-    // $delivery['tuesday']['enabled']  = !empty($_POST['wmb_del_tue_enabled']);
-    // $delivery['friday']['enabled']   = !empty($_POST['wmb_del_fri_enabled']);
-    // ... остальные настройки доставки ...
-    
-    // Сохраняем порядок категорий
-    $smart_food_order = trim((string)($_POST['wmb_category_order_smart_food'] ?? ''));
-    $mercat_order = trim((string)($_POST['wmb_category_order_mercat'] ?? ''));
-    $category_order = [
-      'smart_food' => array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $smart_food_order)))),
-      'mercat' => array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $mercat_order)))),
-    ];
-    update_option('wmb_category_order', wp_json_encode($category_order, JSON_UNESCAPED_UNICODE));
-    
+    $delivery['tuesday']['enabled']  = !empty($_POST['wmb_del_tue_enabled']);
+    $delivery['friday']['enabled']   = !empty($_POST['wmb_del_fri_enabled']);
+    $delivery['tuesday']['deadline']['dow']  = intval($_POST['wmb_del_tue_dow'] ?? 0);
+    $delivery['tuesday']['deadline']['time'] = sanitize_text_field($_POST['wmb_del_tue_time'] ?? '14:00');
+    $delivery['friday']['deadline']['dow']   = intval($_POST['wmb_del_fri_dow'] ?? 3);
+    $delivery['friday']['deadline']['time']  = sanitize_text_field($_POST['wmb_del_fri_time'] ?? '14:00');
+    $delivery['timezone'] = sanitize_text_field($_POST['wmb_del_tz'] ?? $delivery['timezone']);
+    $delivery['banner']   = sanitize_text_field($_POST['wmb_del_banner'] ?? $delivery['banner']);
+    $blackout = trim((string)($_POST['wmb_del_blackout'] ?? ''));
+    $delivery['blackout'] = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $blackout))));
+    $settings['delivery'] = $delivery;
+    update_option('wmb_menu_json', wp_json_encode($settings, JSON_UNESCAPED_UNICODE));
     $saved=true;
   }
-  
-  $smart_food_order = wmb_get_category_order('smart_food');
-  $mercat_order = wmb_get_category_order('mercat');
 
   $dow_opts = [0=>'Воскресенье',1=>'Понедельник',2=>'Вторник',3=>'Среда',4=>'Четверг',5=>'Пятница',6=>'Суббота'];
 
@@ -720,23 +606,38 @@ function wmb_page_settings(){
   echo '<form method="post" style="max-width:980px">';
   wp_nonce_field('wmb_settings_save','wmb_settings_nonce');
 
-  // Секция "Доставка" временно отключена
-  // echo '<h2 style="margin-top:24px">Доставка</h2>';
-  // ... весь код доставки скрыт ...
-  
-  echo '<h2 style="margin-top:32px">Порядок категорий</h2>';
-  echo '<p class="description">Укажите порядок отображения категорий товаров. Каждая категория на новой строке. Порядок сверху вниз.</p>';
+  echo '<h2 style="margin-top:24px">Доставка</h2>';
   echo '<table class="form-table" role="presentation"><tbody>';
 
-  echo '<tr><th scope="row"><label for="wmb_category_order_smart_food">Superfood</label></th><td>';
-  echo '<textarea id="wmb_category_order_smart_food" name="wmb_category_order_smart_food" rows="10" class="large-text" placeholder="Авторские сэндвичи&#10;Готовые салаты&#10;Роллы кимпаб&#10;Протеины&#10;Готовые боулы&#10;Паста ручной работы (требует доготовки)&#10;Десерты">'.esc_textarea(implode("\n", $smart_food_order)).'</textarea>';
-  echo '<p class="description">Категории для Superfood. Используйте точные названия из CSV.</p>';
+  echo '<tr><th scope="row">Вторник</th><td>';
+    echo '<label><input type="checkbox" name="wmb_del_tue_enabled" value="1" '.checked(!empty($delivery['tuesday']['enabled']),true,false).'> включено</label><br>';
+    echo '<label>Дедлайн (день недели + время): ';
+      echo '<select name="wmb_del_tue_dow" style="min-width:180px">';
+      foreach($dow_opts as $i=>$lab){
+        $sel = selected(intval($delivery['tuesday']['deadline']['dow']), $i, false);
+        echo '<option value="'.$i.'" '.$sel.'>'.$lab.'</option>';
+      }
+      echo '</select> ';
+      echo '<input type="time" name="wmb_del_tue_time" value="'.esc_attr($delivery['tuesday']['deadline']['time']).'">';
+    echo '</label>';
   echo '</td></tr>';
 
-  echo '<tr><th scope="row"><label for="wmb_category_order_mercat">Mercat</label></th><td>';
-  echo '<textarea id="wmb_category_order_mercat" name="wmb_category_order_mercat" rows="10" class="large-text" placeholder="Завтраки&#10;Салаты&#10;Заморозка (требует доготовки)">'.esc_textarea(implode("\n", $mercat_order)).'</textarea>';
-  echo '<p class="description">Категории для Mercat. Используйте точные названия из CSV.</p>';
+  echo '<tr><th scope="row">Пятница</th><td>';
+    echo '<label><input type="checkbox" name="wmb_del_fri_enabled" value="1" '.checked(!empty($delivery['friday']['enabled']),true,false).'> включено</label><br>';
+    echo '<label>Дедлайн (день недели + время): ';
+      echo '<select name="wmb_del_fri_dow" style="min-width:180px">';
+      foreach($dow_opts as $i=>$lab){
+        $sel = selected(intval($delivery['friday']['deadline']['dow']), $i, false);
+        echo '<option value="'.$i.'" '.$sel.'>'.$lab.'</option>';
+      }
+      echo '</select> ';
+      echo '<input type="time" name="wmb_del_fri_time" value="'.esc_attr($delivery['friday']['deadline']['time']).'">';
+    echo '</label>';
   echo '</td></tr>';
+
+  echo '<tr><th scope="row"><label for="wmb_del_tz">Часовой пояс</label></th><td><input type="text" id="wmb_del_tz" name="wmb_del_tz" class="regular-text" value="'.esc_attr($delivery['timezone']).'"> <span class="description">По умолчанию берётся из настроек WordPress</span></td></tr>';
+  echo '<tr><th scope="row"><label for="wmb_del_banner">Текст баннера</label></th><td><input type="text" id="wmb_del_banner" name="wmb_del_banner" class="regular-text" style="width:100%" value="'.esc_attr($delivery['banner']).'"><p class="description">Плейсхолдеры: {delivery_date}, {weekday}, {weekday_short}, {deadline}, {countdown}</p></td></tr>';
+  echo '<tr><th scope="row"><label for="wmb_del_blackout">Нерабочие даты</label></th><td><textarea id="wmb_del_blackout" name="wmb_del_blackout" rows="4" class="large-text" placeholder="YYYY-MM-DD по одной на строку">'.esc_textarea(implode("\n",$delivery['blackout'])).'</textarea></td></tr>';
 
   echo '</tbody></table>';
   echo '<p><button class="button button-primary">Сохранить</button></p>';
@@ -815,8 +716,6 @@ add_action('rest_api_init', function () {
       ]);
 
       $sections = [];
-      // Сохраняем sale_type из параметра запроса для использования в сортировке
-      $request_sale_type = $sale_type;
       foreach ($posts as $p) {
         $price = (float) get_post_meta($p->ID, 'wmb_price', true);
         $unit  = (string) get_post_meta($p->ID, 'wmb_unit', true);
@@ -827,7 +726,7 @@ add_action('rest_api_init', function () {
         $photo_url = (string) get_post_meta($p->ID, 'wmb_photo_url', true);
         $photo_alt = (string) get_post_meta($p->ID, 'wmb_photo_alt', true);
         $nutrition = (string) get_post_meta($p->ID, 'wmb_nutrition', true);
-        $item_sale_type = (string) get_post_meta($p->ID, 'wmb_sale_type', true) ?: 'smart_food';
+        $sale_type = (string) get_post_meta($p->ID, 'wmb_sale_type', true) ?: 'smart_food';
         $available_on_glovo_uber = get_post_meta($p->ID, 'wmb_available_on_glovo_uber', true) === '1';
         $glovo_url = (string) get_post_meta($p->ID, 'wmb_glovo_url', true);
         $uber_url = (string) get_post_meta($p->ID, 'wmb_uber_url', true);
@@ -848,7 +747,7 @@ add_action('rest_api_init', function () {
           'photo_url'             => $photo_url,
           'photo_alt'             => $photo_alt,
           'nutrition'             => $nutrition,
-          'sale_type'             => $item_sale_type,
+          'sale_type'             => $sale_type,
           'available_on_glovo_uber' => $available_on_glovo_uber,
           'glovo_url'             => $glovo_url,
           'uber_url'              => $uber_url,
@@ -858,63 +757,52 @@ add_action('rest_api_init', function () {
 
       $out_sections = [];
       foreach ($sections as $title => $items) {
-        // НЕ используем gustolocal_get_category_display_name, чтобы не преобразовывать названия
-        // Используем оригинальные названия из CSV напрямую
-        $out_sections[] = [
-          'title' => $title, 
-          'original_title' => $title, // Оригинальное название = отображаемое
-          'items' => $items
-        ];
+        // Используем отображаемое название категории, если функция доступна
+        $display_title = function_exists('gustolocal_get_category_display_name') 
+          ? gustolocal_get_category_display_name($title) 
+          : $title;
+        $out_sections[] = ['title' => $display_title, 'items' => $items];
       }
 
-      // Используем настройки порядка категорий из админки
-      // ВАЖНО: используем $request_sale_type из параметра запроса, а не из последнего товара!
-      $category_order = wmb_get_category_order($request_sale_type);
-      if (!empty($category_order)) {
-        // Создаем карту порядка (регистронезависимо, нормализуем пробелы) - сравниваем с оригинальными названиями
+      // Используем настройки категорий из темы, если доступны
+      if (function_exists('gustolocal_get_ordered_categories')) {
+        $ordered_settings = gustolocal_get_ordered_categories();
         $order_map = [];
-        foreach ($category_order as $index => $cat_name) {
-          // Нормализуем: приводим к нижнему регистру, убираем лишние пробелы
-          $normalized = mb_strtolower(trim($cat_name));
-          $normalized = preg_replace('/\s+/', ' ', $normalized); // Множественные пробелы -> один
-          $order_map[$normalized] = $index;
+        foreach ($ordered_settings as $original => $config) {
+          $display = !empty($config['display']) ? $config['display'] : $original;
+          $order_map[mb_strtolower($display)] = isset($config['order']) ? (int)$config['order'] : 999;
         }
         
         usort($out_sections, function($a, $b) use ($order_map) {
-          // Нормализуем названия категорий для сравнения
-          $a_title_normalized = mb_strtolower(trim($a['original_title']));
-          $a_title_normalized = preg_replace('/\s+/', ' ', $a_title_normalized);
-          $b_title_normalized = mb_strtolower(trim($b['original_title']));
-          $b_title_normalized = preg_replace('/\s+/', ' ', $b_title_normalized);
-          
-          $ai = isset($order_map[$a_title_normalized]) ? $order_map[$a_title_normalized] : PHP_INT_MAX;
-          $bi = isset($order_map[$b_title_normalized]) ? $order_map[$b_title_normalized] : PHP_INT_MAX;
-          
-          // Если обе категории не найдены в порядке, сортируем по алфавиту
-          if ($ai === PHP_INT_MAX && $bi === PHP_INT_MAX) {
-            return strcmp($a['original_title'], $b['original_title']);
-          }
-          
-          // Если одна не найдена, она идет в конец
-          if ($ai === PHP_INT_MAX) return 1;
-          if ($bi === PHP_INT_MAX) return -1;
-          
-          // Обе найдены - сортируем по порядку
-          if ($ai === $bi) return strcmp($a['original_title'], $b['original_title']);
+          $a_title_lower = mb_strtolower($a['title']);
+          $b_title_lower = mb_strtolower($b['title']);
+          $ai = isset($order_map[$a_title_lower]) ? $order_map[$a_title_lower] : PHP_INT_MAX;
+          $bi = isset($order_map[$b_title_lower]) ? $order_map[$b_title_lower] : PHP_INT_MAX;
+          if ($ai === $bi) return strcmp($a['title'], $b['title']);
           return $ai - $bi;
         });
       } else {
-        // Fallback: сортируем по алфавиту, если порядок не задан
-        usort($out_sections, function($a, $b) {
-          return strcmp($a['original_title'], $b['original_title']);
+        // Fallback на старый порядок, если функции темы недоступны
+        $hard_order = [
+          'Завтраки и сладкое',
+          'Авторские сэндвичи и перекусы',
+          'Паста ручной работы',
+          'Основные блюда',
+          'Гарниры и зелень',
+          'Супы и крем-супы',
+          'Для запаса / в морозильник',
+        ];
+
+        $index = array_map('mb_strtolower', $hard_order);
+        usort($out_sections, function($a, $b) use ($index) {
+          $ai = array_search(mb_strtolower($a['title']), $index);
+          $bi = array_search(mb_strtolower($b['title']), $index);
+          $ai = ($ai === false) ? PHP_INT_MAX : $ai;
+          $bi = ($bi === false) ? PHP_INT_MAX : $bi;
+          if ($ai === $bi) return strcmp($a['title'], $b['title']);
+          return $ai - $bi;
         });
       }
-      
-      // Убираем original_title из финального результата
-      foreach ($out_sections as &$section) {
-        unset($section['original_title']);
-      }
-      unset($section);
 
       return rest_ensure_response([
         'description'     => '',
@@ -1107,12 +995,11 @@ function wmb_display_cart_item_details($name, $cart_item, $cart_item_key) {
           $item_nutrition = isset($item['nutrition']) ? trim($item['nutrition']) : '';
           $total_price = $item_price * $item_qty;
           
-          // Форматируем дочерние товары: "Название (единица) — цена_за_единицу — количество — подытог [КБЖУ]"
+          // Форматируем дочерние товары: "Название (единица) — цена [КБЖУ]"
           $unit_display = $item_unit ? ' (' . $item_unit . ')' : '';
           // Используем формат WooCommerce для цены (учитывает настройки валюты)
-          $formatted_unit_price = function_exists('wc_price') ? strip_tags(wc_price($item_price)) : number_format($item_price, 2, ',', '') . ' €';
-          $formatted_total_price = function_exists('wc_price') ? strip_tags(wc_price($total_price)) : number_format($total_price, 2, ',', '') . ' €';
-          $detail_line = $item_name . $unit_display . ' — ' . $formatted_unit_price . ' — ' . $item_qty . ' — ' . $formatted_total_price;
+          $formatted_price = function_exists('wc_price') ? strip_tags(wc_price($total_price)) : number_format($total_price, 2, ',', '') . ' €';
+          $detail_line = $item_name . $unit_display . ' — ' . $formatted_price;
           // Добавляем КБЖУ если есть
           if ($item_nutrition) {
             $detail_line .= ' <span class="wmb-cart-nutrition">' . esc_html($item_nutrition) . '</span>';
@@ -1216,7 +1103,7 @@ function wmb_show_cart_addon_hints() {
     echo '<div style="display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap;">';
     echo '<div style="flex: 1; min-width: 200px;">';
     echo '<strong style="display: block; font-size: 18px; color: #1976d2; margin-bottom: 8px;">Добавьте товары из Mercat!</strong>';
-    echo '<p style="font-size: 14px; color: #555; margin: 0 0 12px 0; line-height: 1.5;">Вы можете добавить товары из раздела Mercat к вашему заказу Superfood, и мы объединим заказ.</p>';
+    echo '<p style="font-size: 14px; color: #555; margin: 0 0 12px 0; line-height: 1.5;">Вы можете добавить товары из раздела Mercat к вашему заказу Superfood. Доставка будет объединена на следующий день.</p>';
     echo '<a href="' . esc_url($menu_url) . '#mercat" style="display: inline-block; padding: 10px 20px; background: #2196f3; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; transition: all 0.2s;">Перейти к Mercat →</a>';
     echo '</div>';
     echo '</div>';
@@ -1226,7 +1113,7 @@ function wmb_show_cart_addon_hints() {
     echo '<div style="display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap;">';
     echo '<div style="flex: 1; min-width: 200px;">';
     echo '<strong style="display: block; font-size: 18px; color: #f57c00; margin-bottom: 8px;">Добавьте Superfood!</strong>';
-    echo '<p style="font-size: 14px; color: #555; margin: 0 0 12px 0; line-height: 1.5;">Вы можете добавить блюда из раздела Superfood к вашему заказу Mercat, и мы объединим заказ.</p>';
+    echo '<p style="font-size: 14px; color: #555; margin: 0 0 12px 0; line-height: 1.5;">Вы можете добавить блюда из раздела Superfood к вашему заказу Mercat. Доставка будет объединена на следующий день.</p>';
     echo '<a href="' . esc_url($menu_url) . '#smart_food" style="display: inline-block; padding: 10px 20px; background: #ff9800; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; transition: all 0.2s;">Перейти к Superfood →</a>';
     echo '</div>';
     echo '</div>';
@@ -1260,7 +1147,7 @@ function wmb_show_addon_hints() {
     if (!$menu_url) $menu_url = home_url('/menu/');
     echo '<div class="wmb-checkout-hint" style="background: #e3f2fd; border-left: 4px solid #2196f3; padding: 16px; margin-bottom: 20px; border-radius: 4px;">';
     echo '<strong>💡 Хотите добавить товары из Mercat?</strong><br>';
-    echo '<span style="font-size: 14px; color: #666;">Вы можете добавить товары из раздела Mercat к вашему заказу Smart Food, и мы объединим заказ.</span><br>';
+    echo '<span style="font-size: 14px; color: #666;">Вы можете добавить товары из раздела Mercat к вашему заказу Smart Food. Доставка будет объединена на следующий день.</span><br>';
     echo '<a href="' . esc_url($menu_url) . '#mercat" style="display: inline-block; margin-top: 8px; padding: 8px 16px; background: #2196f3; color: white; text-decoration: none; border-radius: 4px; font-weight: 600;">Перейти к Mercat →</a>';
     echo '</div>';
   } elseif ($has_mercat && !$has_smart_food) {
@@ -1268,7 +1155,7 @@ function wmb_show_addon_hints() {
     if (!$menu_url) $menu_url = home_url('/menu/');
     echo '<div class="wmb-checkout-hint" style="background: #fff3e0; border-left: 4px solid #ff9800; padding: 16px; margin-bottom: 20px; border-radius: 4px;">';
     echo '<strong>Хотите добавить Superfood?</strong><br>';
-    echo '<span style="font-size: 14px; color: #666;">Вы можете добавить блюда из раздела Superfood к вашему заказу Mercat, и мы объединим заказ.</span><br>';
+    echo '<span style="font-size: 14px; color: #666;">Вы можете добавить блюда из раздела Superfood к вашему заказу Mercat. Доставка будет объединена на следующий день.</span><br>';
     echo '<a href="' . esc_url($menu_url) . '#smart_food" style="display: inline-block; margin-top: 8px; padding: 8px 16px; background: #ff9800; color: white; text-decoration: none; border-radius: 4px; font-weight: 600;">Перейти к Superfood →</a>';
     echo '</div>';
   }
@@ -1318,19 +1205,13 @@ add_action('woocommerce_order_item_meta_end', function($item_id, $item, $order, 
     $qty  = isset($row['qty']) ? intval($row['qty']) : 0;
     $price= isset($row['price']) ? floatval($row['price']) : 0.0;
     $unit = isset($row['unit']) ? trim($row['unit']) : '';
-    $nutrition = isset($row['nutrition']) ? trim($row['nutrition']) : '';
     if (empty($name) || $qty <= 0) continue;
     $subtotal = $price * $qty;
     $unit_display = $unit ? " ({$unit})" : '';
-    $line = sprintf('%s%s — %s', $name, $unit_display, strip_tags(wc_price($subtotal)));
-    // Добавляем КБЖУ если есть
-    if ($nutrition) {
-      if ($plain_text) {
-        $line .= ' [' . $nutrition . ']';
-      } else {
-        $line .= ' <span class="wmb-cart-nutrition">' . esc_html($nutrition) . '</span>';
-      }
-    }
+    $formatted_unit_price = function_exists('wc_price') ? strip_tags(wc_price($price)) : number_format($price, 2, ',', '') . ' €';
+    $formatted_total_price = function_exists('wc_price') ? strip_tags(wc_price($subtotal)) : number_format($subtotal, 2, ',', '') . ' €';
+    // Формат: "Название (единица) — цена за единицу — количество — подытог"
+    $line = sprintf('%s%s — %s — %d — %s', $name, $unit_display, $formatted_unit_price, $qty, $formatted_total_price);
     $lines[] = $line;
   }
   if (!$lines) return;
@@ -1355,15 +1236,13 @@ add_action('woocommerce_after_order_itemmeta', function($item_id, $item, $produc
     $qty  = isset($row['qty']) ? intval($row['qty']) : 0;
     $price= isset($row['price']) ? floatval($row['price']) : 0.0;
     $unit = isset($row['unit']) ? trim($row['unit']) : '';
-    $nutrition = isset($row['nutrition']) ? trim($row['nutrition']) : '';
     if (empty($name) || $qty <= 0) continue;
     $subtotal = $price * $qty;
     $unit_display = $unit ? " ({$unit})" : '';
-    $line = sprintf('%s%s — %s', $name, $unit_display, strip_tags(wc_price($subtotal)));
-    // Добавляем КБЖУ если есть
-    if ($nutrition) {
-      $line .= ' <span class="wmb-cart-nutrition">' . esc_html($nutrition) . '</span>';
-    }
+    $formatted_unit_price = function_exists('wc_price') ? strip_tags(wc_price($price)) : number_format($price, 2, ',', '') . ' €';
+    $formatted_total_price = function_exists('wc_price') ? strip_tags(wc_price($subtotal)) : number_format($subtotal, 2, ',', '') . ' €';
+    // Формат: "Название (единица) — цена за единицу — количество — подытог"
+    $line = sprintf('%s%s — %s — %d — %s', $name, $unit_display, $formatted_unit_price, $qty, $formatted_total_price);
     $lines[] = $line;
   }
   if (!$lines) return;
@@ -1465,59 +1344,6 @@ add_action('wp_enqueue_scripts', function(){
         box-sizing:border-box !important;
       }
       /* Критично: исправляем обрезку именно в woocommerce-cart-form - максимальная специфичность */
-      /* На мобильных устройствах убираем min-width: 100% */
-      @media (max-width: 768px) {
-        form.woocommerce-cart-form,
-        .woocommerce-cart-form,
-        .woocommerce-cart form.woocommerce-cart-form,
-        .woocommerce.woocommerce-cart form.woocommerce-cart-form,
-        .woocommerce.woocommerce-cart .woocommerce-cart-form {
-          overflow-x:visible !important;
-          overflow-y:visible !important;
-          overflow:visible !important;
-          max-width:100% !important;
-          width:100% !important;
-          min-width:0 !important;
-          box-sizing:border-box !important;
-        }
-        form.woocommerce-cart-form table,
-        .woocommerce-cart-form table,
-        .woocommerce-cart form.woocommerce-cart-form table,
-        .woocommerce.woocommerce-cart form.woocommerce-cart-form table,
-        .woocommerce.woocommerce-cart .woocommerce-cart-form table {
-          overflow-x:visible !important;
-          overflow-y:visible !important;
-          overflow:visible !important;
-          max-width:100% !important;
-          width:100% !important;
-          min-width:0 !important;
-          table-layout:fixed !important;
-          box-sizing:border-box !important;
-          border:0 !important;
-          border-width:0 !important;
-          border-style:none !important;
-          border-collapse:collapse !important;
-          border-spacing:0 !important;
-          padding:0 !important;
-          margin:0 !important;
-        }
-        form.woocommerce-cart-form table tbody,
-        .woocommerce-cart-form table tbody,
-        .woocommerce-cart form.woocommerce-cart-form table tbody,
-        .woocommerce.woocommerce-cart form.woocommerce-cart-form table tbody,
-        .woocommerce.woocommerce-cart .woocommerce-cart-form table tbody {
-          overflow-x:visible !important;
-          overflow-y:visible !important;
-          overflow:visible !important;
-          max-width:100% !important;
-          width:100% !important;
-          min-width:0 !important;
-          display:table-row-group !important;
-          box-sizing:border-box !important;
-        }
-      }
-      /* На десктопе оставляем min-width: 100% */
-      @media (min-width: 769px) {
       form.woocommerce-cart-form,
       .woocommerce-cart-form,
       .woocommerce-cart form.woocommerce-cart-form,
@@ -1556,7 +1382,6 @@ add_action('wp_enqueue_scripts', function(){
         width:auto !important;
         min-width:100% !important;
         display:table-row-group !important;
-        }
       }
       form.woocommerce-cart-form table tbody tr,
       .woocommerce-cart form.woocommerce-cart-form table tbody tr {
@@ -1580,31 +1405,7 @@ add_action('wp_enqueue_scripts', function(){
         white-space:normal !important;
         text-overflow:clip !important;
       }
-      /* Меняем table-layout на fixed для мобильных, убираем border */
-      @media (max-width: 768px) {
-        .woocommerce .cart, 
-        .woocommerce table.shop_table,
-        .woocommerce-cart-form table,
-        form.woocommerce-cart-form table,
-        .woocommerce table.cart,
-        .woocommerce-cart-form table.shop_table {
-          table-layout:fixed !important;
-          width:100% !important;
-          max-width:100% !important;
-          min-width:0 !important;
-          overflow-x:visible !important;
-          overflow-y:visible !important;
-          border-collapse:collapse !important;
-          border-spacing:0 !important;
-          border:0 !important;
-          border-width:0 !important;
-          border-style:none !important;
-          box-sizing:border-box !important;
-          padding:0 !important;
-          margin:0 !important;
-        }
-      }
-      @media (min-width: 769px) {
+      /* Меняем table-layout на auto для более гибкого распределения колонок */
       .woocommerce .cart, 
       .woocommerce table.shop_table,
       .woocommerce-cart-form table,
@@ -1619,7 +1420,6 @@ add_action('wp_enqueue_scripts', function(){
         overflow-y:visible !important;
         border-collapse:separate !important;
         border-spacing:0 !important;
-        }
       }
       .woocommerce table.shop_table td, 
       .woocommerce table.shop_table th,
@@ -1638,41 +1438,6 @@ add_action('wp_enqueue_scripts', function(){
         padding-right:8px !important;
       }
       /* Критично: убираем все ограничения overflow для корзины (только специфичные элементы, БЕЗ универсального селектора!) */
-      @media (max-width: 768px) {
-        .woocommerce-cart-form table,
-        form.woocommerce-cart-form table,
-        .woocommerce.woocommerce-cart .woocommerce-cart-form table,
-        .woocommerce.woocommerce-cart form.woocommerce-cart-form table {
-          overflow-x:visible !important;
-          overflow-y:visible !important;
-          overflow:visible !important;
-          max-width:100% !important;
-          width:100% !important;
-          min-width:0 !important;
-          table-layout:auto !important;
-          box-sizing:border-box !important;
-        }
-        /* Критично: tbody должен расширяться, а не иметь фиксированную ширину - максимальная специфичность */
-        .woocommerce-cart-form table tbody,
-        form.woocommerce-cart-form table tbody,
-        .woocommerce table.cart tbody,
-        .woocommerce.woocommerce-cart form.woocommerce-cart-form table tbody,
-        .woocommerce.woocommerce-cart .woocommerce-cart-form table tbody,
-        .woocommerce.woocommerce-cart .woocommerce-cart-form table.shop_table tbody,
-        form.woocommerce-cart-form table.shop_table tbody,
-        .woocommerce.woocommerce-cart form.woocommerce-cart-form table.shop_table.cart tbody,
-        .woocommerce.woocommerce-cart .woocommerce-cart-form table.shop_table.cart.woocommerce-cart-form__contents tbody {
-          overflow-x:visible !important;
-          overflow-y:visible !important;
-          overflow:visible !important;
-          max-width:100% !important;
-          width:100% !important;
-          min-width:0 !important;
-          box-sizing:border-box !important;
-          display:table-row-group !important;
-        }
-      }
-      @media (min-width: 769px) {
       .woocommerce-cart-form table,
       form.woocommerce-cart-form table,
       .woocommerce.woocommerce-cart .woocommerce-cart-form table,
@@ -1704,7 +1469,6 @@ add_action('wp_enqueue_scripts', function(){
         min-width:100% !important;
         box-sizing:border-box !important;
         display:table-row-group !important;
-        }
       }
       .woocommerce-cart-form table tbody tr,
       form.woocommerce-cart-form table tbody tr,
@@ -1917,8 +1681,6 @@ add_action('wp_enqueue_scripts', function(){
           overflow-y:visible !important;
           max-width:100% !important;
           width:100% !important;
-          min-width:0 !important;
-          box-sizing:border-box !important;
         }
         .woocommerce-cart .woocommerce-cart-form table,
         form.woocommerce-cart-form table {
@@ -1926,8 +1688,6 @@ add_action('wp_enqueue_scripts', function(){
           overflow-y:visible !important;
           max-width:100% !important;
           width:100% !important;
-          min-width:0 !important;
-          box-sizing:border-box !important;
         }
         /* Критично: исправляем flex-контейнеры на мобилке */
         .woocommerce-cart .shop_table tbody td {
@@ -2029,38 +1789,27 @@ add_action('wp_enqueue_scripts', function(){
           overflow-y:visible !important;
           max-width:100% !important;
           width:100% !important;
-          min-width:0 !important;
           box-sizing:border-box !important;
         }
         /* Критично: tbody на мобилке должен расширяться */
-        /* УБИРАЕМ BORDER чтобы таблица не расширялась за счет border (417.797 + 1px + 1px = 419.8px) */
         .woocommerce-cart .woocommerce-cart-form table,
         form.woocommerce-cart-form table {
           overflow-x:visible !important;
           overflow-y:visible !important;
-          max-width:100% !important;
+          max-width:none !important;
           width:100% !important;
-          min-width:0 !important;
-          table-layout:fixed !important;
-          box-sizing:border-box !important;
-          border:0 !important;
-          border-width:0 !important;
-          border-style:none !important;
-          border-collapse:collapse !important;
-          border-spacing:0 !important;
-          padding:0 !important;
-          margin:0 !important;
+          min-width:100% !important;
+          table-layout:auto !important;
         }
         .woocommerce-cart .woocommerce-cart-form table tbody,
         form.woocommerce-cart-form table tbody,
         .woocommerce.woocommerce-cart form.woocommerce-cart-form table tbody {
           overflow-x:visible !important;
           overflow-y:visible !important;
-          max-width:100% !important;
-          width:100% !important;
-          min-width:0 !important;
+          max-width:none !important;
+          width:auto !important;
+          min-width:100% !important;
           display:table-row-group !important;
-          box-sizing:border-box !important;
         }
         .woocommerce-cart .woocommerce-cart-form table tbody tr,
         form.woocommerce-cart-form table tbody tr {
@@ -2400,97 +2149,29 @@ add_action('wp_enqueue_scripts', function(){
     add_action('wp_footer', function() use ($css) {
       if (function_exists('is_cart') && is_cart()) {
         echo '<style id="wmb-cart-fix-footer">' . $css . '</style>';
-        // JavaScript для принудительного изменения ширины на мобильных
+        // JavaScript для принудительного изменения ширины tbody
         echo '<script>
         (function() {
-          function fixCartFormWidth() {
-            var isMobile = window.innerWidth <= 768;
-            
-            // Находим все возможные варианты таблицы
-            var tableSelectors = [
-              "form.woocommerce-cart-form table.shop_table",
-              "form.woocommerce-cart-form table.shop_table_responsive",
-              "form.woocommerce-cart-form table.woocommerce-cart-form__contents",
-              "form.woocommerce-cart-form table.shop_table.shop_table_responsive.cart.woocommerce-cart-form__contents",
-              ".woocommerce-cart-form table.shop_table",
-              ".woocommerce-cart-form table.shop_table_responsive",
-              ".woocommerce-cart-form table.woocommerce-cart-form__contents",
-              ".woocommerce-cart-form table.shop_table.shop_table_responsive.cart.woocommerce-cart-form__contents",
-              "form.woocommerce-cart-form table",
-              ".woocommerce-cart-form table"
-            ];
-            
-            var formSelectors = [
-              "form.woocommerce-cart-form",
-              ".woocommerce-cart-form"
-            ];
-            
-            var tbodySelectors = [
-              "form.woocommerce-cart-form table tbody",
-              ".woocommerce-cart-form table tbody"
-            ];
-            
-            // Применяем стили ко всем найденным элементам
-            function applyStyles(elements, isMobile) {
-              elements.forEach(function(el) {
-                if (el) {
-                  if (isMobile) {
-                    el.style.setProperty("min-width", "0", "important");
-                    el.style.setProperty("max-width", "100%", "important");
-                    el.style.setProperty("width", "100%", "important");
-                    el.style.setProperty("box-sizing", "border-box", "important");
-                  } else {
-                    el.style.removeProperty("min-width");
-                    el.style.removeProperty("max-width");
-                    el.style.removeProperty("width");
-                    el.style.removeProperty("box-sizing");
-                  }
-                }
-              });
+          function fixTbodyWidth() {
+            var tbody = document.querySelector("form.woocommerce-cart-form table tbody, .woocommerce-cart-form table tbody");
+            if (tbody) {
+              tbody.style.width = "auto";
+              tbody.style.maxWidth = "none";
+              tbody.style.minWidth = "100%";
             }
-            
-            // Находим все формы
-            var forms = [];
-            formSelectors.forEach(function(selector) {
-              var el = document.querySelector(selector);
-              if (el) forms.push(el);
-            });
-            
-            // Находим все таблицы
-            var tables = [];
-            tableSelectors.forEach(function(selector) {
-              var el = document.querySelector(selector);
-              if (el && tables.indexOf(el) === -1) tables.push(el);
-            });
-            
-            // Находим все tbody
-            var tbodies = [];
-            tbodySelectors.forEach(function(selector) {
-              var el = document.querySelector(selector);
-              if (el && tbodies.indexOf(el) === -1) tbodies.push(el);
-            });
-            
-            // Применяем стили
-            applyStyles(forms, isMobile);
-            applyStyles(tables, isMobile);
-            applyStyles(tbodies, isMobile);
           }
-          
           // Выполняем сразу
-          fixCartFormWidth();
+          fixTbodyWidth();
           // И после загрузки DOM
           if (document.readyState === "loading") {
-            document.addEventListener("DOMContentLoaded", fixCartFormWidth);
+            document.addEventListener("DOMContentLoaded", fixTbodyWidth);
           } else {
-            fixCartFormWidth();
+            fixTbodyWidth();
           }
           // И после полной загрузки
-          window.addEventListener("load", fixCartFormWidth);
+          window.addEventListener("load", fixTbodyWidth);
           // И при изменении размера окна
-          window.addEventListener("resize", fixCartFormWidth);
-          // И через небольшую задержку для гарантии
-          setTimeout(fixCartFormWidth, 100);
-          setTimeout(fixCartFormWidth, 500);
+          window.addEventListener("resize", fixTbodyWidth);
         })();
         </script>';
       }

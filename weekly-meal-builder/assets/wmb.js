@@ -430,7 +430,7 @@
   /* ======== UI RENDER ======== */
   function render(root){
     var activeMenu = getActiveMenu();
-    if (!activeMenu) { 
+    if (!activeMenu && state.activeTab !== 'glovo_uber') { 
       root.innerHTML = '<div class="wmb-loading">Загрузка меню…</div>'; 
       return; 
     }
@@ -448,13 +448,12 @@
         '<div class="wmb-tabs">',
           '<button class="wmb-tab' + (state.activeTab === 'smart_food' ? ' wmb-tab-active' : '') + '" data-tab="smart_food">Superfood</button>',
           '<button class="wmb-tab' + (state.activeTab === 'mercat' ? ' wmb-tab-active' : '') + '" data-tab="mercat">Mercat</button>',
-          // Вкладка Glovo/Uber временно скрыта
-          // '<button class="wmb-tab' + (state.activeTab === 'glovo_uber' ? ' wmb-tab-active' : '') + '" data-tab="glovo_uber">Glovo / Uber</button>',
+          '<button class="wmb-tab' + (state.activeTab === 'glovo_uber' ? ' wmb-tab-active' : '') + '" data-tab="glovo_uber">Glovo / Uber</button>',
         '</div>',
         '<div class="wmb-header">',
           '<div>',
-            // Баннер доставки временно скрыт
-            // '<div id="wmb-banner" class="wmb-banner" aria-live="polite"></div>',
+            // описание убрано — текст вводится на странице
+            '<div id="wmb-banner" class="wmb-banner" aria-live="polite"></div>',
           '</div>',
         '</div>',
 
@@ -487,8 +486,9 @@
 
         '<div class="wmb-body">',
           '<div class="wmb-catalog">',
-            (activeMenu && activeMenu.sections ? activeMenu.sections.map(renderSection).join('') : 
-              '<div class="wmb-empty">Прямо сейчас мы разрабатываем новое меню для вас, скоро оно появится здесь.</div>'),
+            (state.activeTab === 'glovo_uber' ? renderGlovoUber(menuGlovoUber) : 
+             (activeMenu && activeMenu.sections ? activeMenu.sections.map(renderSection).join('') : 
+              '<div class="wmb-empty">Прямо сейчас мы разрабатываем новое меню для вас, скоро оно появится здесь.</div>')),
           '</div>',
           '<aside class="wmb-sidebar">',
             '<div class="wmb-summary">',
@@ -513,15 +513,12 @@
       '</div>'
     ].join("");
 
-    // Баннер доставки временно отключен
-    // if (delivery && dcfg){ renderBanner(el('#wmb-banner', root), dcfg, delivery); }
+    if (delivery && dcfg){ renderBanner(el('#wmb-banner', root), dcfg, delivery); }
 
     // Переключение табов
     els('.wmb-tab', root).forEach(function(tab){
       tab.addEventListener('click', function(){
         var newTab = tab.getAttribute('data-tab');
-        // Блокируем переключение на glovo_uber (вкладка скрыта)
-        if (newTab === 'glovo_uber') return;
         if (newTab && newTab !== state.activeTab) {
           state.activeTab = newTab;
           persist();
@@ -714,7 +711,7 @@
           (unit ? '<span class="wmb-unit">'+escapeHtml(unit)+'</span>' : ''),
         '</div>',
           (nutrition ? '<div class="wmb-card-nutrition">'+escapeHtml(nutrition)+'</div>' : ''),
-          (shelfLife ? '<div class="wmb-card-shelf-life">хранить '+escapeHtml(shelfLife)+'</div>' : ''),
+          (shelfLife ? '<div class="wmb-card-shelf-life">'+escapeHtml(shelfLife)+'</div>' : ''),
         (tags.length? '<div class="wmb-card-tags">'+tags.map(function(t){return '<span class="wmb-tag">'+escapeHtml(t)+'</span>'}).join('')+'</div>' : ''),
         '<div class="wmb-qty">',
           '<button class="wmb-qty-dec" data-id="'+item.id+'" '+(q===0?'disabled':'')+' aria-label="Уменьшить">–</button>',
@@ -1014,7 +1011,7 @@
             (unit ? '<span class="wmb-unit">'+escapeHtml(unit)+'</span>' : ''),
           '</div>',
           (nutrition ? '<div class="wmb-card-nutrition">'+escapeHtml(nutrition)+'</div>' : ''),
-          (shelfLife ? '<div class="wmb-card-shelf-life">хранить '+escapeHtml(shelfLife)+'</div>' : ''),
+          (shelfLife ? '<div class="wmb-card-shelf-life">'+escapeHtml(shelfLife)+'</div>' : ''),
           (tags.length? '<div class="wmb-card-tags">'+tags.map(function(t){return '<span class="wmb-tag">'+escapeHtml(t)+'</span>'}).join('')+'</div>' : ''),
         '</div>',
       '</div>'
@@ -1368,16 +1365,9 @@
 
     // Проверяем hash в URL для открытия нужной вкладки
     var hash = window.location.hash.replace('#', '');
-    if (hash && ['smart_food', 'mercat'].indexOf(hash) !== -1) {
+    if (hash && ['smart_food', 'mercat', 'glovo_uber'].indexOf(hash) !== -1) {
       state.activeTab = hash;
       persist();
-    } else if (hash === 'glovo_uber') {
-      // Вкладка Glovo/Uber временно скрыта - перенаправляем на smart_food
-      state.activeTab = 'smart_food';
-      persist();
-      if (history.pushState) {
-        history.pushState(null, '', window.location.pathname + '#smart_food');
-      }
     }
 
     // Оптимизация: загружаем только активную вкладку сразу, остальные - лениво

@@ -1249,18 +1249,18 @@ function gustolocal_show_minimum_order_notice_checkout() {
    УПРАВЛЕНИЕ КАТЕГОРИЯМИ МЕНЮ
    ======================================== */
 
-// Регистрация страницы настроек категорий - ОТКЛЮЧЕНО (используется настройка в Meal Builder)
-// add_action('admin_menu', 'gustolocal_add_category_settings_page');
-// function gustolocal_add_category_settings_page() {
-//     add_submenu_page(
-//         'woocommerce',
-//         'Категории меню',
-//         'Категории меню',
-//         'manage_options',
-//         'gustolocal-categories',
-//         'gustolocal_category_settings_page'
-//     );
-// }
+// Регистрация страницы настроек категорий
+add_action('admin_menu', 'gustolocal_add_category_settings_page');
+function gustolocal_add_category_settings_page() {
+    add_submenu_page(
+        'woocommerce',
+        'Категории меню',
+        'Категории меню',
+        'manage_options',
+        'gustolocal-categories',
+        'gustolocal_category_settings_page'
+    );
+}
 
 // Функция для получения всех существующих категорий из таксономии
 function gustolocal_get_all_categories() {
@@ -1286,9 +1286,16 @@ function gustolocal_get_category_settings() {
     $settings = get_option('gustolocal_category_settings', array());
     
     // Если настройки пустые, инициализируем из существующих категорий
-    // Убраны старые жестко зашитые названия категорий - теперь используются только реальные категории из таксономии
     if (empty($settings)) {
-        $default_order = array(); // Убраны старые названия, чтобы не конфликтовать с новыми
+        $default_order = array(
+            'Завтраки и сладкое',
+            'Авторские сэндвичи и перекусы',
+            'Паста ручной работы',
+            'Основные блюда',
+            'Гарниры и зелень',
+            'Супы и крем-супы',
+            'Для запаса / в морозильник',
+        );
         
         $all_categories = gustolocal_get_all_categories();
         $order = 1;
