@@ -59,6 +59,27 @@ expect {
     }
 }
 
+# Загружаем functions.php
+spawn scp -P $port -o StrictHostKeyChecking=no wp-content/themes/gustolocal/functions.php $user@$host:$remote_path/wp-content/themes/gustolocal/
+
+expect {
+    "password:" {
+        send "$pass\r"
+        exp_continue
+    }
+    "yes/no" {
+        send "yes\r"
+        exp_continue
+    }
+    timeout {
+        puts "❌ Таймаут подключения"
+        exit 1
+    }
+    eof {
+        puts "✅ functions.php загружен!"
+    }
+}
+
 puts ""
 puts "✅ Деплой темы завершен!"
 

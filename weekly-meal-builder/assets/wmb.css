@@ -100,7 +100,7 @@ html,body{overflow:visible !important}
 }
 .wmb-header{margin:12px 0 16px}
 .wmb-sub{display:none}
-.wmb-banner{margin-top:8px;color:#333;line-height:1.4}
+.wmb-banner{display:none !important; /* Баннер доставки временно скрыт */}
 /* Выделение дат и времени в баннере доставки */
 .wmb-banner strong{color:#2d5a3d;font-weight:700}
 .wmb-banner em{color:#e74c3c;font-weight:700;font-style:normal}
