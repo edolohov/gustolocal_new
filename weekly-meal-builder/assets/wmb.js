@@ -448,12 +448,12 @@
         '<div class="wmb-tabs">',
           '<button class="wmb-tab' + (state.activeTab === 'smart_food' ? ' wmb-tab-active' : '') + '" data-tab="smart_food">Superfood</button>',
           '<button class="wmb-tab' + (state.activeTab === 'mercat' ? ' wmb-tab-active' : '') + '" data-tab="mercat">Mercat</button>',
-          '<button class="wmb-tab' + (state.activeTab === 'glovo_uber' ? ' wmb-tab-active' : '') + '" data-tab="glovo_uber">Glovo / Uber</button>',
+          // Вкладка Glovo/Uber временно скрыта
+          // '<button class="wmb-tab' + (state.activeTab === 'glovo_uber' ? ' wmb-tab-active' : '') + '" data-tab="glovo_uber">Glovo / Uber</button>',
         '</div>',
         '<div class="wmb-header">',
           '<div>',
-            // описание убрано — текст вводится на странице
-            '<div id="wmb-banner" class="wmb-banner" aria-live="polite"></div>',
+            // Баннер доставки полностью удален
           '</div>',
         '</div>',
 
@@ -513,7 +513,8 @@
       '</div>'
     ].join("");
 
-    if (delivery && dcfg){ renderBanner(el('#wmb-banner', root), dcfg, delivery); }
+    // Баннер доставки полностью отключен
+    // if (delivery && dcfg){ renderBanner(el('#wmb-banner', root), dcfg, delivery); }
 
     // Переключение табов
     els('.wmb-tab', root).forEach(function(tab){

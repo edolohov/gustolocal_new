@@ -410,7 +410,8 @@ function gustolocal_load_pattern_file($path) {
 
 /* ============ WooCommerce упрощенная форма оформления ============ */
 // Упрощаем форму чекаута - оставляем только необходимые поля
-add_filter('woocommerce_checkout_fields', 'gustolocal_simplify_checkout_fields');
+// Приоритет 999 - выполняется ПОСЛЕ плагина Checkout Field Editor, чтобы не переопределять его настройки
+add_filter('woocommerce_checkout_fields', 'gustolocal_simplify_checkout_fields', 999);
 function gustolocal_simplify_checkout_fields($fields) {
     // Полностью скрываем shipping поля (доставка не используется)
     unset($fields['shipping']);
@@ -461,30 +462,33 @@ function gustolocal_simplify_checkout_fields($fields) {
     }
     
     if (isset($fields['billing']['billing_address_1'])) {
-        $fields['billing']['billing_address_1']['label'] = 'Адрес';
-        $fields['billing']['billing_address_1']['required'] = false;
-        $fields['billing']['billing_address_1']['placeholder'] = 'Номер дома и название улицы';
+        // Не переопределяем label и placeholder - пусть плагин Checkout Field Editor управляет этим
+        // $fields['billing']['billing_address_1']['label'] = 'Адрес';
+        // $fields['billing']['billing_address_1']['placeholder'] = 'Номер дома и название улицы';
         $fields['billing']['billing_address_1']['priority'] = 30;
     }
     
     if (isset($fields['billing']['billing_email'])) {
-        $fields['billing']['billing_email']['label'] = 'Ваш e-mail';
-        $fields['billing']['billing_email']['required'] = false;
-        $fields['billing']['billing_email']['placeholder'] = '';
+        // Не переопределяем required, label и placeholder - пусть плагин Checkout Field Editor управляет этим
+        // $fields['billing']['billing_email']['label'] = 'Ваш e-mail';
+        // $fields['billing']['billing_email']['required'] = false;
+        // $fields['billing']['billing_email']['placeholder'] = '';
         $fields['billing']['billing_email']['priority'] = 40;
     }
     
     if (isset($fields['billing']['billing_address_2'])) {
-        $fields['billing']['billing_address_2']['required'] = false;
-        $fields['billing']['billing_address_2']['label'] = 'Как к вам попасть';
-        $fields['billing']['billing_address_2']['placeholder'] = 'укажите домофон, этаж и квартиру';
+        // Не переопределяем required, label и placeholder - пусть плагин Checkout Field Editor управляет этим
+        // $fields['billing']['billing_address_2']['required'] = false;
+        // $fields['billing']['billing_address_2']['label'] = 'Как к вам попасть';
+        // $fields['billing']['billing_address_2']['placeholder'] = 'укажите домофон, этаж и квартиру';
         $fields['billing']['billing_address_2']['priority'] = 50;
     }
     
     if (isset($fields['billing']['billing_phone'])) {
-        $fields['billing']['billing_phone']['required'] = false;
-        $fields['billing']['billing_phone']['label'] = 'Как с вами связаться';
-        $fields['billing']['billing_phone']['placeholder'] = 'телеграм, whatsApp, телефон или факс';
+        // Не переопределяем required, label и placeholder - пусть плагин Checkout Field Editor управляет этим
+        // $fields['billing']['billing_phone']['required'] = false;
+        // $fields['billing']['billing_phone']['label'] = 'Как с вами связаться';
+        // $fields['billing']['billing_phone']['placeholder'] = 'телеграм, whatsApp, телефон или факс';
         $fields['billing']['billing_phone']['priority'] = 60;
     }
     
@@ -492,14 +496,15 @@ function gustolocal_simplify_checkout_fields($fields) {
 }
 
 // Отключаем обязательную валидацию email, так как поле необязательное
-add_filter('woocommerce_checkout_fields', 'gustolocal_make_email_optional', 20);
-function gustolocal_make_email_optional($fields) {
-    if (isset($fields['billing']['billing_email'])) {
-        $fields['billing']['billing_email']['required'] = false;
-        $fields['billing']['billing_email']['validate'] = array('email'); // Валидация формата, но не обязательность
-    }
-    return $fields;
-}
+// ОТКЛЮЧЕНО: пусть плагин Checkout Field Editor управляет этим
+// add_filter('woocommerce_checkout_fields', 'gustolocal_make_email_optional', 20);
+// function gustolocal_make_email_optional($fields) {
+//     if (isset($fields['billing']['billing_email'])) {
+//         $fields['billing']['billing_email']['required'] = false;
+//         $fields['billing']['billing_email']['validate'] = array('email'); // Валидация формата, но не обязательность
+//     }
+//     return $fields;
+// }
 
 // Отключаем валидацию скрытых полей (провинция, страна, город, почтовый индекс)
 add_action('woocommerce_checkout_process', 'gustolocal_disable_hidden_fields_validation', 1);
@@ -1249,18 +1254,19 @@ function gustolocal_show_minimum_order_notice_checkout() {
    УПРАВЛЕНИЕ КАТЕГОРИЯМИ МЕНЮ
    ======================================== */
 
-// Регистрация страницы настроек категорий
-add_action('admin_menu', 'gustolocal_add_category_settings_page');
-function gustolocal_add_category_settings_page() {
-    add_submenu_page(
-        'woocommerce',
-        'Категории меню',
-        'Категории меню',
-        'manage_options',
-        'gustolocal-categories',
-        'gustolocal_category_settings_page'
-    );
-}
+// Регистрация страницы настроек категорий - ОТКЛЮЧЕНО
+// Используем настройки порядка категорий в Meal Builder вместо этого
+// add_action('admin_menu', 'gustolocal_add_category_settings_page');
+// function gustolocal_add_category_settings_page() {
+//     add_submenu_page(
+//         'woocommerce',
+//         'Категории меню',
+//         'Категории меню',
+//         'manage_options',
+//         'gustolocal-categories',
+//         'gustolocal_category_settings_page'
+//     );
+// }
 
 // Функция для получения всех существующих категорий из таксономии
 function gustolocal_get_all_categories() {

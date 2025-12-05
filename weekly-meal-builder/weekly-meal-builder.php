@@ -55,6 +55,41 @@ function wmb_get_settings(){
   return $out;
 }
 
+/* ---------- Category order settings ---------- */
+function wmb_get_category_order($sale_type = 'smart_food'){
+  $default_smart_food = [
+    'Авторские сэндвичи',
+    'Готовые салаты',
+    'Роллы кимпаб',
+    'Протеины',
+    'Готовые боулы',
+    'Паста ручной работы (требует доготовки)',
+    'Десерты',
+  ];
+  $default_mercat = [
+    'Завтраки',
+    'Супы и крем-супы (требует доготовки)',
+    'Салаты',
+    'Заморозка (требует доготовки)',
+  ];
+  
+  $order_json = get_option('wmb_category_order', '');
+  if ($order_json) {
+    $order_arr = json_decode($order_json, true);
+    if (is_array($order_arr)) {
+      if ($sale_type === 'smart_food' && isset($order_arr['smart_food']) && is_array($order_arr['smart_food'])) {
+        return $order_arr['smart_food'];
+      }
+      if ($sale_type === 'mercat' && isset($order_arr['mercat']) && is_array($order_arr['mercat'])) {
+        return $order_arr['mercat'];
+      }
+    }
+  }
+  
+  // Возвращаем значения по умолчанию
+  return $sale_type === 'mercat' ? $default_mercat : $default_smart_food;
+}
+
 /* ---------- admin menu ---------- */
 add_action('admin_menu', function(){
   add_menu_page('Meal Builder','Meal Builder','manage_options','wmb_root','wmb_page_root','dashicons-carrot',56);
@@ -584,20 +619,25 @@ function wmb_page_settings(){
   $delivery = $settings['delivery'];
 
   if (!empty($_POST['wmb_settings_nonce']) && wp_verify_nonce($_POST['wmb_settings_nonce'],'wmb_settings_save')){
-    $delivery['tuesday']['enabled']  = !empty($_POST['wmb_del_tue_enabled']);
-    $delivery['friday']['enabled']   = !empty($_POST['wmb_del_fri_enabled']);
-    $delivery['tuesday']['deadline']['dow']  = intval($_POST['wmb_del_tue_dow'] ?? 0);
-    $delivery['tuesday']['deadline']['time'] = sanitize_text_field($_POST['wmb_del_tue_time'] ?? '14:00');
-    $delivery['friday']['deadline']['dow']   = intval($_POST['wmb_del_fri_dow'] ?? 3);
-    $delivery['friday']['deadline']['time']  = sanitize_text_field($_POST['wmb_del_fri_time'] ?? '14:00');
-    $delivery['timezone'] = sanitize_text_field($_POST['wmb_del_tz'] ?? $delivery['timezone']);
-    $delivery['banner']   = sanitize_text_field($_POST['wmb_del_banner'] ?? $delivery['banner']);
-    $blackout = trim((string)($_POST['wmb_del_blackout'] ?? ''));
-    $delivery['blackout'] = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $blackout))));
-    $settings['delivery'] = $delivery;
-    update_option('wmb_menu_json', wp_json_encode($settings, JSON_UNESCAPED_UNICODE));
+    // Настройки доставки временно отключены - не сохраняем
+    // $delivery['tuesday']['enabled']  = !empty($_POST['wmb_del_tue_enabled']);
+    // $delivery['friday']['enabled']   = !empty($_POST['wmb_del_fri_enabled']);
+    // ... остальные настройки доставки ...
+    
+    // Сохраняем порядок категорий
+    $smart_food_order = trim((string)($_POST['wmb_category_order_smart_food'] ?? ''));
+    $mercat_order = trim((string)($_POST['wmb_category_order_mercat'] ?? ''));
+    $category_order = [
+      'smart_food' => array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $smart_food_order)))),
+      'mercat' => array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', $mercat_order)))),
+    ];
+    update_option('wmb_category_order', wp_json_encode($category_order, JSON_UNESCAPED_UNICODE));
+    
     $saved=true;
   }
+  
+  $smart_food_order = wmb_get_category_order('smart_food');
+  $mercat_order = wmb_get_category_order('mercat');
 
   $dow_opts = [0=>'Воскресенье',1=>'Понедельник',2=>'Вторник',3=>'Среда',4=>'Четверг',5=>'Пятница',6=>'Суббота'];
 
@@ -606,38 +646,51 @@ function wmb_page_settings(){
   echo '<form method="post" style="max-width:980px">';
   wp_nonce_field('wmb_settings_save','wmb_settings_nonce');
 
-  echo '<h2 style="margin-top:24px">Доставка</h2>';
+  // Секция "Доставка" временно отключена
+  // echo '<h2 style="margin-top:24px">Доставка</h2>';
+  // echo '<table class="form-table" role="presentation"><tbody>';
+  // echo '<tr><th scope="row">Вторник</th><td>';
+  //   echo '<label><input type="checkbox" name="wmb_del_tue_enabled" value="1" '.checked(!empty($delivery['tuesday']['enabled']),true,false).'> включено</label><br>';
+  //   echo '<label>Дедлайн (день недели + время): ';
+  //     echo '<select name="wmb_del_tue_dow" style="min-width:180px">';
+  //     foreach($dow_opts as $i=>$lab){
+  //       $sel = selected(intval($delivery['tuesday']['deadline']['dow']), $i, false);
+  //       echo '<option value="'.$i.'" '.$sel.'>'.$lab.'</option>';
+  //     }
+  //     echo '</select> ';
+  //     echo '<input type="time" name="wmb_del_tue_time" value="'.esc_attr($delivery['tuesday']['deadline']['time']).'">';
+  //   echo '</label>';
+  // echo '</td></tr>';
+  // echo '<tr><th scope="row">Пятница</th><td>';
+  //   echo '<label><input type="checkbox" name="wmb_del_fri_enabled" value="1" '.checked(!empty($delivery['friday']['enabled']),true,false).'> включено</label><br>';
+  //   echo '<label>Дедлайн (день недели + время): ';
+  //     echo '<select name="wmb_del_fri_dow" style="min-width:180px">';
+  //     foreach($dow_opts as $i=>$lab){
+  //       $sel = selected(intval($delivery['friday']['deadline']['dow']), $i, false);
+  //       echo '<option value="'.$i.'" '.$sel.'>'.$lab.'</option>';
+  //     }
+  //     echo '</select> ';
+  //     echo '<input type="time" name="wmb_del_fri_time" value="'.esc_attr($delivery['friday']['deadline']['time']).'">';
+  //   echo '</label>';
+  // echo '</td></tr>';
+  // echo '<tr><th scope="row"><label for="wmb_del_tz">Часовой пояс</label></th><td><input type="text" id="wmb_del_tz" name="wmb_del_tz" class="regular-text" value="'.esc_attr($delivery['timezone']).'"> <span class="description">По умолчанию берётся из настроек WordPress</span></td></tr>';
+  // echo '<tr><th scope="row"><label for="wmb_del_banner">Текст баннера</label></th><td><input type="text" id="wmb_del_banner" name="wmb_del_banner" class="regular-text" style="width:100%" value="'.esc_attr($delivery['banner']).'"><p class="description">Плейсхолдеры: {delivery_date}, {weekday}, {weekday_short}, {deadline}, {countdown}</p></td></tr>';
+  // echo '<tr><th scope="row"><label for="wmb_del_blackout">Нерабочие даты</label></th><td><textarea id="wmb_del_blackout" name="wmb_del_blackout" rows="4" class="large-text" placeholder="YYYY-MM-DD по одной на строку">'.esc_textarea(implode("\n",$delivery['blackout'])).'</textarea></td></tr>';
+  // echo '</tbody></table>';
+  
+  echo '<h2 style="margin-top:32px">Порядок категорий</h2>';
+  echo '<p class="description">Укажите порядок отображения категорий товаров. Каждая категория на новой строке. Порядок сверху вниз.</p>';
   echo '<table class="form-table" role="presentation"><tbody>';
 
-  echo '<tr><th scope="row">Вторник</th><td>';
-    echo '<label><input type="checkbox" name="wmb_del_tue_enabled" value="1" '.checked(!empty($delivery['tuesday']['enabled']),true,false).'> включено</label><br>';
-    echo '<label>Дедлайн (день недели + время): ';
-      echo '<select name="wmb_del_tue_dow" style="min-width:180px">';
-      foreach($dow_opts as $i=>$lab){
-        $sel = selected(intval($delivery['tuesday']['deadline']['dow']), $i, false);
-        echo '<option value="'.$i.'" '.$sel.'>'.$lab.'</option>';
-      }
-      echo '</select> ';
-      echo '<input type="time" name="wmb_del_tue_time" value="'.esc_attr($delivery['tuesday']['deadline']['time']).'">';
-    echo '</label>';
+  echo '<tr><th scope="row"><label for="wmb_category_order_smart_food">Superfood</label></th><td>';
+  echo '<textarea id="wmb_category_order_smart_food" name="wmb_category_order_smart_food" rows="10" class="large-text" placeholder="Авторские сэндвичи&#10;Готовые салаты&#10;Роллы кимпаб&#10;Протеины&#10;Готовые боулы&#10;Паста ручной работы (требует доготовки)&#10;Десерты">'.esc_textarea(implode("\n", $smart_food_order)).'</textarea>';
+  echo '<p class="description">Категории для Superfood. Используйте точные названия из CSV.</p>';
   echo '</td></tr>';
 
-  echo '<tr><th scope="row">Пятница</th><td>';
-    echo '<label><input type="checkbox" name="wmb_del_fri_enabled" value="1" '.checked(!empty($delivery['friday']['enabled']),true,false).'> включено</label><br>';
-    echo '<label>Дедлайн (день недели + время): ';
-      echo '<select name="wmb_del_fri_dow" style="min-width:180px">';
-      foreach($dow_opts as $i=>$lab){
-        $sel = selected(intval($delivery['friday']['deadline']['dow']), $i, false);
-        echo '<option value="'.$i.'" '.$sel.'>'.$lab.'</option>';
-      }
-      echo '</select> ';
-      echo '<input type="time" name="wmb_del_fri_time" value="'.esc_attr($delivery['friday']['deadline']['time']).'">';
-    echo '</label>';
+  echo '<tr><th scope="row"><label for="wmb_category_order_mercat">Mercat</label></th><td>';
+  echo '<textarea id="wmb_category_order_mercat" name="wmb_category_order_mercat" rows="10" class="large-text" placeholder="Завтраки&#10;Супы и крем-супы (требует доготовки)&#10;Салаты&#10;Заморозка (требует доготовки)">'.esc_textarea(implode("\n", $mercat_order)).'</textarea>';
+  echo '<p class="description">Категории для Mercat. Используйте точные названия из CSV.</p>';
   echo '</td></tr>';
-
-  echo '<tr><th scope="row"><label for="wmb_del_tz">Часовой пояс</label></th><td><input type="text" id="wmb_del_tz" name="wmb_del_tz" class="regular-text" value="'.esc_attr($delivery['timezone']).'"> <span class="description">По умолчанию берётся из настроек WordPress</span></td></tr>';
-  echo '<tr><th scope="row"><label for="wmb_del_banner">Текст баннера</label></th><td><input type="text" id="wmb_del_banner" name="wmb_del_banner" class="regular-text" style="width:100%" value="'.esc_attr($delivery['banner']).'"><p class="description">Плейсхолдеры: {delivery_date}, {weekday}, {weekday_short}, {deadline}, {countdown}</p></td></tr>';
-  echo '<tr><th scope="row"><label for="wmb_del_blackout">Нерабочие даты</label></th><td><textarea id="wmb_del_blackout" name="wmb_del_blackout" rows="4" class="large-text" placeholder="YYYY-MM-DD по одной на строку">'.esc_textarea(implode("\n",$delivery['blackout'])).'</textarea></td></tr>';
 
   echo '</tbody></table>';
   echo '<p><button class="button button-primary">Сохранить</button></p>';
@@ -761,46 +814,42 @@ add_action('rest_api_init', function () {
         $display_title = function_exists('gustolocal_get_category_display_name') 
           ? gustolocal_get_category_display_name($title) 
           : $title;
-        $out_sections[] = ['title' => $display_title, 'items' => $items];
+        // Сохраняем оригинальное название для сортировки
+        $out_sections[] = ['title' => $display_title, 'original_title' => $title, 'items' => $items];
       }
 
-      // Используем настройки категорий из темы, если доступны
-      if (function_exists('gustolocal_get_ordered_categories')) {
-        $ordered_settings = gustolocal_get_ordered_categories();
+      // Используем настройки порядка категорий из плагина
+      $category_order = wmb_get_category_order($sale_type);
+      if (!empty($category_order) && is_array($category_order)) {
+        // Нормализуем названия для сравнения
+        $normalize = function($str) {
+          return mb_strtolower(trim(preg_replace('/\s+/', ' ', $str)));
+        };
+        
         $order_map = [];
-        foreach ($ordered_settings as $original => $config) {
-          $display = !empty($config['display']) ? $config['display'] : $original;
-          $order_map[mb_strtolower($display)] = isset($config['order']) ? (int)$config['order'] : 999;
+        foreach ($category_order as $index => $cat_name) {
+          $normalized = $normalize($cat_name);
+          $order_map[$normalized] = $index;
         }
         
-        usort($out_sections, function($a, $b) use ($order_map) {
-          $a_title_lower = mb_strtolower($a['title']);
-          $b_title_lower = mb_strtolower($b['title']);
-          $ai = isset($order_map[$a_title_lower]) ? $order_map[$a_title_lower] : PHP_INT_MAX;
-          $bi = isset($order_map[$b_title_lower]) ? $order_map[$b_title_lower] : PHP_INT_MAX;
-          if ($ai === $bi) return strcmp($a['title'], $b['title']);
+        usort($out_sections, function($a, $b) use ($order_map, $normalize) {
+          // Сравниваем по оригинальному названию из CSV
+          $a_normalized = $normalize($a['original_title']);
+          $b_normalized = $normalize($b['original_title']);
+          
+          $ai = isset($order_map[$a_normalized]) ? $order_map[$a_normalized] : PHP_INT_MAX;
+          $bi = isset($order_map[$b_normalized]) ? $order_map[$b_normalized] : PHP_INT_MAX;
+          
+          if ($ai === $bi) {
+            // Если обе категории не найдены в порядке, сортируем по алфавиту
+            return strcmp($a['title'], $b['title']);
+          }
           return $ai - $bi;
         });
       } else {
-        // Fallback на старый порядок, если функции темы недоступны
-        $hard_order = [
-          'Завтраки и сладкое',
-          'Авторские сэндвичи и перекусы',
-          'Паста ручной работы',
-          'Основные блюда',
-          'Гарниры и зелень',
-          'Супы и крем-супы',
-          'Для запаса / в морозильник',
-        ];
-
-        $index = array_map('mb_strtolower', $hard_order);
-        usort($out_sections, function($a, $b) use ($index) {
-          $ai = array_search(mb_strtolower($a['title']), $index);
-          $bi = array_search(mb_strtolower($b['title']), $index);
-          $ai = ($ai === false) ? PHP_INT_MAX : $ai;
-          $bi = ($bi === false) ? PHP_INT_MAX : $bi;
-          if ($ai === $bi) return strcmp($a['title'], $b['title']);
-          return $ai - $bi;
+        // Fallback: сортировка по алфавиту, если порядок не задан
+        usort($out_sections, function($a, $b) {
+          return strcmp($a['title'], $b['title']);
         });
       }
 
