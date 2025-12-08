@@ -745,13 +745,39 @@
   }
 
   function updateCardQty(cardEl, id, qty){
+    if (!cardEl) return;
+    
+    // Нормализуем ID
+    id = String(id || '').trim();
+    if (!id) return;
+    
     var qtyValue = cardEl.querySelector('.wmb-qty-value');
+    var qtyInc = cardEl.querySelector('.wmb-qty-inc');
     var qtyDec = cardEl.querySelector('.wmb-qty-dec');
     var inCartBadge = cardEl.querySelector('.wmb-in-cart-badge');
     
-    if(qtyValue) qtyValue.textContent = qty;
-    if(qtyDec) qtyDec.disabled = qty === 0;
+    // Обновляем значение количества
+    if(qtyValue) {
+      qtyValue.textContent = qty;
+      qtyValue.setAttribute('aria-live', 'polite');
+    }
     
+    // Обновляем состояние кнопок - убеждаемся что data-id сохранен
+    if(qtyInc) {
+      qtyInc.disabled = false; // Кнопка плюс всегда активна
+      if (!qtyInc.getAttribute('data-id')) {
+        qtyInc.setAttribute('data-id', id);
+      }
+    }
+    
+    if(qtyDec) {
+      qtyDec.disabled = qty === 0;
+      if (!qtyDec.getAttribute('data-id')) {
+        qtyDec.setAttribute('data-id', id);
+      }
+    }
+    
+    // Обновляем badge "В корзине"
     if(qty > 0) {
       cardEl.classList.add('wmb-card-in-cart');
       if(!inCartBadge) {
@@ -805,25 +831,61 @@
   }
 
   function changeQty(id, delta, root){
+    // Нормализуем ID к строке для надежного сравнения
+    id = String(id || '').trim();
+    if (!id) {
+      console.warn('changeQty: пустой ID');
+      return;
+    }
+    
+    if (!root || !root.querySelector) {
+      console.warn('changeQty: root не найден или невалиден');
+      return;
+    }
+    
     var activeQty = getActiveQty();
     var cur = activeQty[id] || 0;
     var next = cur + delta;
     if (next < 0) next = 0;
+    
+    // Сохраняем изменения в state
     if (next !== cur) {
       activeQty[id] = next;
       if (next === 0) delete activeQty[id];
       persist();
       
       // Обновляем только нужную карточку и summary, без полного перерендера
-      var cardEl = root.querySelector('[data-item-id="' + id + '"]');
+      // Используем более надежный поиск - пробуем разные варианты селектора
+      var cardEl = root.querySelector('[data-item-id="' + id.replace(/"/g, '&quot;') + '"]');
+      
+      // Если не нашли, пробуем найти через родительский элемент кнопки
+      if (!cardEl) {
+        // Ищем кнопку с этим data-id и берем её родительскую карточку
+        var btn = root.querySelector('.wmb-qty-inc[data-id="' + id.replace(/"/g, '&quot;') + '"], .wmb-qty-dec[data-id="' + id.replace(/"/g, '&quot;') + '"]');
+        if (btn) {
+          cardEl = btn.closest('.wmb-card');
+        }
+      }
+      
       if(cardEl) {
         updateCardQty(cardEl, id, next);
+        updateSummary();
       } else {
-        // Если карточка не найдена, делаем полный перерендер
-        render(root);
+        // Если карточка не найдена, пробуем найти через более широкий поиск
+        // Используем отложенный перерендер чтобы не блокировать интерфейс
+        setTimeout(function(){
+          var cardElRetry = root.querySelector('[data-item-id="' + id.replace(/"/g, '&quot;') + '"]');
+          if (!cardElRetry) {
+            // Только если все еще не найдено - делаем перерендер
+            render(root);
+          } else {
+            // Если нашли - обновляем
+            updateCardQty(cardElRetry, id, next);
+            updateSummary();
+          }
+        }, 0);
         return;
       }
-      updateSummary();
       
       // НЕ обновляем корзину автоматически - только при нажатии "Перейти к оформлению"
       // Это предотвращает дублирование товаров и лишние запросы
@@ -1449,47 +1511,139 @@
     setupDesktopSticky(root);
   }
 
+  // Защита от двойных кликов - только для предотвращения случайных двойных кликов
+  // Используем флаг обработки вместо времени для мгновенной реакции
+  var processingClicks = {};
+  
   // Глобальный обработчик событий для делегирования (один раз, не дублируется)
   var globalClickHandler = function(e){
     var t = e.target;
     var root = document.getElementById('meal-builder-root');
     if (!root) return;
     
-    // Кнопки количества
-    if (t.classList.contains('wmb-qty-inc')) {
-      e.preventDefault();
-      e.stopPropagation();
-      changeQty(t.dataset.id, +1, root);
-      updateSummary();
-    } else if (t.classList.contains('wmb-qty-dec')) {
-      e.preventDefault();
-      e.stopPropagation();
-      changeQty(t.dataset.id, -1, root);
-      updateSummary();
+    // Проверяем, что клик произошел внутри meal-builder-root
+    // Используем более надежную проверку через closest
+    var clickedInRoot = t.closest('#meal-builder-root');
+    if (!clickedInRoot) return;
+    
+    // Кнопки количества - используем closest() для надежной работы даже если клик на дочернем элементе
+    var incBtn = t.closest('.wmb-qty-inc');
+    var decBtn = t.closest('.wmb-qty-dec');
+    
+    // Проверяем что кнопка действительно внутри root и имеет data-id
+    if (incBtn && root.contains(incBtn)) {
+      var itemId = incBtn.getAttribute('data-id');
+      if (itemId) {
+        // Защита от двойных кликов - только для ЭТОЙ конкретной кнопки
+        // Используем флаг вместо времени для мгновенной реакции
+        var clickKey = 'inc_' + itemId;
+        
+        // Если уже обрабатывается этот клик - пропускаем
+        if (processingClicks[clickKey]) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          return false;
+        }
+        
+        // Устанавливаем флаг обработки
+        processingClicks[clickKey] = true;
+        
+        e.preventDefault();
+        e.stopImmediatePropagation(); // Останавливаем все остальные обработчики
+        e.stopPropagation();
+        
+        // Вызываем синхронно, без задержек - это критично для быстрой реакции
+        try {
+          changeQty(itemId, +1, root);
+          updateSummary();
+        } finally {
+          // Сбрасываем флаг сразу после обработки - это позволяет мгновенно кликать на другие кнопки
+          // Используем requestAnimationFrame для неблокирующего сброса
+          requestAnimationFrame(function(){
+            delete processingClicks[clickKey];
+          });
+        }
+        
+        return false; // Дополнительная защита
+      }
     }
-    // Кнопки состава и аллергенов
-    else if (t.classList.contains('wmb-ing-btn')) {
-      e.preventDefault();
-      e.stopPropagation();
-      openIngredientsFor(t.getAttribute('data-id'));
-    } else if (t.classList.contains('wmb-allergens-btn')) {
-      e.preventDefault();
-      e.stopPropagation();
-      openAllergensFor(t.getAttribute('data-id'));
+    
+    if (decBtn && root.contains(decBtn)) {
+      var itemId = decBtn.getAttribute('data-id');
+      if (itemId && !decBtn.disabled) {
+        // Защита от двойных кликов - только для ЭТОЙ конкретной кнопки
+        var clickKey = 'dec_' + itemId;
+        
+        // Если уже обрабатывается этот клик - пропускаем
+        if (processingClicks[clickKey]) {
+          e.preventDefault();
+          e.stopImmediatePropagation();
+          return false;
+        }
+        
+        // Устанавливаем флаг обработки
+        processingClicks[clickKey] = true;
+        
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        e.stopPropagation();
+        
+        try {
+          changeQty(itemId, -1, root);
+          updateSummary();
+        } finally {
+          // Сбрасываем флаг сразу после обработки
+          requestAnimationFrame(function(){
+            delete processingClicks[clickKey];
+          });
+        }
+        
+        return false;
+      }
     }
+    
+    // Кнопки состава и аллергенов - также используем closest()
+    var ingBtn = t.closest('.wmb-ing-btn');
+    var allergensBtn = t.closest('.wmb-allergens-btn');
+    
+    if (ingBtn && root.contains(ingBtn)) {
+      var itemId = ingBtn.getAttribute('data-id');
+      if (itemId) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        e.stopPropagation();
+        openIngredientsFor(itemId);
+        return false;
+      }
+    }
+    
+    if (allergensBtn && root.contains(allergensBtn)) {
+      var itemId = allergensBtn.getAttribute('data-id');
+      if (itemId) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        e.stopPropagation();
+        openAllergensFor(itemId);
+        return false;
+      }
+    }
+    
     // Клик на фото для открытия в модальном окне
-    else if (t.classList.contains('wmb-photo-clickable') || t.closest('.wmb-photo-clickable')) {
+    var photoEl = t.closest('.wmb-photo-clickable');
+    if (photoEl && root.contains(photoEl)) {
       e.preventDefault();
+      e.stopImmediatePropagation();
       e.stopPropagation();
-      var img = t.classList.contains('wmb-photo-clickable') ? t : t.closest('.wmb-photo-clickable');
-      var url = img.getAttribute('data-photo-url') || img.src;
-      var alt = img.getAttribute('data-photo-alt') || img.alt;
-      var title = img.getAttribute('data-photo-title') || '';
+      var url = photoEl.getAttribute('data-photo-url') || photoEl.src;
+      var alt = photoEl.getAttribute('data-photo-alt') || photoEl.alt;
+      var title = photoEl.getAttribute('data-photo-title') || '';
       openPhotoFor(url, alt, title);
+      return false;
     }
   };
   
-  // Добавляем обработчик один раз на document
+  // Добавляем обработчик один раз на document с capture phase для раннего перехвата
+  // Используем capture: true чтобы перехватить событие до других обработчиков
   document.addEventListener('click', globalClickHandler, true);
 
   // Запускаем сразу, если DOM уже готов, иначе ждем DOMContentLoaded

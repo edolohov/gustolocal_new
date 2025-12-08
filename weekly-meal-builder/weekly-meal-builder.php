@@ -878,13 +878,14 @@ add_shortcode('meal_builder', function(){
   $mercat_product_id = (int)WMB_MERCAT_PRODUCT_ID;
   
   // Предзагрузка данных через <link rel="preload"> - добавляем один раз
-  static $preload_added = false;
-  if (!$preload_added) {
-    add_action('wp_head', function() use ($menu_url) {
-      echo '<link rel="preload" as="fetch" href="'.esc_url($menu_url).'" crossorigin="anonymous">'."\n";
-    }, 1);
-    $preload_added = true;
-  }
+  // ВРЕМЕННО ОТКЛЮЧЕНО: вызывает предупреждения в консоли, не критично для работы
+  // static $preload_added = false;
+  // if (!$preload_added) {
+  //   add_action('wp_head', function() use ($menu_url) {
+  //     echo '<link rel="preload" as="fetch" href="'.esc_url($menu_url).'" crossorigin="anonymous">'."\n";
+  //   }, 1);
+  //   $preload_added = true;
+  // }
   
   // Загружаем CSS и JS
   wp_enqueue_style('wmb-style', wmb_assets_url('wmb.css'), [], wmb_file_ver('wmb.css'));

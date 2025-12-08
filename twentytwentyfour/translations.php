@@ -50,6 +50,8 @@ function get_translations($lang) {
             'Address' => 'Адрес',
             'Payment method' => 'Способ оплаты',
             'Order notes' => 'Примечания к заказу',
+            'Your order' => 'Ваш заказ', // Заголовок на странице чекаута
+            'Su pedido' => 'Ваш заказ', // Испанский вариант для перевода на русский
             
             // Дополнительные переводы для сообщений
             'has been added to your cart.' => 'добавлен в корзину.',
@@ -126,6 +128,8 @@ function get_translations($lang) {
             'Address' => 'Dirección',
             'Payment method' => 'Método de pago',
             'Order notes' => 'Notas del pedido',
+            'Your order' => 'Tu pedido', // Заголовок на странице чекаута
+            'Su pedido' => 'Tu pedido', // Альтернативный вариант (если уже переведено GTranslate)
             
             // Дополнительные переводы для сообщений
             'has been added to your cart.' => 'ha sido añadido a tu carrito.',
@@ -205,6 +209,8 @@ function get_translations($lang) {
             'Address' => 'Address',
             'Payment method' => 'Payment method',
             'Order notes' => 'Order notes',
+            'Your order' => 'Your order', // Заголовок на странице чекаута
+            'Su pedido' => 'Your order', // Испанский вариант для перевода на английский
             
             // Дополнительные переводы для сообщений (остаются как есть)
             'has been added to your cart.' => 'has been added to your cart.',

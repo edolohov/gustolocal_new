@@ -539,30 +539,25 @@ function add_language_persistence_script() {
     }
     
     // Проверяем язык сразу, не дожидаясь DOMContentLoaded (убраны console.log для производительности)
+    // ВРЕМЕННО ОТКЛЮЧЕНО: Автоматический редирект отключен до создания страниц -es и -en
+    // Пользователи видят русскую версию, могут использовать встроенный перевод браузера
     (function() {
         var savedLang = localStorage.getItem('user_language');
         var currentUrl = window.location.href;
         var currentLang = getCurrentLangFromUrl(currentUrl);
         
-        // Если нет сохраненного языка, определяем язык браузера
+        // Сохраняем язык браузера для будущего использования, но НЕ редиректим
         if (!savedLang) {
             var browserLang = getBrowserLanguage();
-            if (browserLang && browserLang !== 'ru') {
-                localStorage.setItem('user_language', browserLang);
-                setCookie('user_language', browserLang, 365);
-                var newUrl = switchLanguageInUrl(currentUrl, browserLang);
-                if (newUrl !== currentUrl) {
-                    showLanguageLoader();
-                    window.location.href = newUrl;
-                    return;
-                }
-            } else {
-                localStorage.setItem('user_language', 'ru');
-                setCookie('user_language', 'ru', 365);
-            }
+            // Сохраняем язык в localStorage и cookie, но НЕ делаем редирект
+            localStorage.setItem('user_language', browserLang || 'ru');
+            setCookie('user_language', browserLang || 'ru', 365);
         }
         
-        // Если есть сохраненный язык, но текущий URL не соответствует ему
+        // ВРЕМЕННО ОТКЛЮЧЕНО: Автоматический редирект по сохраненному языку
+        // Если пользователь уже на /es/ или /en/ - оставляем его там (может быть ручной переход)
+        // Но не редиректим автоматически на эти URL, так как страниц может не быть
+        /*
         if (savedLang && savedLang !== currentLang) {
             var newUrl = switchLanguageInUrl(currentUrl, savedLang);
             if (newUrl !== currentUrl) {
@@ -571,11 +566,13 @@ function add_language_persistence_script() {
                 return;
             }
         }
+        */
     })();
     
     document.addEventListener('DOMContentLoaded', function() {
         
         // Добавляем обработчики кликов на переключатель
+        // ВРЕМЕННО ОТКЛЮЧЕНО: Редирект на /es/ и /en/ отключен до создания страниц
         var switcher = document.getElementById('language-switcher');
         if (switcher) {
             var links = switcher.querySelectorAll('a');
@@ -586,10 +583,18 @@ function add_language_persistence_script() {
                     if (targetLang) {
                         localStorage.setItem('user_language', targetLang);
                         setCookie('user_language', targetLang, 365);
-                        var newUrl = switchLanguageInUrl(window.location.href, targetLang);
-                        if (newUrl !== window.location.href) {
-                            showLanguageLoader();
-                            window.location.href = newUrl;
+                        
+                        // ВРЕМЕННО: Редирект только на русский, /es/ и /en/ отключены
+                        if (targetLang === 'ru') {
+                            var newUrl = switchLanguageInUrl(window.location.href, targetLang);
+                            if (newUrl !== window.location.href) {
+                                showLanguageLoader();
+                                window.location.href = newUrl;
+                            }
+                        } else {
+                            // Для es и en - только сохраняем выбор, но НЕ редиректим
+                            // Пользователь остается на текущей странице (русской версии)
+                            console.log('Language switcher: ' + targetLang + ' selected, but redirect disabled until pages are created');
                         }
                     }
                 });
@@ -641,6 +646,7 @@ function add_language_persistence_script() {
 }
 
 // Простое перенаправление на основе сохраненного языка
+// ВРЕМЕННО ОТКЛЮЧЕНО: Редирект на /es/ и /en/ отключен до создания страниц
 add_action('template_redirect', 'simple_language_redirect');
 function simple_language_redirect() {
     // Проверяем, есть ли сохраненный язык в cookie
@@ -648,25 +654,20 @@ function simple_language_redirect() {
         $saved_lang = sanitize_text_field($_COOKIE['user_language']);
         $current_lang = get_current_language();
         
-        // Если сохраненный язык не соответствует текущему URL
-        if ($saved_lang !== $current_lang && in_array($saved_lang, ['ru', 'es', 'en'])) {
+        // ВРЕМЕННО: Редирект только на русский, /es/ и /en/ отключены
+        // Если сохраненный язык - русский, и мы не на русской версии - редиректим
+        if ($saved_lang === 'ru' && $current_lang !== 'ru') {
             $current_url = home_url($_SERVER['REQUEST_URI']);
-            
-            // Создаем правильный URL для сохраненного языка
-            if ($saved_lang === 'ru') {
-                $new_url = str_replace(['/es/', '/en/'], '/', $current_url);
-                $new_url = str_replace([home_url('/es'), home_url('/en')], home_url(), $new_url);
-            } else {
-                $base_url = str_replace(['/es/', '/en/'], '/', $current_url);
-                $base_url = str_replace([home_url('/es'), home_url('/en')], home_url(), $base_url);
-                $new_url = str_replace(home_url(), home_url('/' . $saved_lang), $base_url);
-            }
+            $new_url = str_replace(['/es/', '/en/'], '/', $current_url);
+            $new_url = str_replace([home_url('/es'), home_url('/en')], home_url(), $new_url);
             
             if ($new_url !== $current_url) {
                 wp_redirect($new_url, 302);
                 exit;
             }
         }
+        // Для es и en - НЕ редиректим, так как страниц может не быть
+        // Пользователь остается на текущей странице (русской версии)
     }
 }
 
@@ -781,6 +782,40 @@ function translate_cart_totals($html) {
     }
     
     return $html;
+}
+
+// Переводы для HTML содержимого чекаута (включая заголовки таблиц)
+add_filter('woocommerce_checkout_order_review', 'translate_checkout_order_review', 10, 1);
+function translate_checkout_order_review($html) {
+    if (is_admin()) {
+        return $html;
+    }
+    
+    $current_lang = get_current_language();
+    $translations = get_translations($current_lang);
+    
+    // Переводим все строки из словаря в HTML
+    foreach ($translations as $original => $translated) {
+        if ($original !== $translated) {
+            // Заменяем в текстовом содержимом и в атрибутах
+            $html = str_replace('>' . $original . '<', '>' . $translated . '<', $html);
+            $html = str_replace('>' . htmlspecialchars($original) . '<', '>' . htmlspecialchars($translated) . '<', $html);
+            $html = str_replace($original, $translated, $html);
+        }
+    }
+    
+    return $html;
+}
+
+// Переводы для заголовка "Your order" на странице чекаута
+add_filter('woocommerce_checkout_order_review_heading', 'translate_checkout_order_review_heading', 10, 1);
+function translate_checkout_order_review_heading($heading) {
+    if (is_admin()) {
+        return $heading;
+    }
+    
+    $current_lang = get_current_language();
+    return get_translation($heading, $current_lang);
 }
 
 // Переводы для всех остальных строк
@@ -1838,6 +1873,219 @@ function contact_form_7_webhook_fallback($contact_form, &$abort, $submission) {
     }
 }
 add_action('wpcf7_before_send_mail', 'contact_form_7_webhook_fallback', 10, 3);
+
+// GTranslate widget styling - красивые флажки для переключения языка
+add_action('wp_head', 'gtranslate_custom_styling');
+function gtranslate_custom_styling() {
+    ?>
+    <style>
+    /* GTranslate Widget Styling - Красивые флажки переключения языка */
+    
+    /* Основной контейнер GTranslate (floating widget) */
+    .gt_float_switcher,
+    .gtranslate_wrapper {
+        position: fixed !important;
+        top: 20px !important;
+        left: 20px !important;
+        z-index: 9998 !important; /* Ниже чем модалки, но выше контента */
+        background: rgba(255, 255, 255, 0.95) !important;
+        backdrop-filter: blur(10px) !important;
+        border-radius: 12px !important;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15) !important;
+        padding: 8px !important;
+        border: 1px solid rgba(0, 0, 0, 0.1) !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    /* Hover эффект */
+    .gt_float_switcher:hover,
+    .gtranslate_wrapper:hover {
+        box-shadow: 0 6px 25px rgba(0, 0, 0, 0.2) !important;
+        transform: translateY(-2px) !important;
+    }
+    
+    /* Флажки внутри виджета */
+    .gt_float_switcher img,
+    .gtranslate_wrapper img {
+        width: 28px !important;
+        height: 20px !important;
+        border-radius: 4px !important;
+        margin: 0 4px !important;
+        transition: transform 0.2s ease, box-shadow 0.2s ease !important;
+        border: 1px solid rgba(0, 0, 0, 0.1) !important;
+        object-fit: cover !important;
+    }
+    
+    /* Hover на флажках */
+    .gt_float_switcher img:hover,
+    .gtranslate_wrapper img:hover {
+        transform: scale(1.15) !important;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2) !important;
+        z-index: 10 !important;
+        position: relative !important;
+    }
+    
+    /* Активный флаг (текущий язык) */
+    .gt_float_switcher img.gt_current,
+    .gtranslate_wrapper img.gt_current {
+        border: 2px solid #007cba !important;
+        box-shadow: 0 0 0 2px rgba(0, 124, 186, 0.2) !important;
+    }
+    
+    /* Ссылки флажков */
+    .gt_float_switcher a,
+    .gtranslate_wrapper a {
+        display: inline-block !important;
+        padding: 4px !important;
+        border-radius: 6px !important;
+        transition: background-color 0.2s ease !important;
+        text-decoration: none !important;
+    }
+    
+    .gt_float_switcher a:hover,
+    .gtranslate_wrapper a:hover {
+        background-color: rgba(0, 124, 186, 0.1) !important;
+    }
+    
+    /* Мобильная версия - адаптация */
+    @media (max-width: 768px) {
+        .gt_float_switcher,
+        .gtranslate_wrapper {
+            top: 15px !important;
+            left: 15px !important;
+            padding: 6px !important;
+            border-radius: 10px !important;
+        }
+        
+        .gt_float_switcher img,
+        .gtranslate_wrapper img {
+            width: 24px !important;
+            height: 18px !important;
+            margin: 0 3px !important;
+        }
+    }
+    
+    /* Очень маленькие экраны */
+    @media (max-width: 480px) {
+        .gt_float_switcher,
+        .gtranslate_wrapper {
+            top: 10px !important;
+            left: 10px !important;
+            padding: 5px !important;
+        }
+        
+        .gt_float_switcher img,
+        .gtranslate_wrapper img {
+            width: 22px !important;
+            height: 16px !important;
+            margin: 0 2px !important;
+        }
+    }
+    
+    /* Убеждаемся что виджет не перекрывает важные элементы */
+    @media (max-width: 1024px) {
+        /* Если есть мобильное меню, сдвигаем виджет ниже */
+        .gt_float_switcher,
+        .gtranslate_wrapper {
+            top: 70px !important; /* Ниже мобильного меню */
+        }
+    }
+    
+    /* Скрываем стандартные элементы GTranslate которые могут мешать */
+    .gt_float_switcher .gt_float_switcher_text,
+    .gtranslate_wrapper .gt_float_switcher_text {
+        display: none !important;
+    }
+    
+    /* Улучшаем видимость на темном фоне (если используется) */
+    .gt_float_switcher.dark-mode,
+    .gtranslate_wrapper.dark-mode {
+        background: rgba(0, 0, 0, 0.8) !important;
+        border-color: rgba(255, 255, 255, 0.2) !important;
+    }
+    
+    /* Анимация появления */
+    @keyframes gtranslateFadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(-10px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+    
+    .gt_float_switcher,
+    .gtranslate_wrapper {
+        animation: gtranslateFadeIn 0.3s ease-out !important;
+    }
+    
+    /* Если виджет в меню (не floating) */
+    .wp-block-navigation .gtranslate_wrapper,
+    .main-navigation .gtranslate_wrapper,
+    nav .gtranslate_wrapper {
+        position: relative !important;
+        top: auto !important;
+        left: auto !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        background: transparent !important;
+        padding: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+    }
+    
+    .wp-block-navigation .gtranslate_wrapper img,
+    .main-navigation .gtranslate_wrapper img {
+        width: 24px !important;
+        height: 18px !important;
+        margin: 0 6px !important;
+    }
+    
+    /* Защита от перекрытия с другими элементами */
+    /* Если есть sticky header, сдвигаем виджет ниже */
+    header.wp-block-template-part.is-position-sticky ~ .gt_float_switcher,
+    header.wp-block-template-part.is-position-sticky ~ .gtranslate_wrapper,
+    .site-header.sticky ~ .gt_float_switcher,
+    .site-header.sticky ~ .gtranslate_wrapper {
+        top: 80px !important;
+    }
+    
+    /* На страницах с модалками - убеждаемся что виджет ниже */
+    .modal-open .gt_float_switcher,
+    .modal-open .gtranslate_wrapper {
+        z-index: 9997 !important; /* Ниже модалок */
+    }
+    
+    /* Улучшение для accessibility */
+    .gt_float_switcher a:focus,
+    .gtranslate_wrapper a:focus {
+        outline: 2px solid #007cba !important;
+        outline-offset: 2px !important;
+        border-radius: 4px !important;
+    }
+    
+    /* Скрываем лишние элементы GTranslate если они есть */
+    .gt_float_switcher .gt_float_switcher_text,
+    .gtranslate_wrapper .gt_float_switcher_text,
+    .gt_float_switcher .gt_float_switcher_text_arrow,
+    .gtranslate_wrapper .gt_float_switcher_text_arrow {
+        display: none !important;
+    }
+    
+    /* Улучшение для темной темы (если используется) */
+    @media (prefers-color-scheme: dark) {
+        .gt_float_switcher:not(.dark-mode),
+        .gtranslate_wrapper:not(.dark-mode) {
+            background: rgba(30, 30, 30, 0.95) !important;
+            border-color: rgba(255, 255, 255, 0.2) !important;
+        }
+    }
+    
+    </style>
+    <?php
+}
 
 // Add delivery options styling
 add_action('wp_head', 'delivery_options_styling');
