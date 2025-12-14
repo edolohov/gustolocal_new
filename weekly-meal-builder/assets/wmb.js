@@ -2451,13 +2451,14 @@
     var observer = new MutationObserver(function(mutations) {
       var shouldFix = false;
       mutations.forEach(function(mutation) {
-        if (mutation.type === 'childList' || mutation.type === 'characterData') {
+        if (mutation.type === 'childList' || mutation.type === 'characterData' || mutation.type === 'attributes') {
           mutation.addedNodes.forEach(function(node) {
             if (node.nodeType === 1 && (
               node.classList && (
                 node.classList.contains('wmb-card-nutrition') ||
                 node.classList.contains('wmb-cart-nutrition') ||
-                node.classList.contains('wmb-total-nutrition-value')
+                node.classList.contains('wmb-total-nutrition-value') ||
+                node.classList.contains('wmb-total-nutrition-summary')
               )
             )) {
               shouldFix = true;
@@ -2466,7 +2467,9 @@
           if (mutation.target && mutation.target.classList && (
             mutation.target.classList.contains('wmb-card-nutrition') ||
             mutation.target.classList.contains('wmb-cart-nutrition') ||
-            mutation.target.classList.contains('wmb-total-nutrition-value')
+            mutation.target.classList.contains('wmb-total-nutrition-value') ||
+            mutation.target.classList.contains('wmb-total-nutrition-summary') ||
+            mutation.target.classList.contains('wmb-total-nutrition-cell')
           )) {
             shouldFix = true;
           }
@@ -2474,6 +2477,18 @@
       });
       if (shouldFix) {
         setTimeout(fixNutritionTranslations, 100);
+        // Также исправляем стили после изменений gtranslate
+        setTimeout(function() {
+          var summaryEls = els('.wmb-total-nutrition-summary');
+          summaryEls.forEach(function(el) {
+            if (el.style) {
+              el.style.maxWidth = '100%';
+              el.style.overflow = 'visible';
+              el.style.wordWrap = 'break-word';
+              el.style.overflowWrap = 'break-word';
+            }
+          });
+        }, 150);
       }
     });
     

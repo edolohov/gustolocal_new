@@ -2509,6 +2509,22 @@ add_action('wp_enqueue_scripts', function(){
           min-width:0 !important;
           box-sizing:border-box !important;
           display:block !important;
+          position:relative !important;
+        }
+        /* Защита от обрезания после динамических изменений gtranslate */
+        .wmb-total-nutrition-summary *,
+        .wmb-total-nutrition-summary font,
+        .wmb-total-nutrition-summary strong,
+        .wmb-total-nutrition-summary strong span,
+        .wmb-total-nutrition-summary strong font,
+        .wmb-total-nutrition-value,
+        .wmb-total-nutrition-value font {
+          max-width:100% !important;
+          overflow:visible !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
+          white-space:normal !important;
+          box-sizing:border-box !important;
         }
         /* Дополнительные отступы для длинных текстов (украинский) */
         .wmb-total-nutrition-cell {
