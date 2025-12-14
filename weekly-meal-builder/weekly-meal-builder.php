@@ -2401,15 +2401,28 @@ add_action('wp_enqueue_scripts', function(){
         line-height:1.5;
         width:100%;
         box-sizing:border-box;
+        overflow:visible !important;
+        word-wrap:break-word !important;
+        overflow-wrap:break-word !important;
+        white-space:normal !important;
       }
       .wmb-total-nutrition-summary strong {
         color:#2d5a3d;
         font-weight:600;
         margin-right:8px;
+        display:inline-block !important;
+        white-space:normal !important;
+        word-wrap:break-word !important;
+        overflow-wrap:break-word !important;
+        max-width:100% !important;
       }
       .wmb-total-nutrition-value {
         color:#333;
         font-weight:500;
+        display:inline-block !important;
+        white-space:normal !important;
+        word-wrap:break-word !important;
+        overflow-wrap:break-word !important;
       }
       /* На мобилке общее КБЖУ */
       @media (max-width:768px) {
@@ -2425,6 +2438,27 @@ add_action('wp_enqueue_scripts', function(){
           margin:0 !important;
           padding:10px 12px !important;
           font-size:14px !important;
+          overflow:visible !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
+          white-space:normal !important;
+          width:100% !important;
+          box-sizing:border-box !important;
+        }
+        .wmb-total-nutrition-summary strong {
+          display:inline-block !important;
+          white-space:normal !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
+          max-width:100% !important;
+          margin-right:8px !important;
+        }
+        .wmb-total-nutrition-value {
+          display:inline-block !important;
+          white-space:normal !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
+          max-width:100% !important;
         }
       }
     ';
