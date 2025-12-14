@@ -550,6 +550,199 @@ function gustolocal_remove_hidden_fields_notices($data, $errors) {
     }
 }
 
+// ИСПРАВЛЕНИЕ: Переопределяем перевод строки "Billing" на пустую строку только для страницы чекаута
+// WooCommerce использует __() для перевода "Billing" и добавляет его к сообщению об ошибке
+add_filter('gettext', 'gustolocal_remove_billing_translation', 999, 3);
+add_filter('ngettext', 'gustolocal_remove_billing_translation', 999, 5);
+function gustolocal_remove_billing_translation($translated_text, $text, $domain = '', $number = null) {
+    // Проверяем, что это перевод строки "Billing" из WooCommerce
+    // И проверяем, что мы на странице чекаута (чтобы не сломать другие страницы)
+    if (!is_admin() && is_checkout() && $domain === 'woocommerce' && strtolower(trim($text)) === 'billing') {
+        // Возвращаем пустую строку вместо "Выставление счета"
+        return '';
+    }
+    return $translated_text;
+}
+
+// Более простой и надежный способ: перехватываем формирование сообщения об ошибке
+// WooCommerce формирует сообщение как: sprintf('%s %s', $section_label, $field_label . ' is a required field')
+// Перехватываем это через фильтр woocommerce_checkout_field_error_message
+add_filter('woocommerce_checkout_field_error_message', 'gustolocal_fix_billing_error_message', 1, 2);
+function gustolocal_fix_billing_error_message($message, $field_key) {
+    // Поля, для которых нужно убрать префикс
+    $billing_fields = array('billing_first_name', 'billing_last_name', 'billing_phone');
+    
+    if (in_array($field_key, $billing_fields)) {
+        // Убираем префикс "Выставление счета" или "Выставление счёта" из начала сообщения
+        $cleaned_message = preg_replace('/^Выставление\s+счета\s+/iu', '', $message);
+        $cleaned_message = preg_replace('/^Выставление\s+счёта\s+/iu', '', $cleaned_message);
+        return $cleaned_message;
+    }
+    
+    return $message;
+}
+
+// Убираем префикс "Выставление счета" из сообщений об ошибках для полей billing
+// Используем несколько хуков для максимальной надежности
+add_action('woocommerce_after_checkout_validation', 'gustolocal_remove_billing_prefix_from_errors', 25, 2);
+function gustolocal_remove_billing_prefix_from_errors($data, $errors) {
+    // Поля, для которых нужно убрать префикс
+    $billing_fields = array('billing_first_name', 'billing_last_name', 'billing_phone');
+    
+    foreach ($billing_fields as $field_key) {
+        $error_message = $errors->get_error_message($field_key);
+        if ($error_message) {
+            // Убираем префикс "Выставление счета" или "Выставление счёта" из начала сообщения
+            $cleaned_message = preg_replace('/^Выставление\s+счета\s+/iu', '', $error_message);
+            $cleaned_message = preg_replace('/^Выставление\s+счёта\s+/iu', '', $cleaned_message);
+            
+            // Если сообщение изменилось, заменяем его
+            if ($cleaned_message !== $error_message) {
+                $errors->remove($field_key);
+                $errors->add($field_key, $cleaned_message);
+            }
+        }
+    }
+}
+
+// Альтернативный способ: фильтр для перехвата сообщений об ошибках на этапе их формирования
+add_filter('woocommerce_checkout_field_error_message', 'gustolocal_clean_billing_error_message', 10, 2);
+function gustolocal_clean_billing_error_message($message, $field_key) {
+    // Поля, для которых нужно убрать префикс
+    $billing_fields = array('billing_first_name', 'billing_last_name', 'billing_phone');
+    
+    if (in_array($field_key, $billing_fields)) {
+        // Убираем префикс "Выставление счета" или "Выставление счёта" из начала сообщения
+        $cleaned_message = preg_replace('/^Выставление\s+счета\s+/iu', '', $message);
+        $cleaned_message = preg_replace('/^Выставление\s+счёта\s+/iu', '', $cleaned_message);
+        return $cleaned_message;
+    }
+    
+    return $message;
+}
+
+// Обработка всех уведомлений об ошибках через фильтр wc_add_notice
+// Используем фильтр для всех уведомлений WooCommerce
+add_filter('woocommerce_add_error', 'gustolocal_clean_billing_notice_message', 999, 1);
+function gustolocal_clean_billing_notice_message($message) {
+    // Проверяем, содержит ли сообщение префикс "Выставление счета" и относится ли к нужным полям
+    $billing_field_patterns = array(
+        '/Выставление\s+счета\s+Ваше\s+имя/iu',
+        '/Выставление\s+счёта\s+Ваше\s+имя/iu',
+        '/Выставление\s+счета\s+и\s+фамилия/iu',
+        '/Выставление\s+счёта\s+и\s+фамилия/iu',
+        '/Выставление\s+счета\s+Как\s+с\s+вами\s+связаться/iu',
+        '/Выставление\s+счёта\s+Как\s+с\s+вами\s+связаться/iu'
+    );
+    
+    foreach ($billing_field_patterns as $pattern) {
+        if (preg_match($pattern, $message)) {
+            // Убираем префикс "Выставление счета" или "Выставление счёта"
+            $cleaned_message = preg_replace('/^Выставление\s+счета\s+/iu', '', $message);
+            $cleaned_message = preg_replace('/^Выставление\s+счёта\s+/iu', '', $cleaned_message);
+            return $cleaned_message;
+        }
+    }
+    
+    return $message;
+}
+
+// Дополнительная обработка через хук после валидации (на случай, если плагин Checkout Field Editor добавляет ошибки позже)
+add_action('woocommerce_after_checkout_validation', 'gustolocal_clean_all_billing_errors_final', 999, 2);
+function gustolocal_clean_all_billing_errors_final($data, $errors) {
+    if (!$errors || !is_wp_error($errors)) {
+        return;
+    }
+    
+    $error_codes = $errors->get_error_codes();
+    foreach ($error_codes as $code) {
+        $error_message = $errors->get_error_message($code);
+        if ($error_message) {
+            // Проверяем, содержит ли сообщение префикс "Выставление счета"
+            if (preg_match('/^Выставление\s+счета\s+/iu', $error_message) || 
+                preg_match('/^Выставление\s+счёта\s+/iu', $error_message)) {
+                // Убираем префикс
+                $cleaned_message = preg_replace('/^Выставление\s+счета\s+/iu', '', $error_message);
+                $cleaned_message = preg_replace('/^Выставление\s+счёта\s+/iu', '', $cleaned_message);
+                
+                // Заменяем сообщение
+                $errors->remove($code);
+                $errors->add($code, $cleaned_message);
+            }
+        }
+    }
+}
+
+// JavaScript решение для обработки сообщений об ошибках на фронтенде (резервный вариант)
+add_action('wp_footer', 'gustolocal_clean_billing_errors_js', 999);
+function gustolocal_clean_billing_errors_js() {
+    if (!is_checkout()) {
+        return;
+    }
+    ?>
+    <script type="text/javascript">
+    (function($) {
+        // Функция для очистки префикса "Выставление счета" из сообщений об ошибках
+        function cleanBillingErrorMessages() {
+            // Обрабатываем все сообщения об ошибках
+            $('.woocommerce-error, .woocommerce-error li, .woocommerce .error').each(function() {
+                var $element = $(this);
+                var text = $element.text() || $element.html();
+                
+                // Убираем префикс "Выставление счета" или "Выставление счёта"
+                if (text && (text.indexOf('Выставление счета') === 0 || text.indexOf('Выставление счёта') === 0)) {
+                    var cleaned = text.replace(/^Выставление\s+счета\s+/i, '').replace(/^Выставление\s+счёта\s+/i, '');
+                    if ($element.is('li')) {
+                        $element.text(cleaned);
+                    } else {
+                        $element.html(cleaned);
+                    }
+                }
+            });
+            
+            // Обрабатываем сообщения об ошибках в полях формы
+            $('.woocommerce form.checkout .form-row .woocommerce-error').each(function() {
+                var $element = $(this);
+                var text = $element.text() || $element.html();
+                
+                if (text && (text.indexOf('Выставление счета') === 0 || text.indexOf('Выставление счёта') === 0)) {
+                    var cleaned = text.replace(/^Выставление\s+счета\s+/i, '').replace(/^Выставление\s+счёта\s+/i, '');
+                    $element.text(cleaned);
+                }
+            });
+        }
+        
+        // Выполняем очистку при загрузке страницы
+        $(document).ready(function() {
+            cleanBillingErrorMessages();
+        });
+        
+        // Выполняем очистку после AJAX запросов (когда форма отправляется)
+        $(document.body).on('checkout_error', function() {
+            setTimeout(cleanBillingErrorMessages, 100);
+        });
+        
+        // Выполняем очистку при изменении DOM (MutationObserver для динамически добавляемых элементов)
+        if (typeof MutationObserver !== 'undefined') {
+            var observer = new MutationObserver(function(mutations) {
+                cleanBillingErrorMessages();
+            });
+            
+            $(document).ready(function() {
+                var targetNode = document.querySelector('.woocommerce-checkout') || document.body;
+                if (targetNode) {
+                    observer.observe(targetNode, {
+                        childList: true,
+                        subtree: true
+                    });
+                }
+            });
+        }
+    })(jQuery);
+    </script>
+    <?php
+}
+
 // Устанавливаем значения по умолчанию только если они пустые (резервное заполнение)
 // Плагин Checkout Field Editor управляет полями, но если значения не установлены,
 // заполняем их для корректной работы платежных систем
