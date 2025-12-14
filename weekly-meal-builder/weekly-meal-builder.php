@@ -1124,55 +1124,6 @@ function wmb_ajax_add_to_cart(){
 }
 
 /* ---------- WooCommerce integration ---------- */
-// Функция для парсинга КБЖУ из строки (например "~120 ккал, Б ~3 г, Ж ~5 г, У ~15 г")
-function wmb_parse_nutrition($nutrition_str) {
-  if (empty($nutrition_str)) return ['kcal' => 0, 'protein' => 0, 'fat' => 0, 'carbs' => 0];
-  
-  $result = ['kcal' => 0, 'protein' => 0, 'fat' => 0, 'carbs' => 0];
-  
-  // Парсим ккал
-  if (preg_match('/(?:~|≈)?\s*(\d+)\s*ккал/i', $nutrition_str, $matches)) {
-    $result['kcal'] = floatval($matches[1]);
-  }
-  
-  // Парсим белки (Б)
-  if (preg_match('/Б\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*г/i', $nutrition_str, $matches)) {
-    $result['protein'] = floatval(str_replace(',', '.', $matches[1]));
-  }
-  
-  // Парсим жиры (Ж)
-  if (preg_match('/Ж\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*г/i', $nutrition_str, $matches)) {
-    $result['fat'] = floatval(str_replace(',', '.', $matches[1]));
-  }
-  
-  // Парсим углеводы (У)
-  if (preg_match('/У\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*г/i', $nutrition_str, $matches)) {
-    $result['carbs'] = floatval(str_replace(',', '.', $matches[1]));
-  }
-  
-  return $result;
-}
-
-// Функция для форматирования КБЖУ
-function wmb_format_nutrition($nutrition) {
-  $parts = [];
-  if ($nutrition['kcal'] > 0) {
-    $parts[] = '~' . round($nutrition['kcal']) . ' ккал';
-  }
-  if ($nutrition['protein'] > 0) {
-    $parts[] = 'Б ~' . round($nutrition['protein'], 1) . ' г';
-  }
-  if ($nutrition['fat'] > 0) {
-    $parts[] = 'Ж ~' . round($nutrition['fat'], 1) . ' г';
-  }
-  if ($nutrition['carbs'] > 0) {
-    $parts[] = 'У ~' . round($nutrition['carbs'], 1) . ' г';
-  }
-  return implode(', ', $parts);
-}
-
-// Улучшенное отображение деталей заказа в корзине и на checkout
-/* ---------- WooCommerce integration ---------- */
 // Функция для определения текущего языка
 function wmb_get_current_language() {
   // Проверяем URL
