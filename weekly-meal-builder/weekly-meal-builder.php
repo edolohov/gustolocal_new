@@ -598,10 +598,9 @@ function wmb_page_import(){
         $unit  = trim($r[$map['Единица']]??'');
         $section_raw = trim($r[$map['Категория']]??'');
         
-        // Маппинг категории через функцию темы, если доступна
-        $section = function_exists('gustolocal_map_category_by_alias') 
-          ? gustolocal_map_category_by_alias($section_raw) 
-          : $section_raw;
+        // Используем категорию точно как указано в CSV, без маппинга
+        // (старый маппинг через gustolocal_map_category_by_alias отключен, чтобы сохранять точные названия из CSV)
+        $section = $section_raw;
         $tags_str= trim($r[$map['Теги']]??'');
         $shelf_life = isset($map['Срок хранения']) ? sanitize_text_field(trim((string)($r[$map['Срок хранения']]??''))) : '';
         $ing    = isset($map['Состав'])     ? trim((string)($r[$map['Состав']]??''))     : '';
