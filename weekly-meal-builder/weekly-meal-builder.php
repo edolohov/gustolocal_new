@@ -91,6 +91,17 @@ function wmb_get_category_order($sale_type = 'smart_food'){
 }
 
 /* ---------- admin menu ---------- */
+// Проверяем экспорт очень рано, до любого вывода
+add_action('admin_init', function(){
+  if (isset($_GET['page']) && $_GET['page'] === 'wmb_import' && isset($_GET['wmb_export']) && isset($_GET['wmb_export_nonce'])) {
+    // Отключаем все возможные буферы вывода
+    while (ob_get_level()) {
+      ob_end_clean();
+    }
+    wmb_export_csv();
+  }
+}, 1); // Приоритет 1 - выполняется очень рано
+
 add_action('admin_menu', function(){
   add_menu_page('Meal Builder','Meal Builder','manage_options','wmb_root','wmb_page_root','dashicons-carrot',56);
   add_submenu_page('wmb_root','Блюда','Блюда','edit_posts','wmb_items','wmb_page_items');
@@ -417,6 +428,132 @@ function wmb_page_items(){
   echo '</form></div>';
 }
 
+/* ---------- Export CSV ---------- */
+function wmb_export_csv(){
+  if (!current_user_can('manage_options')) return;
+  
+  // Проверяем nonce для безопасности
+  if (!isset($_GET['wmb_export_nonce']) || !wp_verify_nonce($_GET['wmb_export_nonce'], 'wmb_export')) {
+    wp_die('Ошибка безопасности');
+  }
+  
+  // Отключаем все буферы вывода
+  while (ob_get_level()) {
+    ob_end_clean();
+  }
+  
+  // Получаем все блюда
+  $posts = get_posts([
+    'post_type' => 'wmb_dish',
+    'numberposts' => -1,
+    'orderby' => 'title',
+    'order' => 'ASC',
+    'post_status' => 'any'
+  ]);
+  
+  // Заголовки CSV (в том же порядке, что и при импорте)
+  $headers = [
+    'Название',
+    'Цена',
+    'Единица',
+    'Категория',
+    'Теги',
+    'Срок хранения',
+    'Состав',
+    'Аллергены',
+    'Фото',
+    'Alt',
+    'КБЖУ',
+    'Тип продажи',
+    'Glovo/Uber',
+    'Glovo URL',
+    'Uber URL',
+    'Активно'
+  ];
+  
+  // Собираем CSV в памяти
+  $csv_data = [];
+  
+  // Функция для безопасного добавления строки в CSV
+  $add_csv_row = function($row) use (&$csv_data) {
+    $fp = fopen('php://temp', 'r+');
+    fputcsv($fp, $row, ',', '"');
+    rewind($fp);
+    $csv_data[] = stream_get_contents($fp);
+    fclose($fp);
+  };
+  
+  // Добавляем заголовки
+  $add_csv_row($headers);
+  
+  // Обрабатываем каждое блюдо
+  foreach ($posts as $post) {
+    $id = $post->ID;
+    
+    // Получаем мета-поля
+    $price = get_post_meta($id, 'wmb_price', true);
+    $unit = get_post_meta($id, 'wmb_unit', true);
+    $ingredients = get_post_meta($id, 'wmb_ingredients', true);
+    $allergens = get_post_meta($id, 'wmb_allergens', true);
+    $photo_url = get_post_meta($id, 'wmb_photo_url', true);
+    $photo_alt = get_post_meta($id, 'wmb_photo_alt', true);
+    $nutrition = get_post_meta($id, 'wmb_nutrition', true);
+    $shelf_life = get_post_meta($id, 'wmb_shelf_life', true);
+    $sale_type = get_post_meta($id, 'wmb_sale_type', true);
+    $available_on_glovo_uber = get_post_meta($id, 'wmb_available_on_glovo_uber', true);
+    $glovo_url = get_post_meta($id, 'wmb_glovo_url', true);
+    $uber_url = get_post_meta($id, 'wmb_uber_url', true);
+    $active = get_post_meta($id, 'wmb_active', true);
+    
+    // Получаем категорию (section)
+    $sections = wp_get_post_terms($id, 'wmb_section', ['fields' => 'names']);
+    $section = !empty($sections) ? $sections[0] : '';
+    
+    // Получаем теги
+    $tags = wp_get_post_terms($id, 'wmb_tag', ['fields' => 'names']);
+    $tags_str = !empty($tags) ? implode(', ', $tags) : '';
+    
+    // Формируем строку для CSV
+    $row = [
+      (string)$post->post_title,
+      $price ? (string)$price : '',
+      $unit ? (string)$unit : '',
+      $section ? (string)$section : '',
+      $tags_str ? (string)$tags_str : '',
+      $shelf_life ? (string)$shelf_life : '',
+      $ingredients ? (string)$ingredients : '',
+      $allergens ? (string)$allergens : '',
+      $photo_url ? (string)$photo_url : '',
+      $photo_alt ? (string)$photo_alt : '',
+      $nutrition ? (string)$nutrition : '',
+      $sale_type ? (string)$sale_type : 'smart_food',
+      ($available_on_glovo_uber === '1') ? '1' : '0',
+      $glovo_url ? (string)$glovo_url : '',
+      $uber_url ? (string)$uber_url : '',
+      ($active === '0') ? '0' : '1'
+    ];
+    
+    $add_csv_row($row);
+  }
+  
+  // Объединяем все строки
+  $csv_content = implode('', $csv_data);
+  
+  // Добавляем UTF-8 BOM в начало для правильного отображения в Excel
+  $csv_content = "\xEF\xBB\xBF" . $csv_content;
+  
+  // Отправляем заголовки
+  header('Content-Type: text/csv; charset=utf-8');
+  header('Content-Disposition: attachment; filename="meal-builder-export-' . date('Y-m-d') . '.csv"');
+  header('Pragma: no-cache');
+  header('Expires: 0');
+  header('Content-Length: ' . strlen($csv_content));
+  
+  // Выводим CSV
+  echo $csv_content;
+  exit;
+}
+
 /* ---------- Import CSV ---------- */
 function wmb_page_import(){
   if (!current_user_can('manage_options')) return;
@@ -567,6 +704,14 @@ function wmb_page_import(){
   }
 
   echo '<div class="wrap"><h1>Импорт CSV</h1>';
+  
+  // Кнопка экспорта
+  $export_url = add_query_arg([
+    'wmb_export' => '1',
+    'wmb_export_nonce' => wp_create_nonce('wmb_export')
+  ], admin_url('admin.php?page=wmb_import'));
+  echo '<p><a href="' . esc_url($export_url) . '" class="button button-secondary">📥 Экспортировать CSV</a> <small>Экспортирует все блюда со ссылками на фотографии в CSV файл</small></p>';
+  
   if (!empty($report['errors'])) {
     echo '<div class="error notice"><p><strong>Ошибки:</strong></p><ul>';
     foreach ($report['errors'] as $err) {
@@ -1027,6 +1172,118 @@ function wmb_format_nutrition($nutrition) {
 }
 
 // Улучшенное отображение деталей заказа в корзине и на checkout
+/* ---------- WooCommerce integration ---------- */
+// Функция для определения текущего языка
+function wmb_get_current_language() {
+  // Проверяем URL
+  $path = $_SERVER['REQUEST_URI'] ?? '';
+  if (preg_match('#/(es|en|uk)/#', $path, $matches)) {
+    return $matches[1];
+  }
+  
+  // Проверяем параметр языка
+  if (isset($_GET['lang']) && in_array($_GET['lang'], ['es', 'en', 'uk', 'ru'])) {
+    return $_GET['lang'];
+  }
+  
+  // Проверяем cookie (для gtranslate)
+  if (isset($_COOKIE['googtrans']) && preg_match('#/es/#', $_COOKIE['googtrans'])) {
+    return 'es';
+  }
+  if (isset($_COOKIE['googtrans']) && preg_match('#/en/#', $_COOKIE['googtrans'])) {
+    return 'en';
+  }
+  if (isset($_COOKIE['googtrans']) && preg_match('#/uk/#', $_COOKIE['googtrans'])) {
+    return 'uk';
+  }
+  
+  return 'ru';
+}
+
+// Функция для парсинга КБЖУ из строки (например "~120 ккал, Б ~3 г, Ж ~5 г, У ~15 г")
+function wmb_parse_nutrition($nutrition_str) {
+  if (empty($nutrition_str)) return ['kcal' => 0, 'protein' => 0, 'fat' => 0, 'carbs' => 0];
+  
+  $result = ['kcal' => 0, 'protein' => 0, 'fat' => 0, 'carbs' => 0];
+  
+  // Парсим ккал (также поддерживаем kcal для уже переведенных строк)
+  if (preg_match('/(?:~|≈)?\s*(\d+)\s*(?:ккал|kcal)/i', $nutrition_str, $matches)) {
+    $result['kcal'] = floatval($matches[1]);
+  }
+  
+  // Парсим белки (Б, B или Proteínas/Protein)
+  if (preg_match('/(?:Б|B|Prote[íi]nas?|Protein)\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*г/i', $nutrition_str, $matches)) {
+    $result['protein'] = floatval(str_replace(',', '.', $matches[1]));
+  }
+  
+  // Парсим жиры (Ж, F, Grasas, Fat)
+  if (preg_match('/(?:Ж|F|Grasas?|Fat)\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*г/i', $nutrition_str, $matches)) {
+    $result['fat'] = floatval(str_replace(',', '.', $matches[1]));
+  }
+  
+  // Парсим углеводы (У, В, U, Carbohidratos/Hidratos, Carbohydrates/Carbs)
+  // В - для украинского языка
+  if (preg_match('/(?:У|В|U|Carbohidratos|Hidratos|Carbohydrates?|Carbs)\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*г/i', $nutrition_str, $matches)) {
+    $result['carbs'] = floatval(str_replace(',', '.', $matches[1]));
+  }
+  
+  return $result;
+}
+
+// Функция для форматирования КБЖУ с правильными переводами
+function wmb_format_nutrition($nutrition, $lang = null) {
+  if ($lang === null) {
+    $lang = wmb_get_current_language();
+  }
+  
+  $parts = [];
+  
+  if ($nutrition['kcal'] > 0) {
+    if ($lang === 'es') {
+      $parts[] = 'Kcal ~' . round($nutrition['kcal']);
+    } else if ($lang === 'en') {
+      $parts[] = 'Cal ~' . round($nutrition['kcal']);
+    } else if ($lang === 'uk') {
+      $parts[] = 'ккал ~' . round($nutrition['kcal']);
+    } else {
+      $parts[] = '~' . round($nutrition['kcal']) . ' ккал';
+    }
+  }
+  
+  if ($nutrition['protein'] > 0) {
+    if ($lang === 'es' || $lang === 'en') {
+      $parts[] = 'Prot ~' . round($nutrition['protein'], 1) . ' g';
+    } else {
+      $parts[] = 'Б ~' . round($nutrition['protein'], 1) . ' г';
+    }
+  }
+  
+  if ($nutrition['fat'] > 0) {
+    if ($lang === 'es') {
+      $parts[] = 'Gras ~' . round($nutrition['fat'], 1) . ' g';
+    } else if ($lang === 'en') {
+      $parts[] = 'F ~' . round($nutrition['fat'], 1) . ' g';
+    } else {
+      $parts[] = 'Ж ~' . round($nutrition['fat'], 1) . ' г';
+    }
+  }
+  
+  if ($nutrition['carbs'] > 0) {
+    if ($lang === 'es') {
+      $parts[] = 'HC ~' . round($nutrition['carbs'], 1) . ' g';
+    } else if ($lang === 'en') {
+      $parts[] = 'C ~' . round($nutrition['carbs'], 1) . ' g';
+    } else if ($lang === 'uk') {
+      $parts[] = 'В ~' . round($nutrition['carbs'], 1) . ' г';
+    } else {
+      $parts[] = 'У ~' . round($nutrition['carbs'], 1) . ' г';
+    }
+  }
+  
+  return implode(', ', $parts);
+}
+
+// Улучшенное отображение деталей заказа в корзине и на checkout
 add_filter('woocommerce_cart_item_name', 'wmb_display_cart_item_details', 10, 3);
 function wmb_display_cart_item_details($name, $cart_item, $cart_item_key) {
   if (isset($cart_item['wmb_payload'])) {
@@ -1045,14 +1302,22 @@ function wmb_display_cart_item_details($name, $cart_item, $cart_item_key) {
           $item_nutrition = isset($item['nutrition']) ? trim($item['nutrition']) : '';
           $total_price = $item_price * $item_qty;
           
+          // Переводим КБЖУ если нужно (включая украинский)
+          $lang = wmb_get_current_language();
+          if ($item_nutrition && $lang !== 'ru') {
+            $nutrition_parsed = wmb_parse_nutrition($item_nutrition);
+            $item_nutrition = wmb_format_nutrition($nutrition_parsed, $lang);
+          }
+          
           // Форматируем дочерние товары: "Название (единица) — цена [КБЖУ]"
           $unit_display = $item_unit ? ' (' . $item_unit . ')' : '';
           // Используем формат WooCommerce для цены (учитывает настройки валюты)
           $formatted_price = function_exists('wc_price') ? strip_tags(wc_price($total_price)) : number_format($total_price, 2, ',', '') . ' €';
           $detail_line = $item_name . $unit_display . ' — ' . $formatted_price;
-          // Добавляем КБЖУ если есть
+          // Добавляем КБЖУ если есть (сохраняем оригинал в data-атрибуте)
           if ($item_nutrition) {
-            $detail_line .= ' <span class="wmb-cart-nutrition">' . esc_html($item_nutrition) . '</span>';
+            $original_nutrition = isset($item['nutrition']) ? trim($item['nutrition']) : $item_nutrition;
+            $detail_line .= ' <span class="wmb-cart-nutrition notranslate" data-original-nutrition="' . esc_attr($original_nutrition) . '">' . esc_html($item_nutrition) . '</span>';
           }
           $details[] = $detail_line;
         }
@@ -1362,20 +1627,44 @@ function wmb_display_total_nutrition() {
   }
   
   if ($has_nutrition && ($total_nutrition['kcal'] > 0 || $total_nutrition['protein'] > 0 || $total_nutrition['fat'] > 0 || $total_nutrition['carbs'] > 0)) {
-    $formatted = wmb_format_nutrition($total_nutrition);
+    $lang = wmb_get_current_language();
+    $formatted = wmb_format_nutrition($total_nutrition, $lang);
+    
     if (!empty($formatted)) {
+      // Переводим заголовок
+      $label = 'Общее КБЖУ:';
+      if ($lang === 'es') {
+        $label = 'Total Kcal / Macronutrientes:';
+      } else if ($lang === 'en') {
+        $label = 'Total Calories / Macros:';
+      } else if ($lang === 'uk') {
+        $label = 'Загальне КБЖУ:';
+      }
+      
       // Добавляем как строку таблицы внутри tbody, перед строкой с actions
       echo '<tr class="wmb-total-nutrition-row">';
       echo '<td colspan="5" class="wmb-total-nutrition-cell">';
       echo '<div class="wmb-total-nutrition-summary">';
-      echo '<strong>' . esc_html__('Общее КБЖУ:', 'woocommerce') . '</strong> ';
-      echo '<span class="wmb-total-nutrition-value">' . esc_html($formatted) . '</span>';
+      // Добавляем класс notranslate к заголовку, чтобы gtranslate не переводил его
+      $label_html = '<span class="notranslate">' . esc_html($label) . '</span>';
+      echo '<strong>' . $label_html . '</strong> ';
+      // Сохраняем оригинальное русское КБЖУ в data-атрибуте для перехвата gtranslate
+      $original_formatted = wmb_format_nutrition($total_nutrition, 'ru');
+      echo '<span class="wmb-total-nutrition-value notranslate" data-original-nutrition="' . esc_attr($original_formatted) . '">' . esc_html($formatted) . '</span>';
       echo '</div>';
       echo '</td>';
       echo '</tr>';
     }
   }
 }
+
+// Загружаем скрипт для перевода КБЖУ на странице корзины и checkout
+add_action('wp_enqueue_scripts', function(){
+  if (function_exists('is_cart') && (is_cart() || (function_exists('is_checkout') && is_checkout()))){
+    // Загружаем только функцию перевода КБЖУ для корзины и checkout
+    wp_enqueue_script('wmb-cart-translation', wmb_assets_url('wmb.js'), [], wmb_file_ver('wmb.js'), true);
+  }
+}, 998);
 
 // Скрываем заголовок колонки количества через CSS
 add_action('wp_enqueue_scripts', function(){

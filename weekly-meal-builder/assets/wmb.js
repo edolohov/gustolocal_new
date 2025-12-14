@@ -427,6 +427,123 @@
     return sOk && tOk;
   }
 
+  // Функция для перевода КБЖУ на разные языки с правильными терминами
+  function translateNutrition(nutritionStr, lang) {
+    if (!nutritionStr) return '';
+    
+    // Определяем язык из URL или из класса body
+    if (!lang) {
+      var bodyLang = document.body.className.match(/lang-([a-z]{2})/);
+      var urlLang = window.location.pathname.match(/\/(es|en|uk)\//);
+      lang = (urlLang && urlLang[1]) || (bodyLang && bodyLang[1]) || 'ru';
+    }
+    
+    if (lang === 'ru') return nutritionStr;
+    
+    // Парсим КБЖУ из строки вида "~120 ккал, Б ~3 г, Ж ~5 г, У ~15 г" или "~120 kcal, B~6 g, F~6 g, U~18 g"
+    var parts = [];
+    
+    // Парсим ккал (поддерживаем и русский и английский формат)
+    var kcalMatch = nutritionStr.match(/(?:~|≈)?\s*(\d+)\s*(?:ккал|kcal)/i);
+    if (kcalMatch) {
+      var kcal = kcalMatch[1];
+      if (lang === 'es') {
+        parts.push('Kcal ~' + kcal);
+      } else if (lang === 'en') {
+        parts.push('Cal ~' + kcal);
+      } else if (lang === 'uk') {
+        parts.push('ккал ~' + kcal);
+      }
+    }
+    
+    // Парсим белки (Б или B -> Prot)
+    var proteinMatch = nutritionStr.match(/(?:Б|B)\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*г/i);
+    if (proteinMatch) {
+      var protein = proteinMatch[1].replace(',', '.');
+      if (lang === 'es' || lang === 'en') {
+        parts.push('Prot ~' + protein + ' g');
+      } else if (lang === 'uk') {
+        parts.push('Б ~' + protein + ' г');
+      }
+    }
+    
+    // Парсим жиры (Ж или F -> Gras/F)
+    var fatMatch = nutritionStr.match(/(?:Ж|F)\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*г/i);
+    if (fatMatch) {
+      var fat = fatMatch[1].replace(',', '.');
+      if (lang === 'es') {
+        parts.push('Gras ~' + fat + ' g');
+      } else if (lang === 'en') {
+        parts.push('F ~' + fat + ' g');
+      } else if (lang === 'uk') {
+        parts.push('Ж ~' + fat + ' г');
+      }
+    }
+    
+    // Парсим углеводы (У, В или U -> HC/C/В)
+    // В - для украинского языка
+    var carbsMatch = nutritionStr.match(/(?:У|В|U)\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*г/i);
+    if (carbsMatch) {
+      var carbs = carbsMatch[1].replace(',', '.');
+      if (lang === 'es') {
+        parts.push('HC ~' + carbs + ' g');
+      } else if (lang === 'en') {
+        parts.push('C ~' + carbs + ' g');
+      } else if (lang === 'uk') {
+        parts.push('В ~' + carbs + ' г');
+      }
+    }
+    
+    return parts.join(', ');
+  }
+
+  // Вспомогательная функция для форматирования КБЖУ на русском (для summary)
+  function formatNutritionRu(nutrition) {
+    var parts = [];
+    if (nutrition.kcal > 0) {
+      parts.push('~' + Math.round(nutrition.kcal) + ' ккал');
+    }
+    if (nutrition.protein > 0) {
+      parts.push('Б ~' + Math.round(nutrition.protein * 10) / 10 + ' г');
+    }
+    if (nutrition.fat > 0) {
+      parts.push('Ж ~' + Math.round(nutrition.fat * 10) / 10 + ' г');
+    }
+    if (nutrition.carbs > 0) {
+      parts.push('У ~' + Math.round(nutrition.carbs * 10) / 10 + ' г');
+    }
+    return parts.join(', ');
+  }
+
+  // Функция для расчета общего КБЖУ
+  function totalNutrition(){
+    var total = {kcal: 0, protein: 0, fat: 0, carbs: 0};
+    var activeMenu = getActiveMenu();
+    if (!activeMenu) return total;
+    
+    Object.entries(getActiveQty()).forEach(function(kv){
+      var it = byId(kv[0], activeMenu);
+      if (it && it.nutrition && kv[1] > 0) {
+        var nutritionStr = it.nutrition;
+        var qty = kv[1];
+        
+        // Парсим КБЖУ (поддерживаем и русский и английский формат)
+        var kcalMatch = nutritionStr.match(/(?:~|≈)?\s*(\d+)\s*(?:ккал|kcal)/i);
+        if (kcalMatch) total.kcal += parseFloat(kcalMatch[1]) * qty;
+        
+        var proteinMatch = nutritionStr.match(/(?:Б|B)\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*г/i);
+        if (proteinMatch) total.protein += parseFloat(proteinMatch[1].replace(',', '.')) * qty;
+        
+        var fatMatch = nutritionStr.match(/(?:Ж|F)\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*г/i);
+        if (fatMatch) total.fat += parseFloat(fatMatch[1].replace(',', '.')) * qty;
+        
+        var carbsMatch = nutritionStr.match(/(?:У|U)\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*г/i);
+        if (carbsMatch) total.carbs += parseFloat(carbsMatch[1].replace(',', '.')) * qty;
+      }
+    });
+    return total;
+  }
+
   /* ======== UI RENDER ======== */
   function render(root){
     var activeMenu = getActiveMenu();
@@ -694,6 +811,24 @@
     var photoAlt = item.photo_alt || item.name || '';
     var nutrition = item.nutrition || '';
     var shelfLife = item.shelf_life || '';
+    
+    // Переводим КБЖУ если нужно
+    // Определяем язык для карточек
+    var cardLang = (function(){
+      if (document.cookie) {
+        var match = document.cookie.match(/googtrans=([^;]+)/);
+        if (match && match[1]) {
+          if (match[1].includes('/es/') || match[1].includes('|es')) return 'es';
+          if (match[1].includes('/en/') || match[1].includes('|en')) return 'en';
+        }
+      }
+      var urlLang = window.location.pathname.match(/\/(es|en|uk)\//);
+      if (urlLang && urlLang[1]) return urlLang[1];
+      var bodyLang = document.body.className.match(/lang-([a-z]{2})/);
+      if (bodyLang && bodyLang[1]) return bodyLang[1];
+      return 'ru';
+    })();
+    var translatedNutrition = nutrition ? translateNutrition(nutrition, cardLang) : '';
 
     return [
       '<div class="wmb-card' + (inCart ? ' wmb-card-in-cart' : '') + '" data-item-id="' + escapeHtml(item.id) + '">',
@@ -711,7 +846,7 @@
           '<span>'+money(Number(item.price)||0)+'</span>',
           (unit ? '<span class="wmb-unit">'+escapeHtml(unit)+'</span>' : ''),
         '</div>',
-          (nutrition ? '<div class="wmb-card-nutrition">'+escapeHtml(nutrition)+'</div>' : ''),
+          (translatedNutrition ? '<div class="wmb-card-nutrition notranslate" data-original-nutrition="'+escapeHtml(nutrition)+'">'+escapeHtml(translatedNutrition)+'</div>' : ''),
           (shelfLife ? '<div class="wmb-card-shelf-life">'+escapeHtml(shelfLife)+'</div>' : ''),
         (tags.length? '<div class="wmb-card-tags">'+tags.map(function(t){return '<span class="wmb-tag">'+escapeHtml(t)+'</span>'}).join('')+'</div>' : ''),
         '<div class="wmb-qty">',
@@ -732,6 +867,65 @@
     if(p) p.textContent = money(totalPrice());
     if(pm) pm.textContent = money(totalPrice());
     if(pp) pp.textContent = totalPortions();
+    
+    // Обновляем КБЖУ
+    var totalNut = totalNutrition();
+    var nutEl = el('#wmb-total-nutrition');
+    var nutRow = nutEl ? nutEl.closest('.wmb-summary-row') : null;
+    if (totalNut.kcal > 0 || totalNut.protein > 0 || totalNut.fat > 0 || totalNut.carbs > 0) {
+      var lang = (function(){
+        var bodyLang = document.body.className.match(/lang-([a-z]{2})/);
+        var urlLang = window.location.pathname.match(/\/(es|en)\//);
+        return (urlLang && urlLang[1]) || (bodyLang && bodyLang[1]) || 'ru';
+      })();
+      var nutStr = '';
+      if (lang === 'ru') {
+        nutStr = formatNutritionRu(totalNut);
+      } else {
+        var parts = [];
+        if (totalNut.kcal > 0) {
+          if (lang === 'es') {
+            parts.push('Kcal ~' + Math.round(totalNut.kcal));
+          } else {
+            parts.push('Cal ~' + Math.round(totalNut.kcal));
+          }
+        }
+        if (totalNut.protein > 0) {
+          parts.push('Prot ~' + (Math.round(totalNut.protein * 10) / 10) + ' g');
+        }
+        if (totalNut.fat > 0) {
+          if (lang === 'es') {
+            parts.push('Gras ~' + (Math.round(totalNut.fat * 10) / 10) + ' g');
+          } else {
+            parts.push('F ~' + (Math.round(totalNut.fat * 10) / 10) + ' g');
+          }
+        }
+        if (totalNut.carbs > 0) {
+          if (lang === 'es') {
+            parts.push('HC ~' + (Math.round(totalNut.carbs * 10) / 10) + ' g');
+          } else {
+            parts.push('C ~' + (Math.round(totalNut.carbs * 10) / 10) + ' g');
+          }
+        }
+        nutStr = parts.join(', ');
+      }
+      if (nutEl) {
+        nutEl.textContent = nutStr;
+      } else if (nutRow) {
+        // Если элемент не найден, создаем его
+        var label = 'Общее КБЖУ:';
+        if (lang === 'es') {
+          label = 'Total Kcal / Macronutrientes:';
+        } else if (lang === 'en') {
+          label = 'Total Calories / Macros:';
+        }
+        nutRow.innerHTML = '<span>'+label+'</span><strong id="wmb-total-nutrition">'+escapeHtml(nutStr)+'</strong>';
+      }
+      if (nutRow) nutRow.style.display = '';
+    } else {
+      // Скрываем КБЖУ если нет данных
+      if (nutRow) nutRow.style.display = 'none';
+    }
     
     var checkout = el('#wmb-checkout');
     var checkoutMobile = el('#wmb-checkout-mobile');
@@ -877,7 +1071,7 @@
           var cardElRetry = root.querySelector('[data-item-id="' + id.replace(/"/g, '&quot;') + '"]');
           if (!cardElRetry) {
             // Только если все еще не найдено - делаем перерендер
-            render(root);
+        render(root);
           } else {
             // Если нашли - обновляем
             updateCardQty(cardElRetry, id, next);
@@ -946,7 +1140,7 @@
       // Обновляем UI
       var root = document.getElementById('meal-builder-root');
       if (root) {
-        updateSummary();
+      updateSummary();
         // Обновляем визуальное состояние карточек
         Object.keys(state.qty).forEach(function(id) {
           var cardEl = root.querySelector('[data-item-id="' + id + '"]');
@@ -1432,6 +1626,11 @@
       state.activeTab = hash;
       persist();
     }
+    
+    // Убеждаемся что activeTab установлен (по умолчанию smart_food)
+    if (!state.activeTab) {
+      state.activeTab = 'smart_food';
+    }
 
     // Оптимизация: загружаем только активную вкладку сразу, остальные - лениво
     var cartPromise = syncWithCart();
@@ -1465,6 +1664,41 @@
     
     // Синхронизируемся с корзиной (она сама загрузит необходимые меню для товаров в корзине)
     await cartPromise;
+    
+    // Восстанавливаем состояние из localStorage (может перезаписать activeTab)
+    restore();
+    
+    // Убеждаемся что activeTab установлен после restore (может быть перезаписан)
+    if (!state.activeTab || !['smart_food', 'mercat', 'glovo_uber'].includes(state.activeTab)) {
+      state.activeTab = 'smart_food';
+    }
+    
+    // Если после restore активная вкладка изменилась, загружаем нужное меню
+    if (state.activeTab === 'smart_food' && !menu) {
+      menu = await fetch(MENU_URL + '?sale_type=smart_food', {credentials:'same-origin'}).then(function(res){
+        if (!res.ok) throw new Error('HTTP '+res.status);
+        return res.json();
+      }).catch(function(e){
+        console.error('Не удалось загрузить меню Superfood из', MENU_URL, e);
+        return { description:'', sections: [] };
+      });
+    } else if (state.activeTab === 'mercat' && !menuMercat) {
+      menuMercat = await fetch(MENU_URL + '?sale_type=mercat', {credentials:'same-origin'}).then(function(res){
+        if (!res.ok) throw new Error('HTTP '+res.status);
+        return res.json();
+      }).catch(function(e){
+        console.error('Не удалось загрузить меню Mercat из', MENU_URL, e);
+        return { description:'', sections: [] };
+      });
+    } else if (state.activeTab === 'glovo_uber' && !menuGlovoUber) {
+      menuGlovoUber = await fetch(MENU_URL + '?sale_type=glovo_uber', {credentials:'same-origin'}).then(function(res){
+        if (!res.ok) throw new Error('HTTP '+res.status);
+        return res.json();
+      }).catch(function(e){
+        console.error('Не удалось загрузить меню Glovo/Uber из', MENU_URL, e);
+        return { description:'', sections: [] };
+      });
+    }
     
     // После синхронизации обновляем summary, чтобы сумма отобразилась корректно
     updateSummary();
@@ -1506,7 +1740,6 @@
       });
     }
     
-    restore();
     render(root);
     setupDesktopSticky(root);
   }
@@ -1515,6 +1748,30 @@
   // Используем флаг обработки вместо времени для мгновенной реакции
   var processingClicks = {};
   
+  // Вспомогательная функция для поиска кнопки с учетом возможных оберток от gtranslate
+  function findButton(element, className, root) {
+    if (!element || !root) return null;
+    
+    // Убираем точку из селектора для проверки класса
+    var classWithoutDot = className.replace(/^\./, '');
+    
+    // Сначала пробуем closest - это самый быстрый способ
+    var btn = element.closest(className);
+    if (btn && root.contains(btn)) return btn;
+    
+    // Если не нашли через closest (gtranslate мог обернуть в дополнительные элементы),
+    // ищем родительские элементы вручную
+    var current = element;
+    while (current && current !== root && current !== document.body && current !== document.documentElement) {
+      if (current.classList && current.classList.contains(classWithoutDot)) {
+        if (root.contains(current)) return current;
+      }
+      current = current.parentElement;
+    }
+    
+    return null;
+  }
+
   // Глобальный обработчик событий для делегирования (один раз, не дублируется)
   var globalClickHandler = function(e){
     var t = e.target;
@@ -1526,9 +1783,9 @@
     var clickedInRoot = t.closest('#meal-builder-root');
     if (!clickedInRoot) return;
     
-    // Кнопки количества - используем closest() для надежной работы даже если клик на дочернем элементе
-    var incBtn = t.closest('.wmb-qty-inc');
-    var decBtn = t.closest('.wmb-qty-dec');
+    // Кнопки количества - используем улучшенную функцию поиска для защиты от изменений DOM gtranslate
+    var incBtn = findButton(t, '.wmb-qty-inc', root);
+    var decBtn = findButton(t, '.wmb-qty-dec', root);
     
     // Проверяем что кнопка действительно внутри root и имеет data-id
     if (incBtn && root.contains(incBtn)) {
@@ -1550,8 +1807,8 @@
         
         e.preventDefault();
         e.stopImmediatePropagation(); // Останавливаем все остальные обработчики
-        e.stopPropagation();
-        
+          e.stopPropagation();
+          
         // Вызываем синхронно, без задержек - это критично для быстрой реакции
         try {
           changeQty(itemId, +1, root);
@@ -1586,8 +1843,8 @@
         
         e.preventDefault();
         e.stopImmediatePropagation();
-        e.stopPropagation();
-        
+          e.stopPropagation();
+          
         try {
           changeQty(itemId, -1, root);
           updateSummary();
@@ -1597,14 +1854,14 @@
             delete processingClicks[clickKey];
           });
         }
-        
-        return false;
+          
+          return false;
       }
     }
     
-    // Кнопки состава и аллергенов - также используем closest()
-    var ingBtn = t.closest('.wmb-ing-btn');
-    var allergensBtn = t.closest('.wmb-allergens-btn');
+    // Кнопки состава и аллергенов - также используем улучшенную функцию поиска
+    var ingBtn = findButton(t, '.wmb-ing-btn', root);
+    var allergensBtn = findButton(t, '.wmb-allergens-btn', root);
     
     if (ingBtn && root.contains(ingBtn)) {
       var itemId = ingBtn.getAttribute('data-id');
@@ -1646,10 +1903,669 @@
   // Используем capture: true чтобы перехватить событие до других обработчиков
   document.addEventListener('click', globalClickHandler, true);
 
+  // Функция для перехвата и исправления переводов КБЖУ после работы gtranslate
+  function fixNutritionTranslations() {
+    var lang = (function(){
+      if (window.console && window.console.log) {
+        console.log('[WMB] Detecting language...');
+        console.log('[WMB] Full cookie:', document.cookie);
+        console.log('[WMB] URL:', window.location.pathname);
+        console.log('[WMB] Body classes:', document.body.className);
+      }
+      
+      // Проверяем cookie googtrans ПЕРВЫМ (самый надежный способ для gtranslate)
+      if (document.cookie) {
+        var match = document.cookie.match(/googtrans=([^;]+)/);
+        if (match && match[1]) {
+          if (window.console && window.console.log) {
+            console.log('[WMB] Found googtrans cookie:', match[1]);
+          }
+          if (match[1].includes('/es/') || match[1].includes('|es') || match[1].includes('/es') || match[1].match(/\/es[\/|]/)) {
+            if (window.console && window.console.log) {
+              console.log('[WMB] Language detected from cookie (es):', match[1]);
+            }
+            return 'es';
+          }
+          if (match[1].includes('/en/') || match[1].includes('|en') || match[1].includes('/en') || match[1].match(/\/en[\/|]/)) {
+            if (window.console && window.console.log) {
+              console.log('[WMB] Language detected from cookie (en):', match[1]);
+            }
+            return 'en';
+          }
+          // Проверяем украинский
+          if (match[1].includes('/uk/') || match[1].includes('|uk') || match[1].includes('/uk') || match[1].match(/\/uk[\/|]/)) {
+            if (window.console && window.console.log) {
+              console.log('[WMB] Language detected from cookie (uk):', match[1]);
+            }
+            return 'uk';
+          }
+          if (window.console && window.console.log) {
+            console.log('[WMB] Cookie found but no es/en/uk detected:', match[1]);
+          }
+        } else {
+          if (window.console && window.console.log) {
+            console.log('[WMB] No googtrans cookie found');
+          }
+        }
+      }
+      
+      // Проверяем URL
+      var urlLang = window.location.pathname.match(/\/(es|en|uk)\//);
+      if (urlLang && urlLang[1]) {
+        if (window.console && window.console.log) {
+          console.log('[WMB] Language detected from URL:', urlLang[1]);
+        }
+        return urlLang[1];
+      }
+      
+      // Проверяем body класс
+      var bodyLang = document.body.className.match(/lang-([a-z]{2})/);
+      if (bodyLang && bodyLang[1]) {
+        if (window.console && window.console.log) {
+          console.log('[WMB] Language detected from body class:', bodyLang[1]);
+        }
+        return bodyLang[1];
+      }
+      
+      // Проверяем язык из gtranslate виджета
+      var gtranslateWidget = document.querySelector('.gtranslate_wrapper');
+      if (gtranslateWidget) {
+        if (window.console && window.console.log) {
+          console.log('[WMB] Found gtranslate widget');
+        }
+        var activeLang = gtranslateWidget.querySelector('.gt_selected');
+        if (activeLang) {
+          var langText = activeLang.textContent.trim().toLowerCase();
+          if (window.console && window.console.log) {
+            console.log('[WMB] Active lang text:', langText);
+          }
+          if (langText.includes('español') || langText.includes('spanish') || langText.includes('es')) {
+            if (window.console && window.console.log) {
+              console.log('[WMB] Language detected from gtranslate widget (es)');
+            }
+            return 'es';
+          }
+          if (langText.includes('english') || langText.includes('inglés') || langText.includes('en')) {
+            if (window.console && window.console.log) {
+              console.log('[WMB] Language detected from gtranslate widget (en)');
+            }
+            return 'en';
+          }
+        } else {
+          if (window.console && window.console.log) {
+            console.log('[WMB] No .gt_selected found in widget');
+          }
+        }
+      } else {
+        if (window.console && window.console.log) {
+          console.log('[WMB] No gtranslate widget found');
+        }
+      }
+      
+      // Проверяем все возможные селекторы gtranslate
+      var gtSelectors = [
+        '.gtranslate_wrapper .gt_selected',
+        '.gtranslate_wrapper .gt-current-lang',
+        '.gt_container .gt_selected',
+        '[data-gt-lang]',
+        '.switcher .selected'
+      ];
+      for (var i = 0; i < gtSelectors.length; i++) {
+        var el = document.querySelector(gtSelectors[i]);
+        if (el) {
+          var text = el.textContent || el.getAttribute('data-gt-lang') || '';
+          if (window.console && window.console.log) {
+            console.log('[WMB] Found element with selector', gtSelectors[i], 'text:', text);
+          }
+          if (text.toLowerCase().includes('es') || text.toLowerCase().includes('spanish') || text.toLowerCase().includes('español')) {
+            if (window.console && window.console.log) {
+              console.log('[WMB] Language detected from selector (es):', gtSelectors[i]);
+            }
+            return 'es';
+          }
+          if (text.toLowerCase().includes('en') || text.toLowerCase().includes('english') || text.toLowerCase().includes('inglés')) {
+            if (window.console && window.console.log) {
+              console.log('[WMB] Language detected from selector (en):', gtSelectors[i]);
+            }
+            return 'en';
+          }
+          if (text.toLowerCase().includes('uk') || text.toLowerCase().includes('ukrainian') || text.toLowerCase().includes('українська') || text.toLowerCase().includes('украинский')) {
+            if (window.console && window.console.log) {
+              console.log('[WMB] Language detected from selector (uk):', gtSelectors[i]);
+            }
+            return 'uk';
+          }
+        }
+      }
+      
+      if (window.console && window.console.log) {
+        console.log('[WMB] No language detected, defaulting to ru');
+      }
+      return 'ru';
+    })();
+    
+    // Для отладки (можно убрать после проверки)
+    if (window.console && window.console.log) {
+      console.log('[WMB] fixNutritionTranslations called, lang:', lang);
+    }
+    
+    if (lang === 'ru') {
+      // Для русского нужно вернуть элементы к русскому формату, если они были переведены
+      if (window.console && window.console.log) {
+        console.log('[WMB] Russian language, restoring Russian format');
+      }
+      
+      // Восстанавливаем КБЖУ на карточках к русскому формату
+      els('.wmb-card-nutrition').forEach(function(el){
+        var original = el.getAttribute('data-original-nutrition');
+        if (!original) {
+          original = el.textContent.trim();
+          // Если уже русский/украинский, сохраняем
+          if (original.match(/[БЖУВккал]/)) {
+            el.setAttribute('data-original-nutrition', original);
+          }
+        }
+        // Если текущий текст не русский (содержит английские/испанские термины), восстанавливаем оригинал
+        var current = el.textContent.trim();
+        if (current && !current.match(/[БЖУВккал]/) && original && original.match(/[БЖУВккал]/)) {
+          el.textContent = original;
+          if (window.console && window.console.log) {
+            console.log('[WMB] Restored card nutrition to Russian:', original);
+          }
+        }
+      });
+      
+      // Восстанавливаем КБЖУ в корзине к русскому формату
+      els('.wmb-cart-nutrition').forEach(function(el){
+        var original = el.getAttribute('data-original-nutrition');
+        if (!original) {
+          original = el.textContent.trim();
+          if (original.match(/[БЖУВккал]/)) {
+            el.setAttribute('data-original-nutrition', original);
+          }
+        }
+        var current = el.textContent.trim();
+        if (current && !current.match(/[БЖУВккал]/) && original && original.match(/[БЖУВккал]/)) {
+          el.textContent = original;
+          if (window.console && window.console.log) {
+            console.log('[WMB] Restored cart nutrition to Russian:', original);
+          }
+        }
+      });
+      
+      // Восстанавливаем общее КБЖУ в корзине к русскому формату
+      var totalNutEl = el('.wmb-total-nutrition-value');
+      if (totalNutEl) {
+        var original = totalNutEl.getAttribute('data-original-nutrition');
+        if (original && original.match(/[БЖУВккал]/)) {
+          var current = totalNutEl.textContent.trim();
+          if (current && !current.match(/[БЖУВккал]/)) {
+            totalNutEl.textContent = original;
+            if (window.console && window.console.log) {
+              console.log('[WMB] Restored total nutrition to Russian:', original);
+            }
+          }
+        }
+      }
+      
+      // Восстанавливаем заголовок к русскому
+      var totalNutSummary = el('.wmb-total-nutrition-summary');
+      if (totalNutSummary) {
+        var labelEl = totalNutSummary.querySelector('strong');
+        if (labelEl) {
+          var currentLabel = labelEl.textContent.trim();
+          var notranslateSpan = labelEl.querySelector('span.notranslate');
+          var currentLabelInner = '';
+          if (notranslateSpan) {
+            currentLabelInner = notranslateSpan.textContent.trim();
+          }
+          var labelText = currentLabelInner || currentLabel;
+          // Если заголовок не русский, восстанавливаем
+          if (labelText !== 'Общее КБЖУ:' && (labelText.includes('Total') || labelText.includes('Загальне'))) {
+            if (!notranslateSpan) {
+              notranslateSpan = document.createElement('span');
+              notranslateSpan.className = 'notranslate';
+              labelEl.innerHTML = '';
+              labelEl.appendChild(notranslateSpan);
+            }
+            notranslateSpan.textContent = 'Общее КБЖУ:';
+            if (window.console && window.console.log) {
+              console.log('[WMB] Restored label to Russian: Общее КБЖУ:');
+            }
+          }
+        }
+      }
+      
+      return;
+    }
+    
+    // Для украинского тоже переводим (У -> В, Общее -> Загальне)
+    
+    // Исправляем КБЖУ на карточках
+    var cardCount = 0;
+    els('.wmb-card-nutrition').forEach(function(el){
+      cardCount++;
+      var original = el.getAttribute('data-original-nutrition');
+      if (!original) {
+        // Сохраняем оригинал если еще не сохранен
+        original = el.textContent.trim();
+        // Если уже переведено gtranslate, пытаемся восстановить оригинал
+        // Проверяем русский или украинский формат (БЖУ или БЖВ)
+        if (original.match(/[БЖУВккал]/)) {
+          // Уже русский/украинский, сохраняем как есть
+          el.setAttribute('data-original-nutrition', original);
+        } else {
+          // Похоже gtranslate уже перевел, пытаемся найти оригинал в данных
+          var card = el.closest('.wmb-card');
+          if (card) {
+            var itemId = card.getAttribute('data-item-id');
+            if (itemId && menu) {
+              var item = byId(itemId, getActiveMenu());
+              if (item && item.nutrition) {
+                original = item.nutrition;
+                el.setAttribute('data-original-nutrition', original);
+              }
+            }
+          }
+        }
+      }
+      // Проверяем русский или украинский формат (БЖУ или БЖВ)
+      if (original && original.match(/[БЖУВккал]/)) {
+        var translated = translateNutrition(original, lang);
+        if (translated && translated !== el.textContent.trim()) {
+          if (window.console && window.console.log) {
+            console.log('[WMB] Translating card nutrition:', original, '->', translated);
+          }
+          el.textContent = translated;
+        }
+      }
+    });
+    if (window.console && window.console.log && cardCount > 0) {
+      console.log('[WMB] Processed', cardCount, 'card nutrition elements');
+    }
+    
+    // Исправляем КБЖУ в корзине и на checkout (для товаров)
+    var cartCount = 0;
+    // Ищем элементы как в корзине, так и на checkout
+    var cartNutritionElements = els('.wmb-cart-nutrition');
+    // Также ищем в таблице checkout review order
+    var checkoutElements = els('.woocommerce-checkout-review-order-table .wmb-cart-nutrition, .woocommerce-order-details .wmb-cart-nutrition');
+    var allCartElements = Array.from(new Set([...cartNutritionElements, ...checkoutElements]));
+    
+    allCartElements.forEach(function(el){
+      cartCount++;
+      var original = el.getAttribute('data-original-nutrition');
+      if (!original) {
+        original = el.textContent.trim();
+        // Если уже русский/украинский, сохраняем
+        if (original.match(/[БЖУВккал]/)) {
+          el.setAttribute('data-original-nutrition', original);
+        }
+      }
+      // Проверяем русский или украинский формат (БЖУ или БЖВ)
+      if (original && original.match(/[БЖУВккал]/)) {
+        var translated = translateNutrition(original, lang);
+        if (translated && translated !== el.textContent.trim()) {
+          if (window.console && window.console.log) {
+            console.log('[WMB] Translating cart/checkout nutrition:', original, '->', translated);
+          }
+          el.textContent = translated;
+        }
+      } else if (original && !original.match(/[БЖУВккал]/) && lang === 'ru') {
+        // Если переключились на русский, но оригинал не сохранен, пытаемся найти его
+        // Это может быть на checkout, где элементы создаются динамически
+        var parent = el.closest('.wmb-product-details, .product-name, td');
+        if (parent) {
+          // Пытаемся найти оригинальное КБЖУ из соседних элементов или из данных
+          // Пока просто пропускаем, оригинал должен быть в data-атрибуте
+        }
+      }
+    });
+    if (window.console && window.console.log && cartCount > 0) {
+      console.log('[WMB] Processed', cartCount, 'cart/checkout nutrition elements');
+    }
+    
+    // Исправляем заголовок "Общее КБЖУ:" в корзине
+    var totalNutSummary = el('.wmb-total-nutrition-summary');
+    if (totalNutSummary) {
+      var labelEl = totalNutSummary.querySelector('strong');
+      if (labelEl) {
+        // Получаем текст, игнорируя возможные обертки
+        var currentLabel = labelEl.textContent.trim();
+        var currentLabelInner = '';
+        var notranslateSpan = labelEl.querySelector('span.notranslate');
+        if (notranslateSpan) {
+          currentLabelInner = notranslateSpan.textContent.trim();
+        }
+        
+        // Определяем нужный перевод
+        var newLabel = 'Общее КБЖУ:';
+        if (lang === 'es') {
+          newLabel = 'Total Kcal / Macronutrientes:';
+        } else if (lang === 'en') {
+          newLabel = 'Total Calories / Macros:';
+        } else if (lang === 'uk') {
+          newLabel = 'Загальне КБЖУ:';
+        }
+        
+        // Проверяем, нужно ли обновить
+        var needsUpdate = false;
+        if (lang !== 'ru' && (currentLabel === 'Общее КБЖУ:' || currentLabel.includes('КБЖУ') || currentLabel.includes('KBZhU') || currentLabel.includes('KBZhU total'))) {
+          needsUpdate = true;
+        } else if (lang === 'ru' && (currentLabel !== 'Общее КБЖУ:' && (currentLabel.includes('Total') || currentLabel.includes('Загальне') || currentLabel.includes('KBZhU')))) {
+          needsUpdate = true;
+          newLabel = 'Общее КБЖУ:';
+        } else if (notranslateSpan && currentLabelInner !== newLabel) {
+          needsUpdate = true;
+        } else if (!notranslateSpan && currentLabel !== newLabel) {
+          needsUpdate = true;
+        }
+        
+        if (needsUpdate) {
+          // Создаем или обновляем span с notranslate чтобы gtranslate не трогал
+          if (!notranslateSpan) {
+            notranslateSpan = document.createElement('span');
+            notranslateSpan.className = 'notranslate';
+            labelEl.innerHTML = '';
+            labelEl.appendChild(notranslateSpan);
+          }
+          notranslateSpan.textContent = newLabel;
+          if (window.console && window.console.log) {
+            console.log('[WMB] Translated label:', currentLabel, '->', newLabel);
+          }
+        }
+      }
+    }
+    
+    // Исправляем общее КБЖУ в корзине (на странице /cart/)
+    var totalNutEl = el('.wmb-total-nutrition-value');
+    if (totalNutEl) {
+      var original = totalNutEl.getAttribute('data-original-nutrition');
+      if (!original) {
+        original = totalNutEl.textContent.trim();
+        // Проверяем русский или украинский формат (БЖУ или БЖВ)
+        if (original.match(/[БЖУВккал]/)) {
+          totalNutEl.setAttribute('data-original-nutrition', original);
+        }
+      }
+      // Проверяем русский или украинский формат (БЖУ или БЖВ)
+      if (original && original.match(/[БЖУВккал]/)) {
+        // Парсим оригинальное КБЖУ из строки
+        var parsed = {kcal: 0, protein: 0, fat: 0, carbs: 0};
+        var kcalMatch = original.match(/(?:~|≈)?\s*(\d+)\s*(?:ккал|kcal)/i);
+        if (kcalMatch) parsed.kcal = parseFloat(kcalMatch[1]);
+        var proteinMatch = original.match(/(?:Б|B)\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*г/i);
+        if (proteinMatch) parsed.protein = parseFloat(proteinMatch[1].replace(',', '.'));
+        var fatMatch = original.match(/(?:Ж|F)\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*г/i);
+        if (fatMatch) parsed.fat = parseFloat(fatMatch[1].replace(',', '.'));
+        var carbsMatch = original.match(/(?:У|U)\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*г/i);
+        if (carbsMatch) parsed.carbs = parseFloat(carbsMatch[1].replace(',', '.'));
+        
+        if (window.console && window.console.log) {
+          console.log('[WMB] Total nutrition parsed from string:', parsed);
+        }
+        
+        if (parsed.kcal > 0 || parsed.protein > 0 || parsed.fat > 0 || parsed.carbs > 0) {
+          var parts = [];
+        if (parsed.kcal > 0) {
+          if (lang === 'es') {
+            parts.push('Kcal ~' + Math.round(parsed.kcal));
+          } else if (lang === 'en') {
+            parts.push('Cal ~' + Math.round(parsed.kcal));
+          } else if (lang === 'uk') {
+            parts.push('ккал ~' + Math.round(parsed.kcal));
+          }
+        }
+        if (parsed.protein > 0) {
+          if (lang === 'es' || lang === 'en') {
+            parts.push('Prot ~' + (Math.round(parsed.protein * 10) / 10) + ' g');
+          } else if (lang === 'uk') {
+            parts.push('Б ~' + (Math.round(parsed.protein * 10) / 10) + ' г');
+          }
+        }
+        if (parsed.fat > 0) {
+          if (lang === 'es') {
+            parts.push('Gras ~' + (Math.round(parsed.fat * 10) / 10) + ' g');
+          } else if (lang === 'en') {
+            parts.push('F ~' + (Math.round(parsed.fat * 10) / 10) + ' g');
+          } else if (lang === 'uk') {
+            parts.push('Ж ~' + (Math.round(parsed.fat * 10) / 10) + ' г');
+          }
+        }
+        if (parsed.carbs > 0) {
+          if (lang === 'es') {
+            parts.push('HC ~' + (Math.round(parsed.carbs * 10) / 10) + ' g');
+          } else if (lang === 'en') {
+            parts.push('C ~' + (Math.round(parsed.carbs * 10) / 10) + ' g');
+          } else if (lang === 'uk') {
+            parts.push('В ~' + (Math.round(parsed.carbs * 10) / 10) + ' г');
+          }
+        }
+          var translated = parts.join(', ');
+          if (window.console && window.console.log) {
+            console.log('[WMB] Translating total nutrition:', original, '->', translated);
+          }
+          if (translated && translated !== totalNutEl.textContent.trim()) {
+            totalNutEl.textContent = translated;
+          }
+        }
+      } else {
+        // Если оригинал не найден, но текст уже переведен gtranslate (например "KBZhU total: ~520 kcal, B~20 g, F~32 g, U ~40 g")
+        // Пытаемся распарсить из текущего текста
+        var currentText = totalNutEl.textContent.trim();
+        if (currentText && !currentText.match(/[БЖУВккал]/)) {
+          // Похоже gtranslate уже перевел, пытаемся распарсить
+          var parsed = {kcal: 0, protein: 0, fat: 0, carbs: 0};
+          var kcalMatch = currentText.match(/(?:~|≈)?\s*(\d+)\s*(?:ккал|kcal)/i);
+          if (kcalMatch) parsed.kcal = parseFloat(kcalMatch[1]);
+          var proteinMatch = currentText.match(/(?:Б|B|Prot)\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*[гg]/i);
+          if (proteinMatch) parsed.protein = parseFloat(proteinMatch[1].replace(',', '.'));
+          var fatMatch = currentText.match(/(?:Ж|F|Gras)\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*[гg]/i);
+          if (fatMatch) parsed.fat = parseFloat(fatMatch[1].replace(',', '.'));
+          var carbsMatch = currentText.match(/(?:У|U|В|HC|C)\s*(?:~|≈)?\s*(\d+(?:[.,]\d+)?)\s*[гg]/i);
+          if (carbsMatch) parsed.carbs = parseFloat(carbsMatch[1].replace(',', '.'));
+          
+          if (parsed.kcal > 0 || parsed.protein > 0 || parsed.fat > 0 || parsed.carbs > 0) {
+            // Сохраняем как оригинал для будущих переводов
+            var originalStr = '~' + Math.round(parsed.kcal) + ' ккал, Б ~' + (Math.round(parsed.protein * 10) / 10) + ' г, Ж ~' + (Math.round(parsed.fat * 10) / 10) + ' г, У ~' + (Math.round(parsed.carbs * 10) / 10) + ' г';
+            totalNutEl.setAttribute('data-original-nutrition', originalStr);
+            
+            // Теперь переводим правильно
+            var parts = [];
+            if (parsed.kcal > 0) {
+              if (lang === 'es') {
+                parts.push('Kcal ~' + Math.round(parsed.kcal));
+              } else if (lang === 'en') {
+                parts.push('Cal ~' + Math.round(parsed.kcal));
+              } else if (lang === 'uk') {
+                parts.push('ккал ~' + Math.round(parsed.kcal));
+              } else {
+                parts.push('~' + Math.round(parsed.kcal) + ' ккал');
+              }
+            }
+            if (parsed.protein > 0) {
+              if (lang === 'es' || lang === 'en') {
+                parts.push('Prot ~' + (Math.round(parsed.protein * 10) / 10) + ' g');
+              } else if (lang === 'uk') {
+                parts.push('Б ~' + (Math.round(parsed.protein * 10) / 10) + ' г');
+              } else {
+                parts.push('Б ~' + (Math.round(parsed.protein * 10) / 10) + ' г');
+              }
+            }
+            if (parsed.fat > 0) {
+              if (lang === 'es') {
+                parts.push('Gras ~' + (Math.round(parsed.fat * 10) / 10) + ' g');
+              } else if (lang === 'en') {
+                parts.push('F ~' + (Math.round(parsed.fat * 10) / 10) + ' g');
+              } else if (lang === 'uk') {
+                parts.push('Ж ~' + (Math.round(parsed.fat * 10) / 10) + ' г');
+              } else {
+                parts.push('Ж ~' + (Math.round(parsed.fat * 10) / 10) + ' г');
+              }
+            }
+            if (parsed.carbs > 0) {
+              if (lang === 'es') {
+                parts.push('HC ~' + (Math.round(parsed.carbs * 10) / 10) + ' g');
+              } else if (lang === 'en') {
+                parts.push('C ~' + (Math.round(parsed.carbs * 10) / 10) + ' g');
+              } else if (lang === 'uk') {
+                parts.push('В ~' + (Math.round(parsed.carbs * 10) / 10) + ' г');
+              } else {
+                parts.push('У ~' + (Math.round(parsed.carbs * 10) / 10) + ' г');
+              }
+            }
+            var translated = parts.join(', ');
+            if (window.console && window.console.log) {
+              console.log('[WMB] Parsed and translated total nutrition from gtranslate text:', currentText, '->', translated);
+            }
+            if (translated && translated !== totalNutEl.textContent.trim()) {
+              totalNutEl.textContent = translated;
+            }
+          }
+        }
+        if (window.console && window.console.log) {
+          console.log('[WMB] Total nutrition element found but no Russian text to translate. Original:', original, 'Current:', totalNutEl.textContent.trim());
+        }
+      }
+    } else {
+      if (window.console && window.console.log) {
+        console.log('[WMB] Total nutrition element not found');
+      }
+    }
+  }
+  
+  // Перехватываем изменения от gtranslate
+  function setupGTranslateInterceptor() {
+    if (window.console && window.console.log) {
+      console.log('[WMB] setupGTranslateInterceptor() called');
+    }
+    // Исправляем сразу после загрузки с разными задержками
+    setTimeout(fixNutritionTranslations, 100);
+    setTimeout(fixNutritionTranslations, 500);
+    setTimeout(fixNutritionTranslations, 1000);
+    setTimeout(fixNutritionTranslations, 2000);
+    setTimeout(fixNutritionTranslations, 3000);
+    setTimeout(fixNutritionTranslations, 5000);
+    
+    // Исправляем при изменении DOM (gtranslate может изменять контент асинхронно)
+    var observer = new MutationObserver(function(mutations) {
+      var shouldFix = false;
+      mutations.forEach(function(mutation) {
+        if (mutation.type === 'childList' || mutation.type === 'characterData') {
+          mutation.addedNodes.forEach(function(node) {
+            if (node.nodeType === 1 && (
+              node.classList && (
+                node.classList.contains('wmb-card-nutrition') ||
+                node.classList.contains('wmb-cart-nutrition') ||
+                node.classList.contains('wmb-total-nutrition-value')
+              )
+            )) {
+              shouldFix = true;
+            }
+          });
+          if (mutation.target && mutation.target.classList && (
+            mutation.target.classList.contains('wmb-card-nutrition') ||
+            mutation.target.classList.contains('wmb-cart-nutrition') ||
+            mutation.target.classList.contains('wmb-total-nutrition-value')
+          )) {
+            shouldFix = true;
+          }
+        }
+      });
+      if (shouldFix) {
+        setTimeout(fixNutritionTranslations, 100);
+      }
+    });
+    
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+    
+    // Перехватываем события изменения языка от gtranslate
+    if (window.gtranslateSettings) {
+      var originalTranslate = window.gtranslateSettings.translate;
+      if (originalTranslate) {
+        window.gtranslateSettings.translate = function() {
+          var result = originalTranslate.apply(this, arguments);
+          setTimeout(fixNutritionTranslations, 500);
+          return result;
+        };
+      }
+    }
+    
+    // Слушаем изменения cookie googtrans
+    var lastCookie = document.cookie;
+    var cookieCheckInterval = setInterval(function() {
+      if (document.cookie !== lastCookie) {
+        lastCookie = document.cookie;
+        if (window.console && window.console.log) {
+          console.log('[WMB] Cookie changed, fixing translations');
+        }
+        setTimeout(fixNutritionTranslations, 500);
+      }
+    }, 1000);
+    
+    // Также вызываем при изменении языка через события
+    window.addEventListener('languagechange', function() {
+      setTimeout(fixNutritionTranslations, 500);
+    });
+    
+    // Вызываем при клике на переключатель языка gtranslate
+    document.addEventListener('click', function(e) {
+      var target = e.target;
+      if (target && (
+        target.closest('.gtranslate_wrapper') ||
+        target.closest('[data-gt-lang]') ||
+        target.closest('.gt_selector')
+      )) {
+        setTimeout(fixNutritionTranslations, 1000);
+        setTimeout(fixNutritionTranslations, 2000);
+      }
+    }, true);
+  }
+
   // Запускаем сразу, если DOM уже готов, иначе ждем DOMContentLoaded
+  if (window.console && window.console.log) {
+    console.log('[WMB] Script loaded, readyState:', document.readyState);
+  }
+  
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', boot);
+    document.addEventListener('DOMContentLoaded', function() {
+      if (window.console && window.console.log) {
+        console.log('[WMB] DOMContentLoaded fired');
+      }
+      // Проверяем, есть ли meal-builder-root (страница меню) или только корзина
+      var hasMealBuilder = document.getElementById('meal-builder-root');
+      if (hasMealBuilder) {
+        if (window.console && window.console.log) {
+          console.log('[WMB] Meal builder root found, calling boot()');
+        }
+        boot();
+      }
+      // На странице корзины тоже запускаем перехват переводов
+      if (window.console && window.console.log) {
+        console.log('[WMB] Calling setupGTranslateInterceptor()');
+      }
+      setupGTranslateInterceptor();
+    });
   } else {
-    boot();
+    if (window.console && window.console.log) {
+      console.log('[WMB] DOM already ready');
+    }
+    // Проверяем, есть ли meal-builder-root (страница меню) или только корзина
+    var hasMealBuilder = document.getElementById('meal-builder-root');
+    if (hasMealBuilder) {
+      if (window.console && window.console.log) {
+        console.log('[WMB] Meal builder root found, calling boot()');
+      }
+      boot();
+    }
+    // На странице корзины тоже запускаем перехват переводов
+    if (window.console && window.console.log) {
+      console.log('[WMB] Calling setupGTranslateInterceptor()');
+    }
+    setupGTranslateInterceptor();
   }
 })();
