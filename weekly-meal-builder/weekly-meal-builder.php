@@ -1971,6 +1971,10 @@ add_action('wp_enqueue_scripts', function(){
           overflow-y:visible !important;
           max-width:100% !important;
           width:100% !important;
+          padding-left:0 !important;
+          padding-right:0 !important;
+          margin-left:0 !important;
+          margin-right:0 !important;
         }
         .woocommerce-cart .woocommerce-cart-form table,
         form.woocommerce-cart-form table {
@@ -2493,6 +2497,8 @@ add_action('wp_enqueue_scripts', function(){
         .wmb-total-nutrition-summary {
           margin:0 !important;
           padding:10px 12px !important;
+          padding-left:12px !important;
+          padding-right:12px !important;
           font-size:14px !important;
           overflow:visible !important;
           word-wrap:break-word !important;
@@ -2503,6 +2509,30 @@ add_action('wp_enqueue_scripts', function(){
           min-width:0 !important;
           box-sizing:border-box !important;
           display:block !important;
+        }
+        /* Дополнительные отступы для длинных текстов (украинский) */
+        .wmb-total-nutrition-cell {
+          padding-left:0 !important;
+          padding-right:0 !important;
+          margin-left:0 !important;
+          margin-right:0 !important;
+        }
+        /* Убираем все возможные ограничения для контейнера */
+        .woocommerce-cart-form,
+        form.woocommerce-cart-form,
+        .woocommerce.woocommerce-cart .woocommerce-cart-form {
+          padding-left:0 !important;
+          padding-right:0 !important;
+          margin-left:0 !important;
+          margin-right:0 !important;
+        }
+        .woocommerce-cart-form table,
+        form.woocommerce-cart-form table,
+        .woocommerce table.cart {
+          margin-left:0 !important;
+          margin-right:0 !important;
+          padding-left:0 !important;
+          padding-right:0 !important;
         }
         .wmb-total-nutrition-summary strong,
         .wmb-total-nutrition-summary strong span {
