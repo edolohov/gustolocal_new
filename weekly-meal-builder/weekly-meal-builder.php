@@ -2581,6 +2581,13 @@ add_action('wp_enqueue_scripts', function(){
           overflow-wrap:break-word !important;
           max-width:100% !important;
           overflow:visible !important;
+          box-sizing:border-box !important;
+        }
+        /* Критично: защита от обрезания после изменений gtranslate - учитываем padding */
+        .wmb-total-nutrition-summary,
+        .wmb-total-nutrition-summary * {
+          max-width:calc(100% - 24px) !important;
+          box-sizing:border-box !important;
         }
       }
     ';
