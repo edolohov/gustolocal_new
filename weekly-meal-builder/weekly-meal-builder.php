@@ -2426,16 +2426,66 @@ add_action('wp_enqueue_scripts', function(){
       }
       /* На мобилке общее КБЖУ */
       @media (max-width:768px) {
+        /* Критично: убираем все ограничения для таблицы на мобилке */
+        .woocommerce-cart-form table,
+        .woocommerce table.cart,
+        form.woocommerce-cart-form table {
+          table-layout:auto !important;
+          width:100% !important;
+          max-width:100% !important;
+          min-width:0 !important;
+          overflow:visible !important;
+        }
+        .woocommerce-cart-form table tbody,
+        .woocommerce table.cart tbody,
+        form.woocommerce-cart-form table tbody {
+          display:block !important;
+          width:100% !important;
+          max-width:100% !important;
+          overflow:visible !important;
+        }
+        .woocommerce-cart-form table tbody tr,
+        .woocommerce table.cart tbody tr,
+        form.woocommerce-cart-form table tbody tr,
+        .woocommerce-cart-form__cart-item,
+        .cart_item {
+          display:block !important;
+          width:100% !important;
+          max-width:100% !important;
+          min-width:0 !important;
+          overflow:visible !important;
+          margin:0 !important;
+          padding:0 !important;
+        }
+        .woocommerce-cart-form table tbody td,
+        .woocommerce table.cart tbody td,
+        form.woocommerce-cart-form table tbody td {
+          display:block !important;
+          width:100% !important;
+          max-width:100% !important;
+          min-width:0 !important;
+          padding-left:0 !important;
+          padding-right:0 !important;
+          overflow:visible !important;
+          box-sizing:border-box !important;
+        }
         .wmb-total-nutrition-row {
           display:block !important;
           width:100% !important;
+          max-width:100% !important;
+          min-width:0 !important;
+          overflow:visible !important;
         }
         .wmb-total-nutrition-cell {
           display:block !important;
           width:100% !important;
-          padding:0.75rem 0 !important;
-          overflow:visible !important;
           max-width:100% !important;
+          min-width:0 !important;
+          padding:0.75rem 0 !important;
+          padding-left:0 !important;
+          padding-right:0 !important;
+          overflow:visible !important;
+          box-sizing:border-box !important;
         }
         .wmb-total-nutrition-cell::before {
           display:none !important;
@@ -2454,7 +2504,8 @@ add_action('wp_enqueue_scripts', function(){
           box-sizing:border-box !important;
           display:block !important;
         }
-        .wmb-total-nutrition-summary strong {
+        .wmb-total-nutrition-summary strong,
+        .wmb-total-nutrition-summary strong span {
           display:block !important;
           white-space:normal !important;
           word-wrap:break-word !important;
@@ -2463,6 +2514,7 @@ add_action('wp_enqueue_scripts', function(){
           width:100% !important;
           margin-right:0 !important;
           margin-bottom:4px !important;
+          overflow:visible !important;
         }
         .wmb-total-nutrition-value {
           display:block !important;
@@ -2471,32 +2523,18 @@ add_action('wp_enqueue_scripts', function(){
           overflow-wrap:break-word !important;
           max-width:100% !important;
           width:100% !important;
+          overflow:visible !important;
         }
-        /* Убираем все ограничения для таблицы на мобилке */
-        .woocommerce-cart-form table,
-        .woocommerce table.cart {
-          table-layout:auto !important;
-          width:100% !important;
+        /* Убираем ограничения для gtranslate оберток */
+        .wmb-total-nutrition-summary font,
+        .wmb-total-nutrition-summary strong font,
+        .wmb-total-nutrition-value font {
+          display:inline !important;
+          white-space:normal !important;
+          word-wrap:break-word !important;
+          overflow-wrap:break-word !important;
           max-width:100% !important;
-        }
-        .woocommerce-cart-form table tbody,
-        .woocommerce table.cart tbody {
-          display:block !important;
-          width:100% !important;
-        }
-        .woocommerce-cart-form table tbody tr,
-        .woocommerce table.cart tbody tr {
-          display:block !important;
-          width:100% !important;
-          max-width:100% !important;
-        }
-        .woocommerce-cart-form table tbody td,
-        .woocommerce table.cart tbody td {
-          display:block !important;
-          width:100% !important;
-          max-width:100% !important;
-          padding-left:0 !important;
-          padding-right:0 !important;
+          overflow:visible !important;
         }
       }
     ';
