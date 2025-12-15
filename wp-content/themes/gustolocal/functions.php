@@ -3030,9 +3030,16 @@ function gustolocal_feedback_management_page() {
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($recent_feedback as $feedback): 
+                        <?php 
+                        // Получаем список просмотренных токенов для текущего пользователя
+                        $viewed_tokens = get_user_meta(get_current_user_id(), '_gustolocal_viewed_feedbacks', true);
+                        $viewed_tokens_array = !empty($viewed_tokens) ? json_decode($viewed_tokens, true) : array();
+                        
+                        foreach ($recent_feedback as $feedback): 
                             $order_edit_url = admin_url('post.php?post=' . $feedback['order_id'] . '&action=edit');
                             $is_new = strtotime($feedback['last_date']) >= strtotime('-7 days');
+                            $is_viewed = in_array($feedback['token'], $viewed_tokens_array);
+                            $show_badge = $is_new && !$is_viewed;
                         ?>
                             <tr class="feedback-row clickable-row" data-token="<?php echo esc_attr($feedback['token']); ?>" style="cursor: pointer;">
                                 <td>
@@ -3040,7 +3047,7 @@ function gustolocal_feedback_management_page() {
                                 </td>
                                 <td>
                                     <?php echo esc_html($feedback['last_date']); ?>
-                                    <span class="new-badge" data-token="<?php echo esc_attr($feedback['token']); ?>" style="color: #f0ad4e; font-size: 14px; display: <?php echo $is_new ? 'inline' : 'none'; ?>;" title="Новый отзыв">⭐</span>
+                                    <span class="new-badge" data-token="<?php echo esc_attr($feedback['token']); ?>" style="color: #f0ad4e; font-size: 14px; display: <?php echo $show_badge ? 'inline' : 'none'; ?>;" title="Новый отзыв">⭐</span>
                                 </td>
                                 <td><strong><?php echo esc_html($feedback['customer_name']); ?></strong></td>
                                 <td>
@@ -5394,8 +5401,15 @@ function gustolocal_custom_feedback_management_page() {
                         </tr>
                     </thead>
                     <tbody>
-                        <?php foreach ($recent_feedback as $feedback): 
+                        <?php 
+                        // Получаем список просмотренных токенов для текущего пользователя
+                        $viewed_custom_tokens = get_user_meta(get_current_user_id(), '_gustolocal_viewed_custom_feedbacks', true);
+                        $viewed_custom_tokens_array = !empty($viewed_custom_tokens) ? json_decode($viewed_custom_tokens, true) : array();
+                        
+                        foreach ($recent_feedback as $feedback): 
                             $is_new = strtotime($feedback['last_date']) >= strtotime('-7 days');
+                            $is_viewed = in_array($feedback['token'], $viewed_custom_tokens_array);
+                            $show_badge = $is_new && !$is_viewed;
                         ?>
                             <tr class="custom-feedback-row clickable-row" data-token="<?php echo esc_attr($feedback['token']); ?>" style="cursor: pointer;">
                                 <td>
@@ -5403,7 +5417,7 @@ function gustolocal_custom_feedback_management_page() {
                                 </td>
                                 <td>
                                     <?php echo esc_html($feedback['last_date']); ?>
-                                    <span class="new-badge" data-token="<?php echo esc_attr($feedback['token']); ?>" style="color: #f0ad4e; font-size: 14px; display: <?php echo $is_new ? 'inline' : 'none'; ?>;" title="Новый отзыв">⭐</span>
+                                    <span class="new-badge" data-token="<?php echo esc_attr($feedback['token']); ?>" style="color: #f0ad4e; font-size: 14px; display: <?php echo $show_badge ? 'inline' : 'none'; ?>;" title="Новый отзыв">⭐</span>
                                 </td>
                                 <td><strong><?php echo esc_html($feedback['client_name']); ?></strong></td>
                                 <td><?php echo esc_html($feedback['client_contact'] ?: '—'); ?></td>
