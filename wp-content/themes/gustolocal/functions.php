@@ -2686,15 +2686,42 @@ function gustolocal_mark_feedback_viewed() {
     
     // Получаем текущий список просмотренных токенов
     $viewed_tokens = get_user_meta($user_id, $meta_key, true);
-    $viewed_tokens_array = !empty($viewed_tokens) ? json_decode($viewed_tokens, true) : array();
+    
+    // Обрабатываем разные форматы данных
+    if (empty($viewed_tokens)) {
+        $viewed_tokens_array = array();
+    } elseif (is_array($viewed_tokens)) {
+        $viewed_tokens_array = $viewed_tokens;
+    } else {
+        $decoded = json_decode($viewed_tokens, true);
+        $viewed_tokens_array = is_array($decoded) ? $decoded : array();
+    }
     
     // Добавляем новый токен, если его еще нет
-    if (!in_array($token, $viewed_tokens_array)) {
+    if (!in_array($token, $viewed_tokens_array, true)) {
         $viewed_tokens_array[] = $token;
         update_user_meta($user_id, $meta_key, json_encode($viewed_tokens_array));
     }
     
     wp_send_json_success('Отзыв помечен как просмотренный');
+}
+
+// AJAX обработчик для получения актуального счетчика новых отзывов
+add_action('wp_ajax_gustolocal_get_feedback_count', 'gustolocal_get_feedback_count_ajax');
+function gustolocal_get_feedback_count_ajax() {
+    if (!current_user_can('manage_options')) {
+        wp_send_json_error('Доступ запрещен');
+    }
+    
+    $type = sanitize_text_field($_POST['type'] ?? 'regular');
+    
+    if ($type === 'custom') {
+        $count = gustolocal_get_new_custom_feedback_count();
+    } else {
+        $count = gustolocal_get_new_feedback_count();
+    }
+    
+    wp_send_json_success(array('count' => $count));
 }
 
 // Функция для определения клиентов для опроса
@@ -3190,20 +3217,47 @@ function gustolocal_feedback_management_page() {
     
     // Функция для обновления счетчика в меню
     function updateMenuCounter(type) {
-        // Находим элемент меню и обновляем счетчик через AJAX
-        var menuItem = document.querySelector('a[href*="gustolocal-' + (type === 'custom' ? 'custom-feedback' : 'feedback') + '"]');
-        if (menuItem) {
-            var badge = menuItem.querySelector('.awaiting-mod');
-            if (badge) {
-                var currentCount = parseInt(badge.textContent) || 0;
-                var newCount = Math.max(0, currentCount - 1);
-                if (newCount > 0) {
-                    badge.textContent = newCount;
-                } else {
-                    badge.remove();
+        // Получаем актуальный счетчик с сервера
+        var formData = new FormData();
+        formData.append('action', 'gustolocal_get_feedback_count');
+        formData.append('type', type);
+        
+        fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+            method: 'POST',
+            body: formData
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.success) {
+                var count = data.data.count || 0;
+                var menuSlug = type === 'custom' ? 'gustolocal-custom-feedback' : 'gustolocal-feedback';
+                var menuItem = document.querySelector('a[href*="' + menuSlug + '"]');
+                
+                if (menuItem) {
+                    var badge = menuItem.querySelector('.awaiting-mod');
+                    if (count > 0) {
+                        if (badge) {
+                            badge.textContent = count;
+                        } else {
+                            // Создаем новый badge
+                            var span = document.createElement('span');
+                            span.className = 'awaiting-mod';
+                            span.textContent = count;
+                            menuItem.appendChild(document.createTextNode(' '));
+                            menuItem.appendChild(span);
+                        }
+                    } else {
+                        // Удаляем badge если счетчик = 0
+                        if (badge) {
+                            badge.remove();
+                        }
+                    }
                 }
             }
-        }
+        })
+        .catch(function(error) {
+            console.error('Ошибка при получении счетчика:', error);
+        });
     }
     
     document.addEventListener('DOMContentLoaded', function() {
@@ -5404,11 +5458,20 @@ function gustolocal_custom_feedback_management_page() {
                         <?php 
                         // Получаем список просмотренных токенов для текущего пользователя
                         $viewed_custom_tokens = get_user_meta(get_current_user_id(), '_gustolocal_viewed_custom_feedbacks', true);
-                        $viewed_custom_tokens_array = !empty($viewed_custom_tokens) ? json_decode($viewed_custom_tokens, true) : array();
+                        
+                        // Обрабатываем разные форматы данных
+                        if (empty($viewed_custom_tokens)) {
+                            $viewed_custom_tokens_array = array();
+                        } elseif (is_array($viewed_custom_tokens)) {
+                            $viewed_custom_tokens_array = $viewed_custom_tokens;
+                        } else {
+                            $decoded = json_decode($viewed_custom_tokens, true);
+                            $viewed_custom_tokens_array = is_array($decoded) ? $decoded : array();
+                        }
                         
                         foreach ($recent_feedback as $feedback): 
                             $is_new = strtotime($feedback['last_date']) >= strtotime('-7 days');
-                            $is_viewed = in_array($feedback['token'], $viewed_custom_tokens_array);
+                            $is_viewed = in_array($feedback['token'], $viewed_custom_tokens_array, true);
                             $show_badge = $is_new && !$is_viewed;
                         ?>
                             <tr class="custom-feedback-row clickable-row" data-token="<?php echo esc_attr($feedback['token']); ?>" style="cursor: pointer;">
