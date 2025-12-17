@@ -5543,15 +5543,16 @@ function gustolocal_custom_feedback_management_page() {
         // Раскрытие/сворачивание строк с деталями для кастомных опросов
         document.querySelectorAll('.custom-feedback-row.clickable-row').forEach(function(row) {
             row.addEventListener('click', function(e) {
-                // Не раскрываем если кликнули на кнопку
-                if (e.target.tagName === 'BUTTON' || e.target.closest('button')) {
+                // Не раскрываем если кликнули на кнопку или ссылку
+                if (e.target.tagName === 'BUTTON' || e.target.tagName === 'A' || e.target.closest('button') || e.target.closest('a')) {
                     return;
                 }
                 
                 var detailsRow = this.nextElementSibling;
                 var toggleIcon = this.querySelector('.toggle-icon');
                 var token = this.getAttribute('data-token');
-                var newBadge = this.querySelector('.new-badge');
+                // Ищем все звездочки в строке
+                var newBadges = this.querySelectorAll('.new-badge');
                 
                 if (detailsRow && detailsRow.classList.contains('custom-feedback-details-row')) {
                     if (detailsRow.style.display === 'none' || detailsRow.style.display === '') {
@@ -5559,10 +5560,16 @@ function gustolocal_custom_feedback_management_page() {
                         if (toggleIcon) {
                             toggleIcon.classList.add('rotated');
                         }
-                        // Помечаем отзыв как просмотренный и скрываем звездочку
-                        if (token && newBadge) {
+                        // Помечаем отзыв как просмотренный и скрываем все звездочки
+                        if (token) {
+                            // Скрываем все найденные звездочки
+                            newBadges.forEach(function(badge) {
+                                if (badge.style.display !== 'none' && badge.offsetParent !== null) {
+                                    badge.style.display = 'none';
+                                }
+                            });
+                            // Помечаем как просмотренный на сервере
                             markFeedbackAsViewed(token, 'custom');
-                            newBadge.style.display = 'none';
                         }
                     } else {
                         detailsRow.style.display = 'none';
