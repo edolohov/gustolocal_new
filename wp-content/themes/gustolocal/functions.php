@@ -5625,6 +5625,134 @@ function gustolocal_custom_feedback_management_page() {
         </style>
     
     <script>
+    // Глобальные функции для работы с просмотренными отзывами (дублируем для кастомных опросов)
+    if (typeof markFeedbackAsViewed === 'undefined') {
+        function markFeedbackAsViewed(token, type) {
+            type = type || 'regular';
+            
+            // Сохраняем в localStorage для быстрого скрытия звездочки
+            var storageKey = type === 'custom' ? 'gustolocal_viewed_custom_feedbacks' : 'gustolocal_viewed_feedbacks';
+            var viewed = JSON.parse(localStorage.getItem(storageKey) || '[]');
+            if (viewed.indexOf(token) === -1) {
+                viewed.push(token);
+                localStorage.setItem(storageKey, JSON.stringify(viewed));
+            }
+            
+            // Отправляем на сервер для обновления счетчика в меню
+            var formData = new FormData();
+            formData.append('action', 'gustolocal_mark_feedback_viewed');
+            formData.append('token', token);
+            formData.append('type', type);
+            
+            fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+                method: 'POST',
+                body: formData
+            })
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    // Обновляем счетчик в меню
+                    updateMenuCounter(type);
+                }
+            })
+            .catch(function(error) {
+                console.error('Ошибка при сохранении просмотренного отзыва:', error);
+            });
+        }
+    }
+    
+    if (typeof updateMenuCounter === 'undefined') {
+        // Функция для обновления счетчика в меню
+        function updateMenuCounter(type) {
+            // Получаем актуальный счетчик с сервера
+            var formData = new FormData();
+            formData.append('action', 'gustolocal_get_feedback_count');
+            formData.append('type', type);
+            
+            fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+                method: 'POST',
+                body: formData
+            })
+            .then(function(response) { return response.json(); })
+            .then(function(data) {
+                if (data.success) {
+                    var count = data.data.count || 0;
+                    var menuSlug = type === 'custom' ? 'gustolocal-custom-feedback' : 'gustolocal-feedback';
+                    
+                    // Пробуем разные способы найти элемент меню
+                    var menuItem = null;
+                    
+                    // Способ 1: поиск по href с полным URL
+                    var allLinks = document.querySelectorAll('a[href*="' + menuSlug + '"]');
+                    if (allLinks.length > 0) {
+                        menuItem = allLinks[0];
+                    }
+                    
+                    // Способ 2: поиск по page параметру
+                    if (!menuItem) {
+                        allLinks = document.querySelectorAll('a[href*="page=' + menuSlug + '"]');
+                        if (allLinks.length > 0) {
+                            menuItem = allLinks[0];
+                        }
+                    }
+                    
+                    // Способ 3: поиск в меню WooCommerce по тексту
+                    if (!menuItem && type === 'custom') {
+                        var wooMenu = document.querySelector('#toplevel_page_woocommerce');
+                        if (wooMenu) {
+                            var links = wooMenu.querySelectorAll('a');
+                            for (var i = 0; i < links.length; i++) {
+                                if (links[i].textContent.indexOf('Кастомные опросы') !== -1) {
+                                    menuItem = links[i];
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (!menuItem && type === 'regular') {
+                        var wooMenu = document.querySelector('#toplevel_page_woocommerce');
+                        if (wooMenu) {
+                            var links = wooMenu.querySelectorAll('a');
+                            for (var i = 0; i < links.length; i++) {
+                                if (links[i].textContent.indexOf('Обратная связь') !== -1) {
+                                    menuItem = links[i];
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    
+                    if (menuItem) {
+                        var badge = menuItem.querySelector('.awaiting-mod');
+                        if (count > 0) {
+                            if (badge) {
+                                badge.textContent = count;
+                            } else {
+                                // Создаем новый badge
+                                var span = document.createElement('span');
+                                span.className = 'awaiting-mod';
+                                span.textContent = count;
+                                menuItem.appendChild(document.createTextNode(' '));
+                                menuItem.appendChild(span);
+                            }
+                        } else {
+                            // Удаляем badge если счетчик = 0
+                            if (badge) {
+                                badge.remove();
+                            }
+                        }
+                    } else {
+                        console.warn('Элемент меню не найден для типа:', type);
+                    }
+                }
+            })
+            .catch(function(error) {
+                console.error('Ошибка при получении счетчика:', error);
+            });
+        }
+    }
+    
     document.addEventListener('DOMContentLoaded', function() {
         // Копирование ссылок
         document.querySelectorAll('.copy-link-btn').forEach(function(btn) {
