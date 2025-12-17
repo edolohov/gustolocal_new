@@ -3154,6 +3154,58 @@ function gustolocal_feedback_management_page() {
     </style>
     
     <script>
+    // Глобальные функции для работы с просмотренными отзывами
+    function markFeedbackAsViewed(token, type) {
+        type = type || 'regular';
+        
+        // Сохраняем в localStorage для быстрого скрытия звездочки
+        var storageKey = type === 'custom' ? 'gustolocal_viewed_custom_feedbacks' : 'gustolocal_viewed_feedbacks';
+        var viewed = JSON.parse(localStorage.getItem(storageKey) || '[]');
+        if (viewed.indexOf(token) === -1) {
+            viewed.push(token);
+            localStorage.setItem(storageKey, JSON.stringify(viewed));
+        }
+        
+        // Отправляем на сервер для обновления счетчика в меню
+        var formData = new FormData();
+        formData.append('action', 'gustolocal_mark_feedback_viewed');
+        formData.append('token', token);
+        formData.append('type', type);
+        
+        fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
+            method: 'POST',
+            body: formData
+        })
+        .then(function(response) { return response.json(); })
+        .then(function(data) {
+            if (data.success) {
+                // Обновляем счетчик в меню
+                updateMenuCounter(type);
+            }
+        })
+        .catch(function(error) {
+            console.error('Ошибка при сохранении просмотренного отзыва:', error);
+        });
+    }
+    
+    // Функция для обновления счетчика в меню
+    function updateMenuCounter(type) {
+        // Находим элемент меню и обновляем счетчик через AJAX
+        var menuItem = document.querySelector('a[href*="gustolocal-' + (type === 'custom' ? 'custom-feedback' : 'feedback') + '"]');
+        if (menuItem) {
+            var badge = menuItem.querySelector('.awaiting-mod');
+            if (badge) {
+                var currentCount = parseInt(badge.textContent) || 0;
+                var newCount = Math.max(0, currentCount - 1);
+                if (newCount > 0) {
+                    badge.textContent = newCount;
+                } else {
+                    badge.remove();
+                }
+            }
+        }
+    }
+    
     document.addEventListener('DOMContentLoaded', function() {
         // Копирование ссылок
         document.querySelectorAll('.copy-link-btn').forEach(function(btn) {
@@ -3176,58 +3228,6 @@ function gustolocal_feedback_management_page() {
                 }
             });
         });
-        
-        // Функция для сохранения просмотренного отзыва на сервере
-        function markFeedbackAsViewed(token, type) {
-            type = type || 'regular';
-            
-            // Сохраняем в localStorage для быстрого скрытия звездочки
-            var storageKey = type === 'custom' ? 'gustolocal_viewed_custom_feedbacks' : 'gustolocal_viewed_feedbacks';
-            var viewed = JSON.parse(localStorage.getItem(storageKey) || '[]');
-            if (viewed.indexOf(token) === -1) {
-                viewed.push(token);
-                localStorage.setItem(storageKey, JSON.stringify(viewed));
-            }
-            
-            // Отправляем на сервер для обновления счетчика в меню
-            var formData = new FormData();
-            formData.append('action', 'gustolocal_mark_feedback_viewed');
-            formData.append('token', token);
-            formData.append('type', type);
-            
-            fetch('<?php echo admin_url('admin-ajax.php'); ?>', {
-                method: 'POST',
-                body: formData
-            })
-            .then(function(response) { return response.json(); })
-            .then(function(data) {
-                if (data.success) {
-                    // Обновляем счетчик в меню
-                    updateMenuCounter(type);
-                }
-            })
-            .catch(function(error) {
-                console.error('Ошибка при сохранении просмотренного отзыва:', error);
-            });
-        }
-        
-        // Функция для обновления счетчика в меню
-        function updateMenuCounter(type) {
-            // Находим элемент меню и обновляем счетчик через AJAX
-            var menuItem = document.querySelector('a[href*="gustolocal-' + (type === 'custom' ? 'custom-feedback' : 'feedback') + '"]');
-            if (menuItem) {
-                var badge = menuItem.querySelector('.awaiting-mod');
-                if (badge) {
-                    var currentCount = parseInt(badge.textContent) || 0;
-                    var newCount = Math.max(0, currentCount - 1);
-                    if (newCount > 0) {
-                        badge.textContent = newCount;
-                    } else {
-                        badge.remove();
-                    }
-                }
-            }
-        }
         
         // Раскрытие/сворачивание строк с деталями
         document.querySelectorAll('.clickable-row').forEach(function(row) {
@@ -5539,8 +5539,6 @@ function gustolocal_custom_feedback_management_page() {
                 }
             });
         });
-        
-        // Используем общую функцию markFeedbackAsViewed для кастомных отзывов
         
         // Раскрытие/сворачивание строк с деталями для кастомных опросов
         document.querySelectorAll('.custom-feedback-row.clickable-row').forEach(function(row) {
