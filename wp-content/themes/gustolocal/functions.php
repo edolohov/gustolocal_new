@@ -3231,7 +3231,50 @@ function gustolocal_feedback_management_page() {
             if (data.success) {
                 var count = data.data.count || 0;
                 var menuSlug = type === 'custom' ? 'gustolocal-custom-feedback' : 'gustolocal-feedback';
-                var menuItem = document.querySelector('a[href*="' + menuSlug + '"]');
+                
+                // Пробуем разные способы найти элемент меню
+                var menuItem = null;
+                
+                // Способ 1: поиск по href с полным URL
+                var allLinks = document.querySelectorAll('a[href*="' + menuSlug + '"]');
+                if (allLinks.length > 0) {
+                    menuItem = allLinks[0];
+                }
+                
+                // Способ 2: поиск по page параметру
+                if (!menuItem) {
+                    allLinks = document.querySelectorAll('a[href*="page=' + menuSlug + '"]');
+                    if (allLinks.length > 0) {
+                        menuItem = allLinks[0];
+                    }
+                }
+                
+                // Способ 3: поиск в меню WooCommerce по тексту
+                if (!menuItem && type === 'custom') {
+                    var wooMenu = document.querySelector('#toplevel_page_woocommerce');
+                    if (wooMenu) {
+                        var links = wooMenu.querySelectorAll('a');
+                        for (var i = 0; i < links.length; i++) {
+                            if (links[i].textContent.indexOf('Кастомные опросы') !== -1) {
+                                menuItem = links[i];
+                                break;
+                            }
+                        }
+                    }
+                }
+                
+                if (!menuItem && type === 'regular') {
+                    var wooMenu = document.querySelector('#toplevel_page_woocommerce');
+                    if (wooMenu) {
+                        var links = wooMenu.querySelectorAll('a');
+                        for (var i = 0; i < links.length; i++) {
+                            if (links[i].textContent.indexOf('Обратная связь') !== -1) {
+                                menuItem = links[i];
+                                break;
+                            }
+                        }
+                    }
+                }
                 
                 if (menuItem) {
                     var badge = menuItem.querySelector('.awaiting-mod');
@@ -3252,6 +3295,8 @@ function gustolocal_feedback_management_page() {
                             badge.remove();
                         }
                     }
+                } else {
+                    console.warn('Элемент меню не найден для типа:', type);
                 }
             }
         })
