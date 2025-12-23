@@ -3274,6 +3274,131 @@ function gustolocal_get_column_letter($col_num) {
     return $letter;
 }
 
+// Функция для отображения сводной таблицы разбора для печати (только первые 3 колонки)
+function gustolocal_display_breakdown_table_print($data) {
+    $dishes_by_sale_type = isset($data['dishes_by_sale_type']) ? $data['dishes_by_sale_type'] : array();
+    $total_portions = $data['total_portions'];
+    
+    ?>
+    <style>
+    .breakdown-table-print {
+        width: 100%;
+        border-collapse: collapse;
+        margin-top: 20px;
+        font-size: 13px;
+    }
+    .breakdown-table-print th,
+    .breakdown-table-print td {
+        border: 1px solid #ddd;
+        padding: 8px;
+        text-align: left;
+    }
+    .breakdown-table-print th {
+        background-color: #f5f5f5;
+        font-weight: bold;
+    }
+    .breakdown-table-print .category-header {
+        background-color: #e8f4f8;
+        font-weight: bold;
+        font-size: 14px;
+    }
+    .breakdown-table-print .sale-type-header {
+        background-color: #cfe2f3;
+        font-weight: bold;
+        font-size: 15px;
+    }
+    .breakdown-table-print .dish-row {
+        background-color: #fff;
+    }
+    .breakdown-table-print .total-row {
+        background-color: #fff3cd;
+        font-weight: bold;
+    }
+    .breakdown-table-print .dish-col {
+        min-width: 200px;
+    }
+    .breakdown-table-print .qty-cell {
+        text-align: center;
+        font-weight: bold;
+    }
+    </style>
+    
+    <div style="overflow-x: auto; max-width: 100%;">
+        <table class="breakdown-table-print" id="breakdown-table-print">
+            <thead>
+                <tr>
+                    <th class="dish-col">Блюдо</th>
+                    <th class="total-row">ИТОГО</th>
+                    <th class="total-row">Итоговый вес</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php 
+                // Обрабатываем сначала superfood, потом mercat
+                $sale_types_order = array('superfood', 'mercat');
+                
+                foreach ($sale_types_order as $sale_type):
+                    if (!isset($dishes_by_sale_type[$sale_type]) || empty($dishes_by_sale_type[$sale_type])) {
+                        continue;
+                    }
+                    
+                    $sale_type_label = ($sale_type === 'superfood') ? 'Superfood' : 'Mercat';
+                ?>
+                    <tr class="sale-type-header">
+                        <td class="sale-type-header" colspan="3"><strong><?php echo esc_html($sale_type_label); ?></strong></td>
+                    </tr>
+                    
+                <?php 
+                $current_category = '';
+                foreach ($dishes_by_sale_type[$sale_type] as $category => $dishes): 
+                    if ($current_category !== $category):
+                        $current_category = $category;
+                ?>
+                    <tr class="category-header">
+                        <td class="category-header" colspan="3"><strong><?php echo esc_html($category); ?></strong></td>
+                    </tr>
+                <?php endif; ?>
+                
+                <?php foreach ($dishes as $dish_key => $dish_data): 
+                    $dish_total = array_sum($dish_data['quantities']);
+                    $weight_info = gustolocal_calculate_dish_weight($dish_data, $dish_data['quantities']);
+                ?>
+                    <tr class="dish-row">
+                        <td class="dish-col">
+                            <?php echo esc_html($dish_data['name']); ?>
+                            <?php if ($dish_data['unit']): ?>
+                                <small style="color: #666;">(<?php echo esc_html($dish_data['unit']); ?>)</small>
+                            <?php endif; ?>
+                        </td>
+                        <td class="qty-cell total-row">
+                            <?php echo $dish_total; ?>
+                        </td>
+                        <td class="qty-cell total-row" style="text-align: left;">
+                            <?php if ($weight_info['display']): ?>
+                                <?php echo esc_html($weight_info['display']); ?>
+                            <?php else: ?>
+                                <span style="color: #999;">—</span>
+                            <?php endif; ?>
+                        </td>
+                    </tr>
+                <?php endforeach; ?>
+                <?php endforeach; ?>
+                <?php endforeach; ?>
+                
+                <!-- Строка ИТОГО -->
+                <tr class="total-row">
+                    <td><strong>ИТОГО</strong></td>
+                    <td class="qty-cell">
+                        <strong><?php echo number_format($total_portions, 0, ',', ' '); ?></strong>
+                    </td>
+                    <td></td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    <?php
+}
+
 /* ========================================
    СИСТЕМА ОБРАТНОЙ СВЯЗИ О БЛЮДАХ
    ======================================== */
@@ -7927,7 +8052,7 @@ function gustolocal_printer_workstation_page() {
     }
     
     $active_tab = isset($_GET['tab']) ? sanitize_text_field($_GET['tab']) : 'orders';
-    if (!in_array($active_tab, array('orders', 'dishes'))) {
+    if (!in_array($active_tab, array('orders', 'dishes', 'breakdown'))) {
         $active_tab = 'orders';
     }
     
@@ -7942,12 +8067,17 @@ function gustolocal_printer_workstation_page() {
             <a href="?page=gustolocal-printer-workstation&tab=dishes" class="nav-tab <?php echo $active_tab === 'dishes' ? 'nav-tab-active' : ''; ?>">
                 🏷️ Блюда (этикетки)
             </a>
+            <a href="?page=gustolocal-printer-workstation&tab=breakdown" class="nav-tab <?php echo $active_tab === 'breakdown' ? 'nav-tab-active' : ''; ?>">
+                📊 Разбор (чеки)
+            </a>
         </nav>
         
         <?php if ($active_tab === 'orders'): ?>
             <?php gustolocal_render_orders_tab(); ?>
-        <?php else: ?>
+        <?php elseif ($active_tab === 'dishes'): ?>
             <?php gustolocal_render_dishes_tab(); ?>
+        <?php else: ?>
+            <?php gustolocal_render_breakdown_tab(); ?>
         <?php endif; ?>
     </div>
     <?php
@@ -8196,6 +8326,187 @@ function gustolocal_render_dishes_tab() {
                 '&allergens=' + encodeURIComponent(allergens || '') +
                 '&nutrition=' + encodeURIComponent(nutrition || '');
             
+            window.open(printUrl, '_blank');
+        });
+    });
+    </script>
+    <?php
+}
+
+// Вкладка разбора заказов для печати на кухню
+function gustolocal_render_breakdown_tab() {
+    // Проверяем, что WooCommerce активен
+    if (!function_exists('wc_get_orders')) {
+        echo '<div class="wrap"><h1>Разбор заказов</h1><div class="error"><p>WooCommerce не активирован!</p></div></div>';
+        return;
+    }
+    
+    $selected_orders = isset($_POST['order_ids']) && is_array($_POST['order_ids']) 
+        ? array_map('intval', $_POST['order_ids']) 
+        : array();
+    
+    $date_from = isset($_POST['date_from']) ? sanitize_text_field($_POST['date_from']) : date('Y-m-d', strtotime('-7 days'));
+    $date_to = isset($_POST['date_to']) ? sanitize_text_field($_POST['date_to']) : date('Y-m-d');
+    $status_filter = isset($_POST['status']) ? sanitize_text_field($_POST['status']) : '';
+    
+    // Получаем заказы для выбора
+    $orders_query = array(
+        'limit' => 500,
+        'orderby' => 'date',
+        'order' => 'DESC',
+        'date_created' => $date_from . '...' . $date_to,
+    );
+    
+    if ($status_filter) {
+        $orders_query['status'] = $status_filter;
+    }
+    
+    $all_orders = wc_get_orders($orders_query);
+    
+    // Если выбраны заказы, формируем сводку
+    $breakdown_data = null;
+    if (!empty($selected_orders)) {
+        $breakdown_data = gustolocal_generate_breakdown($selected_orders);
+    }
+    
+    ?>
+    <div class="printer-workstation-breakdown">
+        <form method="post" action="" id="breakdown-form">
+            <div class="postbox" style="margin-top: 20px; padding: 20px;">
+                <h2>Фильтры</h2>
+                <table class="form-table">
+                    <tr>
+                        <th><label for="date_from">Дата от:</label></th>
+                        <td><input type="date" id="date_from" name="date_from" value="<?php echo esc_attr($date_from); ?>" class="regular-text"></td>
+                    </tr>
+                    <tr>
+                        <th><label for="date_to">Дата до:</label></th>
+                        <td><input type="date" id="date_to" name="date_to" value="<?php echo esc_attr($date_to); ?>" class="regular-text"></td>
+                    </tr>
+                    <tr>
+                        <th><label for="status">Статус:</label></th>
+                        <td>
+                            <select id="status" name="status" class="regular-text">
+                                <option value="">Все статусы</option>
+                                <?php
+                                $statuses = wc_get_order_statuses();
+                                foreach ($statuses as $status_key => $status_label) {
+                                    $selected = ($status_filter === $status_key) ? 'selected' : '';
+                                    echo '<option value="' . esc_attr($status_key) . '" ' . $selected . '>' . esc_html($status_label) . '</option>';
+                                }
+                                ?>
+                            </select>
+                        </td>
+                    </tr>
+                </table>
+                <p class="submit">
+                    <input type="submit" name="filter_orders" class="button button-primary" value="Применить фильтры">
+                </p>
+            </div>
+            
+            <div class="postbox" style="margin-top: 20px; padding: 20px;">
+                <h2>Выберите заказы</h2>
+                <p>
+                    <button type="button" class="button" onclick="selectAllOrdersBreakdown()">Выбрать все</button>
+                    <button type="button" class="button" onclick="deselectAllOrdersBreakdown()">Снять выбор</button>
+                </p>
+                
+                <?php if (empty($all_orders)): ?>
+                    <p>Заказы не найдены.</p>
+                <?php else: ?>
+                    <table class="wp-list-table widefat fixed striped">
+                        <thead>
+                            <tr>
+                                <th style="width: 30px;"><input type="checkbox" id="select-all-checkbox-breakdown" onclick="toggleAllOrdersBreakdown(this)"></th>
+                                <th>№ заказа</th>
+                                <th>Дата</th>
+                                <th>Клиент</th>
+                                <th>Статус</th>
+                                <th>Способ получения</th>
+                                <th>Сумма</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($all_orders as $order): 
+                                $is_selected = in_array($order->get_id(), $selected_orders);
+                                $customer_name = $order->get_billing_first_name() . ' ' . $order->get_billing_last_name();
+                                if (trim($customer_name) === '') {
+                                    $customer_name = $order->get_billing_company() ?: 'Гость';
+                                }
+                                $is_pickup = gustolocal_is_pickup_order($order);
+                            ?>
+                                <tr>
+                                    <td>
+                                        <input type="checkbox" 
+                                               name="order_ids[]" 
+                                               value="<?php echo esc_attr($order->get_id()); ?>"
+                                               <?php echo $is_selected ? 'checked' : ''; ?>>
+                                    </td>
+                                    <td><strong>#<?php echo esc_html($order->get_id()); ?></strong></td>
+                                    <td><?php echo esc_html($order->get_date_created()->date_i18n('d.m.Y H:i')); ?></td>
+                                    <td><?php echo esc_html($customer_name); ?></td>
+                                    <td><?php echo esc_html(wc_get_order_status_name($order->get_status())); ?></td>
+                                    <td><?php echo $is_pickup ? '<strong>Самовывоз</strong>' : 'Доставка'; ?></td>
+                                    <td><?php echo $order->get_formatted_order_total(); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                    
+                    <p class="submit" style="margin-top: 20px;">
+                        <input type="submit" name="generate_breakdown" class="button button-primary button-large" value="Сформировать сводку">
+                    </p>
+                <?php endif; ?>
+            </div>
+        </form>
+        
+        <?php if ($breakdown_data): ?>
+            <div class="postbox" style="margin-top: 20px; padding: 20px;">
+                <h2>Сводная таблица для кухни</h2>
+                <div style="margin: 20px 0;">
+                    <button id="print-breakdown-btn" class="button button-primary button-large" style="background: #28a745; border-color: #28a745; font-size: 16px; padding: 10px 20px; height: auto;">
+                        🖨️ Печать на кухню (80 мм)
+                    </button>
+                </div>
+                <?php gustolocal_display_breakdown_table_print($breakdown_data); ?>
+            </div>
+        <?php endif; ?>
+    </div>
+    
+    <script>
+    function toggleAllOrdersBreakdown(checkbox) {
+        var checkboxes = document.querySelectorAll('#breakdown-form input[name="order_ids[]"]');
+        checkboxes.forEach(function(cb) {
+            cb.checked = checkbox.checked;
+        });
+    }
+    
+    function selectAllOrdersBreakdown() {
+        var checkboxes = document.querySelectorAll('#breakdown-form input[name="order_ids[]"]');
+        checkboxes.forEach(function(cb) {
+            cb.checked = true;
+        });
+        document.getElementById('select-all-checkbox-breakdown').checked = true;
+    }
+    
+    function deselectAllOrdersBreakdown() {
+        var checkboxes = document.querySelectorAll('#breakdown-form input[name="order_ids[]"]');
+        checkboxes.forEach(function(cb) {
+            cb.checked = false;
+        });
+        document.getElementById('select-all-checkbox-breakdown').checked = false;
+    }
+    
+    jQuery(document).ready(function($) {
+        $('#print-breakdown-btn').on('click', function() {
+            const orderIds = <?php echo json_encode($breakdown_data['order_ids']); ?>;
+            if (!orderIds || orderIds.length === 0) {
+                alert('Нет заказов для печати');
+                return;
+            }
+            
+            const printUrl = '<?php echo admin_url('admin.php?page=gustolocal-print-breakdown'); ?>' + 
+                '&order_ids=' + orderIds.join(',');
             window.open(printUrl, '_blank');
         });
     });
@@ -9041,5 +9352,271 @@ function gustolocal_print_multiple_orders_page() {
     </html>
     <?php
     exit;
+}
+
+// Добавляем страницу печати разбора заказов
+add_action('admin_menu', 'gustolocal_add_print_breakdown_page');
+function gustolocal_add_print_breakdown_page() {
+    add_submenu_page(
+        null,
+        'Печать разбора заказов',
+        'Печать разбора заказов',
+        'read',
+        'gustolocal-print-breakdown',
+        'gustolocal_print_breakdown_page'
+    );
+}
+
+// Страница печати разбора заказов
+function gustolocal_print_breakdown_page() {
+    if (!current_user_can('read')) {
+        wp_die(__('У вас нет прав для доступа к этой странице.'));
+    }
+    
+    $order_ids_str = isset($_GET['order_ids']) ? sanitize_text_field($_GET['order_ids']) : '';
+    if (empty($order_ids_str)) {
+        echo '<div class="wrap"><h1>Ошибка</h1><p>Не указаны ID заказов.</p></div>';
+        return;
+    }
+    
+    $order_ids = array_map('intval', explode(',', $order_ids_str));
+    $breakdown_data = gustolocal_generate_breakdown($order_ids);
+    
+    if (!$breakdown_data || empty($breakdown_data['dishes_by_sale_type'])) {
+        echo '<div class="wrap"><h1>Ошибка</h1><p>Не удалось сформировать разбор заказов.</p></div>';
+        return;
+    }
+    
+    ?>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Печать разбора заказов</title>
+        <script src="https://cdn.jsdelivr.net/npm/qz-tray@2.2/qz-tray.min.js"></script>
+    </head>
+    <body>
+        <div style="text-align: center; margin: 20px;">
+            <div id="qz-status" style="margin: 10px 0; padding: 8px; border-radius: 4px; font-size: 12px; background: #f8d7da; color: #721c24;">
+                QZ Tray: Не подключен
+            </div>
+            <button id="qz-print-btn" onclick="printBreakdown()" style="background: #28a745; color: white; padding: 15px 30px; border: none; cursor: pointer; font-size: 18px; border-radius: 5px; font-weight: bold;">
+                🖨️ Печать разбора на кухню
+            </button>
+        </div>
+        
+        <script>
+        const breakdownData = <?php echo json_encode($breakdown_data, JSON_UNESCAPED_UNICODE); ?>;
+        const PRINTER_NAME = 'Printer POS-80';
+        let qzConnected = false;
+        
+        // Подключение к QZ Tray
+        window.addEventListener('load', function() {
+            connectToQZTray();
+        });
+        
+        async function connectToQZTray() {
+            const statusEl = document.getElementById('qz-status');
+            const printBtn = document.getElementById('qz-print-btn');
+            
+            try {
+                if (typeof qz === 'undefined') {
+                    throw new Error('QZ Tray библиотека не загружена');
+                }
+                
+                await qz.websocket.connect().then(function() {
+                    qzConnected = true;
+                    statusEl.textContent = 'QZ Tray: Подключен ✓';
+                    statusEl.style.background = '#d4edda';
+                    statusEl.style.color = '#155724';
+                    printBtn.disabled = false;
+                });
+            } catch (err) {
+                qzConnected = false;
+                statusEl.textContent = 'QZ Tray: Не подключен';
+                printBtn.disabled = true;
+            }
+        }
+        
+        // Функции конвертации UTF-8 в CP866
+        function utf8ToCp866(str) {
+            if (!str) return str;
+            const utf8ToCp866Map = {
+                'А': '\x80', 'Б': '\x81', 'В': '\x82', 'Г': '\x83', 'Д': '\x84', 'Е': '\x85', 'Ж': '\x86', 'З': '\x87',
+                'И': '\x88', 'Й': '\x89', 'К': '\x8A', 'Л': '\x8B', 'М': '\x8C', 'Н': '\x8D', 'О': '\x8E', 'П': '\x8F',
+                'Р': '\x90', 'С': '\x91', 'Т': '\x92', 'У': '\x93', 'Ф': '\x94', 'Х': '\x95', 'Ц': '\x96', 'Ч': '\x97',
+                'Ш': '\x98', 'Щ': '\x99', 'Ъ': '\x9A', 'Ы': '\x9B', 'Ь': '\x9C', 'Э': '\x9D', 'Ю': '\x9E', 'Я': '\x9F',
+                'а': '\xA0', 'б': '\xA1', 'в': '\xA2', 'г': '\xA3', 'д': '\xA4', 'е': '\xA5', 'ж': '\xA6', 'з': '\xA7',
+                'и': '\xA8', 'й': '\xA9', 'к': '\xAA', 'л': '\xAB', 'м': '\xAC', 'н': '\xAD', 'о': '\xAE', 'п': '\xAF',
+                'р': '\xE0', 'с': '\xE1', 'т': '\xE2', 'у': '\xE3', 'ф': '\xE4', 'х': '\xE5', 'ц': '\xE6', 'ч': '\xE7',
+                'ш': '\xE8', 'щ': '\xE9', 'ъ': '\xEA', 'ы': '\xEB', 'ь': '\xEC', 'э': '\xED', 'ю': '\xEE', 'я': '\xEF',
+                'Ё': '\xF0', 'ё': '\xF1'
+            };
+            let result = '';
+            for (let i = 0; i < str.length; i++) {
+                const char = str[i];
+                if (utf8ToCp866Map[char]) {
+                    result += utf8ToCp866Map[char];
+                } else if (char.charCodeAt(0) < 128) {
+                    result += char;
+                } else {
+                    result += '?';
+                }
+            }
+            return result;
+        }
+        
+        function generateBreakdownESCPOS(breakdownData) {
+            let commands = [];
+            const ESC = '\x1B';
+            const GS = '\x1D';
+            const LF = '\x0A';
+            
+            // Инициализация принтера
+            commands.push(ESC + '@'); // Сброс принтера
+            commands.push(ESC + '\x74' + '\x11'); // ESC t 17 = CP866 (Cyrillic)
+            commands.push(LF + LF + LF + LF + LF + LF + LF + LF + LF + LF);
+            
+            // Заголовок
+            commands.push(ESC + '!' + '\x08'); // Полужирный
+            commands.push(utf8ToCp866('РАЗБОР ЗАКАЗОВ') + LF);
+            commands.push(ESC + '!' + '\x00'); // Обычный
+            commands.push(LF);
+            commands.push('--------------------------------' + LF);
+            commands.push(LF);
+            
+            const dishesBySaleType = breakdownData.dishes_by_sale_type || {};
+            const saleTypesOrder = ['superfood', 'mercat'];
+            
+            saleTypesOrder.forEach(function(saleType) {
+                if (!dishesBySaleType[saleType]) return;
+                
+                const saleTypeLabel = saleType === 'superfood' ? 'Superfood' : 'Mercat';
+                commands.push(ESC + '!' + '\x08'); // Полужирный
+                commands.push(utf8ToCp866(saleTypeLabel) + LF);
+                commands.push(ESC + '!' + '\x00'); // Обычный
+                commands.push(LF);
+                
+                const categories = dishesBySaleType[saleType];
+                Object.keys(categories).forEach(function(category) {
+                    const dishes = categories[category];
+                    
+                    // Категория
+                    commands.push(utf8ToCp866(category) + LF);
+                    
+                    // Блюда
+                    Object.keys(dishes).forEach(function(dishKey) {
+                        const dish = dishes[dishKey];
+                        const dishTotal = Object.values(dish.quantities || {}).reduce(function(sum, qty) { return sum + qty; }, 0);
+                        
+                        // Вычисляем вес
+                        let weightDisplay = '';
+                        if (dish.unit) {
+                            const totalQty = dishTotal;
+                            if (dish.unit.match(/^(\d+(?:[.,]\d+)?)\s*(г|мл|кг|л|шт|пор)/ui)) {
+                                const match = dish.unit.match(/^(\d+(?:[.,]\d+)?)\s*(г|мл|кг|л|шт|пор)/ui);
+                                const value = parseFloat(match[1].replace(',', '.'));
+                                const unitType = match[2];
+                                const totalWeight = value * totalQty;
+                                weightDisplay = Math.round(totalWeight) + ' ' + unitType;
+                            }
+                        }
+                        
+                        // Название блюда, количество и вес в одну строку для экономии бумаги
+                        let dishLine = dish.name;
+                        if (dish.unit) {
+                            dishLine += ' (' + dish.unit + ')';
+                        }
+                        // Добавляем количество и вес в ту же строку
+                        if (weightDisplay) {
+                            dishLine += '  ' + dishTotal + ' шт. / ' + weightDisplay;
+                        } else {
+                            dishLine += '  ' + dishTotal + ' шт.';
+                        }
+                        // Конвертируем всю строку в CP866
+                        commands.push(utf8ToCp866(dishLine) + LF);
+                        commands.push(LF);
+                    });
+                });
+            });
+            
+            // Итоговая строка
+            commands.push('--------------------------------' + LF);
+            commands.push(ESC + '!' + '\x08'); // Полужирный
+            commands.push(utf8ToCp866('ИТОГО: ' + breakdownData.total_portions + ' шт.') + LF);
+            commands.push(ESC + '!' + '\x00'); // Обычный
+            commands.push(LF);
+            commands.push(LF);
+            commands.push(LF);
+            
+            // Автоотрез
+            commands.push(GS + 'V' + '\x41' + '\x03');
+            
+            return commands.join('');
+        }
+        
+        async function printBreakdown() {
+            if (!qzConnected) {
+                alert('QZ Tray не подключен');
+                return;
+            }
+            
+            const printBtn = document.getElementById('qz-print-btn');
+            printBtn.disabled = true;
+            printBtn.textContent = 'Печать...';
+            
+            try {
+                const escposData = generateBreakdownESCPOS(breakdownData);
+                
+                const bytes = [];
+                for (let i = 0; i < escposData.length; i++) {
+                    const char = escposData[i];
+                    const charCode = char.charCodeAt(0);
+                    if (charCode < 256) {
+                        bytes.push(charCode);
+                    } else {
+                        bytes.push(charCode & 0xFF);
+                    }
+                }
+                
+                let binary = '';
+                for (let i = 0; i < bytes.length; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                const base64Data = btoa(binary);
+                
+                const config = qz.configs.create(PRINTER_NAME);
+                const printers = await qz.printers.find();
+                
+                if (!printers.includes(PRINTER_NAME)) {
+                    throw new Error('Принтер не найден');
+                }
+                
+                await qz.print(config, [{
+                    type: 'raw',
+                    format: 'base64',
+                    data: base64Data
+                }]).then(function() {
+                    alert('Разбор заказов успешно отправлен на печать!');
+                    window.close();
+                });
+            } catch (err) {
+                console.error('Print error:', err);
+                alert('Ошибка при печати: ' + err.message);
+            } finally {
+                printBtn.disabled = false;
+                printBtn.textContent = '🖨️ Печать разбора на кухню';
+            }
+        }
+        
+        window.addEventListener('beforeunload', function() {
+            if (qzConnected && typeof qz !== 'undefined') {
+                qz.websocket.disconnect();
+            }
+        });
+        </script>
+    </body>
+    </html>
+    <?php
 }
 
