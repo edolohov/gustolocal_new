@@ -841,6 +841,14 @@ function gustolocal_apply_order_defaults($order_id) {
         
         $needs_save = false;
         
+        // Сохраняем delivery_type если его еще нет
+        $delivery_type = $order->get_meta('_delivery_type', true);
+        if (empty($delivery_type) && WC()->session) {
+            $session_delivery_type = WC()->session->get('delivery_type', 'delivery');
+            $order->update_meta_data('_delivery_type', $session_delivery_type);
+            $needs_save = true;
+        }
+        
         if (!$order->get_billing_country()) {
             $order->set_billing_country('ES');
             $needs_save = true;
@@ -1076,6 +1084,21 @@ function gustolocal_update_delivery_type_on_cart_update() {
         if (in_array($delivery_type, array('delivery', 'pickup'))) {
             WC()->session->set('delivery_type', $delivery_type);
         }
+    }
+}
+
+// Сохраняем delivery_type в мета-данные заказа при создании
+add_action('woocommerce_checkout_update_order_meta', 'gustolocal_save_delivery_type_to_order', 10, 2);
+function gustolocal_save_delivery_type_to_order($order_id, $data) {
+    if (isset($data['delivery_type'])) {
+        $delivery_type = sanitize_text_field($data['delivery_type']);
+        if (in_array($delivery_type, array('delivery', 'pickup'))) {
+            update_post_meta($order_id, '_delivery_type', $delivery_type);
+        }
+    } elseif (WC()->session) {
+        // Если delivery_type не передан в данных, берем из сессии
+        $delivery_type = WC()->session->get('delivery_type', 'delivery');
+        update_post_meta($order_id, '_delivery_type', $delivery_type);
     }
 }
 
@@ -1789,6 +1812,109 @@ function gustolocal_add_order_breakdown_page() {
     );
 }
 
+// Хелпер: определение самовывоза по данным заказа
+function gustolocal_is_pickup_order($order) {
+    if (!$order) return false;
+
+    // 1) Явное мета-поле _delivery_type
+    $delivery_type = $order->get_meta('_delivery_type', true);
+    if ($delivery_type === 'pickup') return true;
+    if ($delivery_type === 'delivery') return false;
+
+    // 2) Проверка позиций fee по стоимости (ключевой способ для вашей системы):
+    // - fee с total = 0 → самовывоз (независимо от названия)
+    // - fee с total = 10 → доставка (независимо от названия)
+    // Также проверяем название fee и мета-данные
+    foreach ($order->get_items('fee') as $fee_item) {
+        $fee_name = $fee_item->get_name();
+        $fee_total = floatval($fee_item->get_total());
+        
+        // Проверяем по стоимости (самый надежный способ)
+        // Если total = 0 → самовывоз
+        if (abs($fee_total) < 0.01) {
+            return true;
+        }
+        
+        // Если total = 10 → доставка
+        if (abs($fee_total - 10.0) < 0.01) {
+            return false;
+        }
+        
+        // Дополнительная проверка по названию (на случай если стоимость отличается)
+        // Если fee "Самовывоз" → самовывоз
+        if (stripos($fee_name, 'самовывоз') !== false ||
+            stripos($fee_name, 'pickup') !== false ||
+            stripos($fee_name, 'самостоятельно') !== false) {
+            return true;
+        }
+        
+        // Если fee "Доставка" → доставка
+        if (stripos($fee_name, 'доставка') !== false || 
+            stripos($fee_name, 'delivery') !== false) {
+            return false;
+        }
+        
+        // Проверяем мета-данные fee (может быть поле "комиссионные" или другие)
+        $fee_meta = $fee_item->get_meta_data();
+        foreach ($fee_meta as $meta) {
+            $meta_key = $meta->key;
+            $meta_value = $meta->value;
+            
+            // Если в мета есть упоминание самовывоза
+            if (is_string($meta_value) && (
+                stripos($meta_value, 'самовывоз') !== false ||
+                stripos($meta_value, 'pickup') !== false
+            )) {
+                return true;
+            }
+            
+            // Если в мета есть упоминание доставки
+            if (is_string($meta_value) && (
+                stripos($meta_value, 'доставка') !== false ||
+                stripos($meta_value, 'delivery') !== false
+            )) {
+                return false;
+            }
+        }
+    }
+
+    // 3) Проверка способов доставки (shipping methods)
+    $shipping_methods = $order->get_shipping_methods();
+    foreach ($shipping_methods as $method) {
+        $method_title = $method->get_method_title();
+        $method_id    = $method->get_method_id();
+        if (stripos($method_title, 'самовывоз') !== false ||
+            stripos($method_title, 'pickup') !== false ||
+            stripos($method_title, 'самостоятельно') !== false ||
+            stripos($method_id, 'local_pickup') !== false) {
+            return true;
+        }
+        if (stripos($method_title, 'доставка') !== false) {
+            return false;
+        }
+    }
+
+    // 4) Проверка агрегированного метода доставки
+    $shipping_method = $order->get_shipping_method();
+    if (!empty($shipping_method)) {
+        if (stripos($shipping_method, 'самовывоз') !== false ||
+            stripos($shipping_method, 'pickup') !== false ||
+            stripos($shipping_method, 'самостоятельно') !== false) {
+            return true;
+        }
+        if (stripos($shipping_method, 'доставка') !== false) {
+            return false;
+        }
+    }
+
+    // 5) По суммам: если shipping_total > 0 — считаем доставкой
+    $shipping_total = floatval($order->get_shipping_total());
+    if ($shipping_total > 0.0001) return false;
+
+    // 6) Ничего не нашли — по умолчанию Доставка (чтобы не промахнуться)
+    return false;
+}
+
 // Функция для получения категории блюда по названию
 function gustolocal_get_dish_category($dish_name) {
     // Ищем блюдо в таксономии wmb_section
@@ -1813,6 +1939,82 @@ function gustolocal_get_dish_category($dish_name) {
     }
     
     return 'Прочее';
+}
+
+// Функция для получения sale_type блюда по названию
+function gustolocal_get_dish_sale_type($dish_name) {
+    $dishes = get_posts(array(
+        'post_type' => 'wmb_dish',
+        'title' => $dish_name,
+        'posts_per_page' => 1,
+        'post_status' => 'any',
+    ));
+    
+    if (!empty($dishes)) {
+        $dish_id = $dishes[0]->ID;
+        $sale_type = get_post_meta($dish_id, 'wmb_sale_type', true);
+        if ($sale_type === 'smart_food' || $sale_type === 'both') {
+            return 'superfood';
+        } elseif ($sale_type === 'mercat') {
+            return 'mercat';
+        }
+    }
+    
+    return 'superfood'; // По умолчанию superfood
+}
+
+// Функция для получения всех блюд с их данными
+function gustolocal_get_all_dishes() {
+    static $all_dishes_cache = null;
+    
+    if ($all_dishes_cache !== null) {
+        return $all_dishes_cache;
+    }
+    
+    $dishes = get_posts(array(
+        'post_type' => 'wmb_dish',
+        'posts_per_page' => -1,
+        'post_status' => 'any',
+        'meta_query' => array(
+            array(
+                'key' => 'wmb_active',
+                'value' => '1',
+                'compare' => '='
+            )
+        ),
+        'orderby' => 'title',
+        'order' => 'ASC'
+    ));
+    
+    $all_dishes_cache = array();
+    
+    foreach ($dishes as $dish_post) {
+        $dish_name = $dish_post->post_title;
+        $unit = get_post_meta($dish_post->ID, 'wmb_unit', true);
+        $sale_type = get_post_meta($dish_post->ID, 'wmb_sale_type', true);
+        
+        // Определяем sale_type
+        if ($sale_type === 'smart_food' || $sale_type === 'both') {
+            $dish_sale_type = 'superfood';
+        } elseif ($sale_type === 'mercat') {
+            $dish_sale_type = 'mercat';
+        } else {
+            $dish_sale_type = 'superfood'; // По умолчанию
+        }
+        
+        $category = gustolocal_get_dish_category($dish_name);
+        $key = $dish_name . ($unit ? ' (' . $unit . ')' : '');
+        
+        $all_dishes_cache[$key] = array(
+            'name' => $dish_name,
+            'unit' => $unit ? $unit : '',
+            'category' => $category,
+            'category_order' => gustolocal_get_category_order($category),
+            'sale_type' => $dish_sale_type,
+        );
+    }
+    
+    return $all_dishes_cache;
 }
 
 // Функция для получения порядка категории
@@ -2003,8 +2205,8 @@ function gustolocal_order_breakdown_page() {
                                 if (trim($customer_name) === '') {
                                     $customer_name = $order->get_billing_company() ?: 'Гость';
                                 }
-                                $shipping_method = $order->get_shipping_method();
-                                $is_pickup = (stripos($shipping_method, 'самовывоз') !== false || stripos($shipping_method, 'pickup') !== false);
+                                // Определяем самовывоз с учетом fee/мета/метода доставки
+                                $is_pickup = gustolocal_is_pickup_order($order);
                             ?>
                                 <tr>
                                     <td>
@@ -2068,10 +2270,38 @@ function gustolocal_order_breakdown_page() {
 
 // Функция для генерации сводки
 function gustolocal_generate_breakdown($order_ids) {
-    $dishes_by_category = array(); // [category][dish_key] = dish_data
+    $dishes_by_category = array(); // [sale_type][category][dish_key] = dish_data
     $customers = array(); // [order_id] = customer_data
     $total_sum = 0;
     $total_portions = 0;
+    
+    // Получаем все блюда из базы
+    $all_dishes = gustolocal_get_all_dishes();
+    
+    // Инициализируем структуру для всех блюд
+    foreach ($all_dishes as $dish_key => $dish_data) {
+        $sale_type = $dish_data['sale_type'];
+        $category = $dish_data['category'];
+        
+        if (!isset($dishes_by_category[$sale_type])) {
+            $dishes_by_category[$sale_type] = array();
+        }
+        
+        if (!isset($dishes_by_category[$sale_type][$category])) {
+            $dishes_by_category[$sale_type][$category] = array();
+        }
+        
+        if (!isset($dishes_by_category[$sale_type][$category][$dish_key])) {
+            $dishes_by_category[$sale_type][$category][$dish_key] = array(
+                'name' => $dish_data['name'],
+                'unit' => $dish_data['unit'],
+                'category' => $category,
+                'category_order' => $dish_data['category_order'],
+                'sale_type' => $sale_type,
+                'quantities' => array(), // [order_id] => qty
+            );
+        }
+    }
     
     foreach ($order_ids as $order_id) {
         $order = wc_get_order($order_id);
@@ -2083,14 +2313,81 @@ function gustolocal_generate_breakdown($order_ids) {
             $customer_name = $order->get_billing_company() ?: 'Гость';
         }
         
-        $shipping_method = $order->get_shipping_method();
-        $is_pickup = (stripos($shipping_method, 'самовывоз') !== false || stripos($shipping_method, 'pickup') !== false);
+        // Определяем самовывоз с учетом fee/мета/метода доставки
+        $is_pickup = gustolocal_is_pickup_order($order);
+        
+        // Получаем примечания к заказу
+        $customer_note = $order->get_customer_note();
+        $additional_note = '';
+        
+        // Пробуем разные варианты названий мета-поля "Дополнительно"
+        // Поле настроено через Checkout Field Editor с именем "else" и этикеткой "Дополнительно"
+        $meta_keys_to_check = array(
+            'else',              // Прямое имя поля из Checkout Field Editor (самый вероятный)
+            '_else',             // С префиксом подчеркивания
+            'billing_else',      // С префиксом billing
+            '_billing_else',     // С префиксом billing и подчеркиванием
+            'additional_else',   // С префиксом additional
+            '_additional_else',  // С префиксом additional и подчеркиванием
+            '_additional',
+            'Дополнительно',
+            'additional',
+            'order_additional',
+            '_order_additional',
+            'billing_additional',
+            '_billing_additional',
+            'billing_Дополнительно',
+            '_billing_Дополнительно',
+            'Дополнительная информация',
+            '_Дополнительная информация'
+        );
+        
+        // Сначала пробуем конкретные ключи (самые вероятные)
+        foreach ($meta_keys_to_check as $meta_key) {
+            $meta_value = $order->get_meta($meta_key, true);
+            if (!empty($meta_value) && is_string($meta_value)) {
+                $additional_note = $meta_value;
+                break;
+            }
+        }
+        
+        // Если не нашли через конкретные ключи, проверяем все мета-данные заказа
+        if (empty($additional_note)) {
+            $all_meta = $order->get_meta_data();
+            foreach ($all_meta as $meta) {
+                $meta_key = $meta->key;
+                $meta_value = $meta->value;
+                
+                // Пропускаем системные поля WooCommerce
+                if (strpos($meta_key, '_billing_') === 0 || 
+                    strpos($meta_key, '_shipping_') === 0 ||
+                    strpos($meta_key, '_order_') === 0 ||
+                    in_array($meta_key, array('_payment_method', '_payment_method_title', '_transaction_id'))) {
+                    continue;
+                }
+                
+                // Проверяем, содержит ли ключ или значение слово "дополнительно", "else" или похожие
+                if ((stripos($meta_key, 'дополнительно') !== false || 
+                     stripos($meta_key, 'additional') !== false ||
+                     stripos($meta_key, 'note') !== false ||
+                     stripos($meta_key, 'comment') !== false ||
+                     stripos($meta_key, 'else') !== false) &&
+                    !empty($meta_value) && is_string($meta_value)) {
+                    $additional_note = $meta_value;
+                    break;
+                }
+            }
+        }
+        
+        // Объединяем примечания
+        $order_notes = trim($customer_note . ($additional_note ? ($customer_note ? ' | ' : '') . $additional_note : ''));
         
         $customers[$order_id] = array(
             'name' => $customer_name,
             'order_id' => $order_id,
             'is_pickup' => $is_pickup,
             'total' => $order->get_total(),
+            'notes' => $order_notes,
         );
         
         $total_sum += $order->get_total();
@@ -2100,35 +2397,51 @@ function gustolocal_generate_breakdown($order_ids) {
         
         foreach ($order_dishes as $dish_key => $dish_data) {
             $category = $dish_data['category'];
+            $sale_type = gustolocal_get_dish_sale_type($dish_data['name']);
             
-            if (!isset($dishes_by_category[$category])) {
-                $dishes_by_category[$category] = array();
-            }
-            
-            if (!isset($dishes_by_category[$category][$dish_key])) {
-                $dishes_by_category[$category][$dish_key] = array(
+            // Если блюдо не найдено в базе, добавляем его
+            if (!isset($dishes_by_category[$sale_type][$category][$dish_key])) {
+                if (!isset($dishes_by_category[$sale_type])) {
+                    $dishes_by_category[$sale_type] = array();
+                }
+                if (!isset($dishes_by_category[$sale_type][$category])) {
+                    $dishes_by_category[$sale_type][$category] = array();
+                }
+                $dishes_by_category[$sale_type][$category][$dish_key] = array(
                     'name' => $dish_data['name'],
                     'unit' => $dish_data['unit'],
                     'category' => $category,
                     'category_order' => $dish_data['category_order'],
-                    'quantities' => array(), // [order_id] => qty
+                    'sale_type' => $sale_type,
+                    'quantities' => array(),
                 );
             }
             
-            $dishes_by_category[$category][$dish_key]['quantities'][$order_id] = $dish_data['total_qty'];
+            $dishes_by_category[$sale_type][$category][$dish_key]['quantities'][$order_id] = $dish_data['total_qty'];
             $total_portions += $dish_data['total_qty'];
         }
     }
     
-    // Сортируем категории по порядку
-    uasort($dishes_by_category, function($a, $b) {
+    // Сортируем по sale_type (superfood первый, mercat второй)
+    $sorted_dishes = array();
+    if (isset($dishes_by_category['superfood'])) {
+        $sorted_dishes['superfood'] = $dishes_by_category['superfood'];
+    }
+    if (isset($dishes_by_category['mercat'])) {
+        $sorted_dishes['mercat'] = $dishes_by_category['mercat'];
+    }
+    
+    // Сортируем категории внутри каждого sale_type по порядку
+    foreach ($sorted_dishes as $sale_type => $categories) {
+        uasort($sorted_dishes[$sale_type], function($a, $b) {
         $order_a = !empty($a) ? reset($a)['category_order'] : 999;
         $order_b = !empty($b) ? reset($b)['category_order'] : 999;
         return $order_a - $order_b;
     });
+    }
     
     return array(
-        'dishes_by_category' => $dishes_by_category,
+        'dishes_by_sale_type' => $sorted_dishes,
         'customers' => $customers,
         'total_sum' => $total_sum,
         'total_portions' => $total_portions,
@@ -2158,6 +2471,71 @@ function gustolocal_multiply_numbers_in_string($unit, $multiplier) {
     );
     
     return $result;
+}
+
+// Функция для генерации формулы Google Sheets для расчета итогового веса
+// Возвращает массив с формулами для разных случаев
+function gustolocal_generate_weight_formula($unit, $qty_cell_ref, $unit_cell_ref = '') {
+    if (empty($unit)) {
+        return array('formula' => '', 'type' => 'empty', 'description' => '');
+    }
+    
+    // Проверяем, является ли формат сложным (содержит "/" или скобки с числами)
+    $has_slashes = (strpos($unit, '/') !== false);
+    $has_brackets_with_numbers = preg_match('/\([^)]*\d+[^)]*\)/', $unit);
+    
+    // Для сложных случаев - создаем формулу с использованием Apps Script функции
+    if ($has_slashes || $has_brackets_with_numbers) {
+        // Извлекаем все числа из единицы измерения для создания формулы
+        preg_match_all('/\d+(?:[.,]\d+)?/', $unit, $matches);
+        
+        if (!empty($matches[0])) {
+            // Создаем формулу, которая будет использовать пользовательскую функцию Apps Script
+            // MULTIPLY_NUMBERS_IN_STRING(unit, multiplier)
+            // Если единица хранится в ячейке A (название блюда), извлекаем её оттуда
+            // Или используем прямое значение
+            $unit_escaped = str_replace('"', '""', $unit);
+            
+            // Формула с использованием Apps Script функции
+            // Предполагаем, что единица измерения будет в скобках в ячейке A (название блюда)
+            // Или можно использовать прямое значение единицы
+            $formula_apps_script = '=MULTIPLY_NUMBERS_IN_STRING("' . $unit_escaped . '", ' . $qty_cell_ref . ')';
+            
+            // Альтернатива: если единица хранится в отдельной колонке или извлекается из названия
+            // Можно использовать REGEXEXTRACT для извлечения единицы из названия блюда
+            // Но проще использовать прямое значение
+            
+            $numbers_list = implode(', ', $matches[0]);
+            $description = 'Сложная единица: ' . $unit . ' (числа: ' . $numbers_list . '). Используйте Apps Script функцию.';
+            
+            return array(
+                'formula' => $formula_apps_script,
+                'type' => 'complex',
+                'description' => $description,
+                'numbers' => $matches[0],
+                'unit' => $unit,
+                'instruction' => 'Добавьте функцию MULTIPLY_NUMBERS_IN_STRING в Apps Script (см. инструкцию выше)'
+            );
+        }
+        
+        return array('formula' => '', 'type' => 'complex', 'description' => 'Не удалось извлечь числа из: ' . $unit);
+    }
+    
+    // Простые случаи: "200 г", "1200 мл" - просто умножаем число
+    if (preg_match('/^(\d+(?:[.,]\d+)?)\s*(г|мл|кг|л|шт|пор)/ui', $unit, $matches)) {
+        $value = floatval(str_replace(',', '.', $matches[1]));
+        $unit_type = $matches[2];
+        // Формула: количество * значение единицы измерения
+        // Добавляем проверку на пустое значение, чтобы не было ошибки
+        $formula = '=IF(' . $qty_cell_ref . '=0,"",' . $qty_cell_ref . '*' . $value . '&" ' . $unit_type . '")';
+        return array(
+            'formula' => $formula,
+            'type' => 'simple',
+            'description' => 'Простая единица: ' . $value . ' ' . $unit_type
+        );
+    }
+    
+    return array('formula' => '', 'type' => 'unknown', 'description' => 'Неизвестный формат: ' . $unit);
 }
 
 // Функция для вычисления итогового веса блюда
@@ -2214,19 +2592,15 @@ function gustolocal_calculate_dish_weight($dish_data, $quantities) {
 
 // Функция для отображения сводной таблицы
 function gustolocal_display_breakdown_table($data) {
-    $dishes_by_category = $data['dishes_by_category'];
+    $dishes_by_sale_type = isset($data['dishes_by_sale_type']) ? $data['dishes_by_sale_type'] : array();
     $customers = $data['customers'];
     $total_sum = $data['total_sum'];
     $total_portions = $data['total_portions'];
     $order_ids = $data['order_ids'];
     
-    // Собираем все уникальные блюда
-    $all_dishes = array();
-    foreach ($dishes_by_category as $category => $dishes) {
-        foreach ($dishes as $dish_key => $dish_data) {
-            $all_dishes[$dish_key] = $dish_data;
-        }
-    }
+    // Определяем количество колонок для формул
+    $num_customer_cols = count($customers);
+    $first_customer_col = 3; // A=0 (Блюдо), B=1 (ИТОГО), C=2 (Итоговый вес), D=3 (первый клиент)
     
     // Пересчитываем суммы из заказов для проверки
     $recalculated_sum = 0;
@@ -2268,6 +2642,16 @@ function gustolocal_display_breakdown_table($data) {
         font-weight: bold;
         font-size: 14px;
     }
+    .breakdown-table .category-header-cell {
+        background-color: #e8f4f8;
+        font-weight: bold;
+        font-size: 14px;
+    }
+    .breakdown-table .sale-type-header {
+        background-color: #cfe2f3;
+        font-weight: bold;
+        font-size: 15px;
+    }
     .breakdown-table .dish-row {
         background-color: #fff;
     }
@@ -2294,6 +2678,21 @@ function gustolocal_display_breakdown_table($data) {
         border-radius: 3px;
         font-size: 11px;
         margin-left: 5px;
+    }
+    .breakdown-table .delivery-badge {
+        display: inline-block;
+        background-color: #d4edda;
+        color: #155724;
+        padding: 2px 6px;
+        border-radius: 3px;
+        font-size: 11px;
+        margin-left: 5px;
+    }
+    .breakdown-table .notes-cell {
+        font-size: 11px;
+        color: #666;
+        font-style: italic;
+        max-width: 200px;
     }
     .breakdown-verification {
         margin-top: 20px;
@@ -2327,52 +2726,233 @@ function gustolocal_display_breakdown_table($data) {
         </p>
     </div>
     
+    <div style="margin-bottom: 15px; text-align: right;">
+        <button id="copy-table-btn" style="background-color: #0073aa; color: white; border: none; padding: 10px 20px; font-size: 14px; cursor: pointer; border-radius: 3px; display: inline-flex; align-items: center; gap: 8px;" onmouseover="this.style.backgroundColor='#005a87'" onmouseout="this.style.backgroundColor='#0073aa'">
+            <span style="font-size: 16px;">📋</span>
+            <span>Скопировать таблицу</span>
+        </button>
+    </div>
+    
+    <div style="display: none;">
+        <!-- Скрытый блок инструкции для справки -->
+        <div style="margin-bottom: 20px; padding: 15px; background-color: #e3f2fd; border-left: 4px solid #2196f3;">
+            <h3 style="margin-top: 0;">📋 Инструкция по использованию формул в Google Sheets</h3>
+        <p><strong>Для сложных единиц измерения</strong> (например, "250/150 г (2 пор)") нужно использовать пользовательскую функцию Apps Script:</p>
+        <ol style="line-height: 1.8;">
+            <li>В Google Sheets откройте <strong>Расширения → Apps Script</strong> (или <strong>Инструменты → Редактор скриптов</strong>)</li>
+            <li>Удалите весь код по умолчанию (если есть)</li>
+            <li>Вставьте следующий код:</li>
+        </ol>
+        <pre style="background: #fff; padding: 15px; border: 1px solid #ddd; overflow-x: auto; font-size: 12px; line-height: 1.5;"><code>function MULTIPLY_NUMBERS_IN_STRING(unit, multiplier) {
+  // Проверяем входные данные
+  if (!unit || unit === "") return "";
+  if (!multiplier || multiplier <= 0) return unit || "";
+  
+  // Заменяем все числа на умноженные значения
+  return unit.replace(/\d+(?:[.,]\d+)?/g, function(match) {
+    var num = parseFloat(match.replace(',', '.'));
+    if (isNaN(num)) return match; // Если не число, оставляем как есть
+    var multiplied = num * multiplier;
+    // Если было целое число, возвращаем целое
+    if (match.indexOf('.') === -1 && match.indexOf(',') === -1) {
+      return Math.round(multiplied).toString();
+    }
+    return multiplied.toFixed(2);
+  });
+}</code></pre>
+        <ol start="4" style="line-height: 1.8;">
+            <li>Нажмите <strong>Сохранить</strong> (Ctrl+S или Cmd+S) - появится кнопка "Сохранить проект" вверху</li>
+            <li><strong>ВАЖНО:</strong> При первом использовании функции Google может запросить разрешения:
+                <ul style="margin-top: 5px;">
+                    <li>Нажмите <strong>"Проверить разрешения"</strong> или <strong>"Review permissions"</strong></li>
+                    <li>Выберите свой аккаунт Google</li>
+                    <li>Нажмите <strong>"Разрешить"</strong> или <strong>"Allow"</strong> (функция безопасна, она работает только в вашей таблице)</li>
+                </ul>
+            </li>
+            <li>Закройте вкладку Apps Script и вернитесь в Google Sheets</li>
+            <li>Теперь вы можете использовать формулу из колонки "Формула Вес" в ячейках колонки C (Итоговый вес)</li>
+            <li>Формула будет выглядеть так: <code>=MULTIPLY_NUMBERS_IN_STRING("250/150 г (2 пор)", B5)</code></li>
+            <li>При изменении количества в колонке B, вес в колонке C будет автоматически пересчитываться</li>
+        </ol>
+        <p style="margin-top: 15px; padding: 10px; background-color: #fff3cd; border-left: 3px solid #ffc107;"><strong>💡 Совет:</strong> Скопируйте формулу из колонки "Формула Вес" и вставьте её в соответствующую ячейку колонки C. Формула уже содержит правильные ссылки на ячейки.</p>
+        <p style="margin-top: 10px; padding: 10px; background-color: #e8f5e9; border-left: 3px solid #4caf50;"><strong>✅ Проверка:</strong> Если функция не работает, убедитесь что:
+            <ul style="margin-top: 5px;">
+                <li>Код сохранен в Apps Script (кнопка "Сохранить проект" должна быть неактивна)</li>
+                <li>Вы дали разрешения при первом использовании (может появиться предупреждение при вводе формулы)</li>
+                <li>Формула в ячейке начинается с <code>=</code> (знак равенства)</li>
+                <li>Название функции написано точно: <code>MULTIPLY_NUMBERS_IN_STRING</code> (регистр важен!)</li>
+                <li>Попробуйте перезагрузить страницу Google Sheets после сохранения функции</li>
+            </ul>
+        </p>
+        <p style="margin-top: 10px; padding: 10px; background-color: #e8f5e9; border-left: 3px solid #4caf50;"><strong>✅ Проверка:</strong> Если функция не работает, убедитесь что:
+            <ul style="margin-top: 5px;">
+                <li>Код сохранен в Apps Script (кнопка "Сохранить проект" должна быть неактивна)</li>
+                <li>Вы дали разрешения при первом использовании</li>
+                <li>Формула в ячейке начинается с <code>=</code> (знак равенства)</li>
+                <li>Название функции написано точно: <code>MULTIPLY_NUMBERS_IN_STRING</code> (регистр важен!)</li>
+            </ul>
+        </p>
+    </div>
+    </div>
+    
+    <div style="margin-bottom: 15px; text-align: right;">
+        <button id="copy-table-btn" style="background-color: #0073aa; color: white; border: none; padding: 10px 20px; font-size: 14px; cursor: pointer; border-radius: 3px; display: inline-flex; align-items: center; gap: 8px;" onmouseover="this.style.backgroundColor='#005a87'" onmouseout="this.style.backgroundColor='#0073aa'">
+            <span style="font-size: 16px;">📋</span>
+            <span>Скопировать таблицу</span>
+        </button>
+    </div>
+    
     <div style="overflow-x: auto; max-width: 100%;">
-        <table class="breakdown-table">
+        <table class="breakdown-table" id="breakdown-table">
             <thead>
                 <tr>
                     <th class="dish-col">Блюдо</th>
                     <th class="total-row">ИТОГО</th>
                     <th class="total-row">Итоговый вес</th>
-                    <?php foreach ($customers as $order_id => $customer): ?>
+                    <?php 
+                    $col_index = 0;
+                    foreach ($customers as $order_id => $customer): 
+                        $col_index++;
+                    ?>
                         <th class="customer-col">
                             <?php echo esc_html($customer['name']); ?><br>
-                            <small>#<?php echo esc_html($order_id); ?></small>
+                            <small>#<?php echo esc_html($order_id); ?></small><br>
                             <?php if ($customer['is_pickup']): ?>
                                 <span class="pickup-badge">Самовывоз</span>
                             <?php else: ?>
-                                <span style="font-size: 11px; color: #666;">Доставка</span>
+                                <span class="delivery-badge">Доставка</span>
+                            <?php endif; ?><br>
+                            <strong style="font-size: 12px; margin-top: 5px; display: block;"><?php echo wc_price($customer['total']); ?></strong>
+                        </th>
+                    <?php endforeach; ?>
+                    <th class="formula-col" style="background-color: #e8f5e9; min-width: 120px; font-size: 11px; text-align: center;">
+                        Формула ИТОГО<br>
+                        <small style="font-weight: normal;">(колонка B)</small>
+                    </th>
+                    <th class="formula-col" style="background-color: #fff3cd; min-width: 150px; font-size: 11px; text-align: center;">
+                        Формула Вес<br>
+                        <small style="font-weight: normal;">(колонка C)</small>
+                    </th>
+                </tr>
+                <tr>
+                    <th class="dish-col"></th>
+                    <th class="total-row"></th>
+                    <th class="total-row"></th>
+                    <?php foreach ($customers as $order_id => $customer): ?>
+                        <th class="customer-col notes-header-cell" style="text-align: center; font-weight: normal; font-size: 11px; padding: 5px;">
+                            <?php if (!empty($customer['notes'])): ?>
+                                <div class="notes-cell" style="font-style: italic; color: #666; word-wrap: break-word; max-width: 200px; margin: 0 auto;">
+                                    <?php echo esc_html($customer['notes']); ?>
+                                </div>
+                            <?php else: ?>
+                                &nbsp;
                             <?php endif; ?>
                         </th>
                     <?php endforeach; ?>
+                    <th class="formula-col" style="background-color: #e8f5e9;"></th>
+                    <th class="formula-col" style="background-color: #fff3cd;"></th>
                 </tr>
             </thead>
             <tbody>
                 <?php 
+                // Обрабатываем сначала superfood, потом mercat
+                $sale_types_order = array('superfood', 'mercat');
+                $row_index = 0; // Индекс строки в tbody (начинается с 0)
+                $excel_base_row = 2; // Базовый номер строки в Excel (заголовок = 1, примечания = 2, данные начинаются с 3)
+                
+                foreach ($sale_types_order as $sale_type):
+                    if (!isset($dishes_by_sale_type[$sale_type]) || empty($dishes_by_sale_type[$sale_type])) {
+                        continue;
+                    }
+                    
+                    $sale_type_label = ($sale_type === 'superfood') ? 'Superfood' : 'Mercat';
+                    $row_index++; // Секция занимает строку
+                ?>
+                    <tr class="sale-type-header">
+                        <?php 
+                        // Заголовок секции - каждая ячейка отдельно для избежания объединения
+                        echo '<td class="sale-type-header"><strong>' . esc_html($sale_type_label) . '</strong></td>';
+                        // Остальные ячейки пустые, но не объединенные
+                        for ($i = 0; $i < $num_customer_cols + 2; $i++) {
+                            echo '<td class="sale-type-header"></td>';
+                        }
+                        // Колонки формул (2 колонки)
+                        echo '<td class="formula-col" style="background-color: #e8f5e9;"></td>';
+                        echo '<td class="formula-col" style="background-color: #fff3cd;"></td>';
+                        ?>
+                    </tr>
+                    
+                <?php 
                 $current_category = '';
-                foreach ($dishes_by_category as $category => $dishes): 
+                    foreach ($dishes_by_sale_type[$sale_type] as $category => $dishes): 
                     if ($current_category !== $category):
                         $current_category = $category;
+                            $row_index++; // Категория занимает строку
                 ?>
                     <tr class="category-header">
-                        <td colspan="<?php echo count($customers) + 3; ?>">
-                            <strong><?php echo esc_html($category); ?></strong>
-                        </td>
+                            <?php 
+                            // Категория - каждая ячейка отдельно
+                            echo '<td class="category-header-cell"><strong>' . esc_html($category) . '</strong></td>';
+                            // Остальные ячейки пустые, но не объединенные
+                            for ($i = 0; $i < $num_customer_cols + 2; $i++) {
+                                echo '<td class="category-header-cell"></td>';
+                            }
+                            // Колонки формул (2 колонки)
+                            echo '<td class="formula-col" style="background-color: #e8f5e9;"></td>';
+                            echo '<td class="formula-col" style="background-color: #fff3cd;"></td>';
+                            ?>
                     </tr>
                 <?php endif; ?>
                 
                 <?php foreach ($dishes as $dish_key => $dish_data): 
                     $dish_total = array_sum($dish_data['quantities']);
                     $weight_info = gustolocal_calculate_dish_weight($dish_data, $dish_data['quantities']);
-                ?>
-                    <tr class="dish-row">
+                        $row_index++; // Блюдо занимает строку
+                        
+                        // Формируем формулу для ИТОГО (сумма всех колонок клиентов для этой строки)
+                        // Используем относительные ссылки: сумма колонок клиентов в текущей строке
+                        // ВАЖНО: колонки клиентов начинаются с D (индекс 3), колонки формул находятся после них
+                        $customer_cols = array();
+                        $col_idx = 0;
+                        foreach ($customers as $order_id => $customer) {
+                            // Колонка клиента = first_customer_col (3 = D) + col_idx (0, 1, 2, ...)
+                            $col_letter = gustolocal_get_column_letter($first_customer_col + $col_idx);
+                            $customer_cols[] = $col_letter; // Будем использовать в формуле
+                            $col_idx++;
+                        }
+                        
+                        // Номер строки в Google Sheets
+                        // Структура: строка 1 = заголовок, строка 2 = примечания, строка 3+ = данные (tbody)
+                        // row_index начинается с 0 и увеличивается для каждой строки в tbody (секции, категории, блюда)
+                        // excel_base_row = 2 (примечания), данные начинаются с 3
+                        // Для первой строки данных (секция): row_index = 1, excel_row = 1 + 2 = 3 ✓
+                        // Для второй строки данных (категория): row_index = 2, excel_row = 2 + 2 = 4 ✓
+                        // Для третьей строки данных (блюдо): row_index = 3, excel_row = 3 + 2 = 5 ✓
+                        $excel_row = $row_index + $excel_base_row;
+                        
+                        // Формируем формулу для ИТОГО: суммируем ТОЛЬКО колонки клиентов (не включая колонки формул)
+                        $first_customer_col_letter = !empty($customer_cols) ? $customer_cols[0] : '';
+                        $last_customer_col_letter = !empty($customer_cols) ? end($customer_cols) : '';
+                        // Формула должна суммировать только колонки клиентов, например: =SUM(D5:K5) для 8 клиентов
+                        $total_formula = !empty($customer_cols) ? '=SUM(' . $first_customer_col_letter . $excel_row . ':' . $last_customer_col_letter . $excel_row . ')' : '';
+                        
+                        // Генерируем формулу для веса
+                        $weight_formula_info = array('formula' => '', 'description' => '');
+                        if (!empty($dish_data['unit'])) {
+                            $qty_cell = 'B' . $excel_row; // Колонка ИТОГО
+                            $weight_formula_info = gustolocal_generate_weight_formula($dish_data['unit'], $qty_cell);
+                        }
+                    ?>
+                        <tr class="dish-row" data-row-index="<?php echo $row_index; ?>">
                         <td class="dish-col">
                             <?php echo esc_html($dish_data['name']); ?>
                             <?php if ($dish_data['unit']): ?>
                                 <small style="color: #666;">(<?php echo esc_html($dish_data['unit']); ?>)</small>
                             <?php endif; ?>
                         </td>
-                        <td class="qty-cell total-row"><?php echo $dish_total; ?></td>
+                            <td class="qty-cell total-row" data-formula-template="<?php echo esc_attr($total_formula); ?>" data-customer-cols="<?php echo esc_attr(implode(',', $customer_cols)); ?>">
+                                <?php echo $dish_total; ?>
+                            </td>
                         <td class="qty-cell total-row" style="text-align: left;">
                             <?php if ($weight_info['display']): ?>
                                 <?php echo esc_html($weight_info['display']); ?>
@@ -2380,23 +2960,51 @@ function gustolocal_display_breakdown_table($data) {
                                 <span style="color: #999;">—</span>
                             <?php endif; ?>
                         </td>
-                        <?php foreach ($customers as $order_id => $customer): 
+                            <?php 
+                            $col_idx = 0;
+                            foreach ($customers as $order_id => $customer): 
                             $qty = isset($dish_data['quantities'][$order_id]) ? $dish_data['quantities'][$order_id] : 0;
+                                $col_idx++;
                         ?>
-                            <td class="qty-cell"><?php echo $qty > 0 ? $qty : ''; ?></td>
+                                <td class="qty-cell" data-col-letter="<?php echo esc_attr(gustolocal_get_column_letter($first_customer_col + $col_idx - 1)); ?>">
+                                    <?php echo $qty > 0 ? $qty : ''; ?>
+                                </td>
                         <?php endforeach; ?>
+                            <!-- Колонка формул для ИТОГО -->
+                            <td class="formula-col" style="background-color: #f1f8e9; font-size: 10px; font-family: monospace; text-align: left; padding: 3px;" data-formula="<?php echo esc_attr($total_formula); ?>">
+                                <?php if (!empty($total_formula)): ?>
+                                    <div style="font-family: monospace; background: #fff; padding: 3px; border: 1px solid #c8e6c9; cursor: pointer;" onclick="navigator.clipboard.writeText('<?php echo esc_js($total_formula); ?>').then(() => alert('Формула скопирована!'))">
+                                        <?php echo esc_html($total_formula); ?>
+                                    </div>
+                                <?php endif; ?>
+                            </td>
+                            <!-- Колонка формул для Веса -->
+                            <td class="formula-col" style="background-color: #fffbf0; font-size: 10px; font-family: monospace; text-align: left; padding: 3px;" data-formula="<?php echo !empty($weight_formula_info['formula']) ? esc_attr($weight_formula_info['formula']) : ''; ?>">
+                                <?php if (!empty($weight_formula_info['formula'])): ?>
+                                    <?php if ($weight_formula_info['type'] === 'complex'): ?>
+                                        <div style="font-family: monospace; background: #fff; padding: 3px; border: 1px solid #ffcc02; cursor: pointer;" onclick="navigator.clipboard.writeText('<?php echo esc_js($weight_formula_info['formula']); ?>').then(() => alert('Формула скопирована!'))">
+                                            <?php echo esc_html($weight_formula_info['formula']); ?>
+                                        </div>
+                                    <?php else: ?>
+                                        <div style="font-family: monospace; background: #fff; padding: 3px; border: 1px solid #ffcc02; cursor: pointer;" onclick="navigator.clipboard.writeText('<?php echo esc_js($weight_formula_info['formula']); ?>').then(() => alert('Формула скопирована!'))">
+                                            <?php echo esc_html($weight_formula_info['formula']); ?>
+                                        </div>
+                                    <?php endif; ?>
+                                <?php endif; ?>
+                            </td>
                     </tr>
+                    <?php endforeach; ?>
                 <?php endforeach; ?>
                 <?php endforeach; ?>
                 
-                <tr class="total-row">
-                    <td><strong>ИТОГО</strong></td>
-                    <td class="qty-cell"><strong><?php echo number_format($total_portions, 0, ',', ' '); ?></strong></td>
-                    <td></td>
                     <?php 
+                // Строка ИТОГО
+                $row_index++; // Итоговая строка занимает строку
+                
                     // Подсчитываем общее количество порций для каждого клиента
                     $customer_totals = array();
-                    foreach ($dishes_by_category as $category => $dishes) {
+                foreach ($dishes_by_sale_type as $sale_type => $categories) {
+                    foreach ($categories as $category => $dishes) {
                         foreach ($dishes as $dish_data) {
                             foreach ($dish_data['quantities'] as $order_id => $qty) {
                                 if (!isset($customer_totals[$order_id])) {
@@ -2406,16 +3014,264 @@ function gustolocal_display_breakdown_table($data) {
                             }
                         }
                     }
+                }
+                
+                // Формируем формулы для итоговой строки
+                // Для общего ИТОГО - сумма всех колонок ИТОГО выше
+                $total_col_letter = gustolocal_get_column_letter(1); // Колонка B (ИТОГО)
+                $excel_total_row = $row_index + $excel_base_row; // Номер строки итогов в Google Sheets
+                $first_data_row = $excel_base_row + 1; // Первая строка с данными (после заголовка и примечаний)
+                $last_data_row = $row_index + $excel_base_row - 1; // Последняя строка с данными перед итогами
+                $grand_total_formula = '=SUM(' . $total_col_letter . $first_data_row . ':' . $total_col_letter . $last_data_row . ')';
+                
+                // Собираем колонки клиентов для итоговой строки
+                $total_customer_cols = array();
+                $col_idx = 0;
+                foreach ($customers as $order_id => $customer) {
+                    $col_letter = gustolocal_get_column_letter($first_customer_col + $col_idx);
+                    $total_customer_cols[] = $col_letter;
+                    $col_idx++;
+                }
+                
+                // Формируем строку с формулами для итогов
+                $formulas_for_total = array();
+                $formulas_for_total[] = 'B' . $excel_total_row . ': ' . $grand_total_formula;
+                $col_idx = 0;
+                foreach ($customers as $order_id => $customer) {
+                    $col_idx++;
+                    $customer_col_letter = gustolocal_get_column_letter($first_customer_col + $col_idx - 1);
+                    $customer_total_formula = '=SUM(' . $customer_col_letter . $first_data_row . ':' . $customer_col_letter . $last_data_row . ')';
+                    $formulas_for_total[] = $customer_col_letter . $excel_total_row . ': ' . $customer_total_formula;
+                }
+                ?>
+                <tr class="total-row" data-is-total-row="1">
+                    <td><strong>ИТОГО</strong></td>
+                    <td class="qty-cell" data-formula-template="<?php echo esc_attr($grand_total_formula); ?>">
+                        <strong><?php echo number_format($total_portions, 0, ',', ' '); ?></strong>
+                    </td>
+                    <td></td>
+                    <?php 
+                    $col_idx = 0;
                     foreach ($customers as $order_id => $customer): 
+                        $col_idx++;
                         $customer_total = isset($customer_totals[$order_id]) ? $customer_totals[$order_id] : 0;
+                        $customer_col_letter = gustolocal_get_column_letter($first_customer_col + $col_idx - 1);
+                        // Формула для суммы колонки клиента от начала данных до текущей строки
+                        $customer_total_formula = '=SUM(' . $customer_col_letter . $first_data_row . ':' . $customer_col_letter . $last_data_row . ')';
                     ?>
-                        <td class="qty-cell"><strong><?php echo $customer_total > 0 ? number_format($customer_total, 0, ',', ' ') : ''; ?></strong></td>
+                        <td class="qty-cell" data-formula-template="<?php echo esc_attr($customer_total_formula); ?>" data-col-letter="<?php echo esc_attr($customer_col_letter); ?>">
+                            <strong><?php echo $customer_total > 0 ? number_format($customer_total, 0, ',', ' ') : ''; ?></strong>
+                        </td>
                     <?php endforeach; ?>
+                    <!-- Колонка формул для ИТОГО итоговой строки -->
+                    <td class="formula-col" style="background-color: #f1f8e9; font-size: 10px; font-family: monospace; text-align: left; padding: 3px;">
+                        <?php if (!empty($grand_total_formula)): ?>
+                            <div style="font-family: monospace; background: #fff; padding: 3px; border: 1px solid #c8e6c9; cursor: pointer;" onclick="navigator.clipboard.writeText('<?php echo esc_js($grand_total_formula); ?>').then(() => alert('Формула скопирована!'))">
+                                <?php echo esc_html($grand_total_formula); ?>
+                            </div>
+                        <?php endif; ?>
+                    </td>
+                    <!-- Колонка формул для Веса итоговой строки (пустая) -->
+                    <td class="formula-col" style="background-color: #fffbf0;"></td>
                 </tr>
             </tbody>
         </table>
     </div>
+    
+    <script>
+    // Функция для добавления формул при копировании в Google Sheets
+    document.addEventListener('DOMContentLoaded', function() {
+        var table = document.getElementById('breakdown-table');
+        if (!table) return;
+        
+        // Кнопка копирования таблицы
+        var copyBtn = document.getElementById('copy-table-btn');
+        if (copyBtn) {
+            copyBtn.addEventListener('click', function() {
+                // Выделяем всю таблицу
+                var range = document.createRange();
+                range.selectNode(table);
+                window.getSelection().removeAllRanges();
+                window.getSelection().addRange(range);
+                
+                // Копируем
+                try {
+                    document.execCommand('copy');
+                    copyBtn.innerHTML = '<span style="font-size: 16px;">✅</span><span>Скопировано!</span>';
+                    copyBtn.style.backgroundColor = '#46b450';
+                    
+                    // Возвращаем обратно через 2 секунды
+                    setTimeout(function() {
+                        copyBtn.innerHTML = '<span style="font-size: 16px;">📋</span><span>Скопировать таблицу</span>';
+                        copyBtn.style.backgroundColor = '#0073aa';
+                    }, 2000);
+                } catch (err) {
+                    alert('Не удалось скопировать таблицу. Попробуйте выделить таблицу вручную и нажать Ctrl+C');
+                }
+            });
+        }
+        
+        // Функция для получения буквы колонки по индексу (0=A, 1=B, ...)
+        function getColumnLetter(colIndex) {
+            var letter = '';
+            while (colIndex >= 0) {
+                letter = String.fromCharCode(65 + (colIndex % 26)) + letter;
+                colIndex = Math.floor(colIndex / 26) - 1;
+            }
+            return letter;
+        }
+        
+        // Добавляем обработчик копирования
+        table.addEventListener('copy', function(e) {
+            var selection = window.getSelection();
+            if (!selection.rangeCount) return;
+            
+            var range = selection.getRangeAt(0);
+            var selectedCells = [];
+            
+            // Находим все выбранные ячейки
+            var walker = document.createTreeWalker(
+                range.commonAncestorContainer,
+                NodeFilter.SHOW_ELEMENT,
+                function(node) {
+                    return (node.tagName === 'TD' || node.tagName === 'TH') ? 
+                        NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+                }
+            );
+            
+            var node;
+            while (node = walker.nextNode()) {
+                if (range.intersectsNode(node)) {
+                    selectedCells.push(node);
+                }
+            }
+            
+            // Проверяем, есть ли ячейки с формулами
+            var hasFormulas = false;
+            selectedCells.forEach(function(cell) {
+                if (cell.hasAttribute('data-formula-template')) {
+                    hasFormulas = true;
+                }
+            });
+            
+            if (hasFormulas) {
+                // Создаем карту ячеек по их позиции в таблице
+                var cellMap = {};
+                var minRow = Infinity, maxRow = -Infinity;
+                var minCol = Infinity, maxCol = -Infinity;
+                
+                // Получаем thead и tbody для правильного подсчета строк
+                var thead = table.querySelector('thead');
+                var tbody = table.querySelector('tbody');
+                var headerRowCount = thead ? thead.rows.length : 1;
+                
+                selectedCells.forEach(function(cell) {
+                    var row = cell.parentElement;
+                    var tbody = row.parentElement;
+                    var rowIndex = Array.from(tbody.children).indexOf(row);
+                    var colIndex = Array.from(row.children).indexOf(cell);
+                    
+                    if (!cellMap[rowIndex]) {
+                        cellMap[rowIndex] = {};
+                    }
+                    cellMap[rowIndex][colIndex] = cell;
+                    
+                    minRow = Math.min(minRow, rowIndex);
+                    maxRow = Math.max(maxRow, rowIndex);
+                    minCol = Math.min(minCol, colIndex);
+                    maxCol = Math.max(maxCol, colIndex);
+                });
+                
+                // Создаем TSV с формулами
+                var tsv = '';
+                for (var r = minRow; r <= maxRow; r++) {
+                    var rowData = [];
+                    for (var c = minCol; c <= maxCol; c++) {
+                        var cell = cellMap[r] && cellMap[r][c] ? cellMap[r][c] : null;
+                        if (cell) {
+                            // Проверяем наличие формулы в атрибутах
+                            var formula = null;
+                            if (cell.hasAttribute('data-formula-template')) {
+                                var formulaTemplate = cell.getAttribute('data-formula-template');
+                                // Номер строки в Excel/Google Sheets (начинается с 1, +1 для заголовка)
+                                var excelRowNum = r + headerRowCount + 1;
+                                
+                                // Обрабатываем формулу
+                                formula = formulaTemplate;
+                                
+                                // Для формул SUM с диапазоном заменяем номера строк
+                                if (formula.indexOf('SUM') !== -1) {
+                                    // Формула вида =SUM(B3:B10) или =SUM(D3:D10)
+                                    var match = formula.match(/SUM\(([A-Z]+)(\d+):([A-Z]+)(\d+)\)/);
+                                    if (match) {
+                                        var startCol = match[1];
+                                        var startRowNum = parseInt(match[2]);
+                                        var endCol = match[3];
+                                        var endRowNum = parseInt(match[4]);
+                                        
+                                        // Если это итоговая строка, используем диапазон от начала данных до текущей строки
+                                        if (cell.parentElement && cell.parentElement.hasAttribute('data-is-total-row')) {
+                                            // Для итоговой строки: от строки 3 (начало данных) до строки перед итоговой
+                                            formula = '=SUM(' + startCol + '3:' + endCol + (excelRowNum - 1) + ')';
+                                        } else {
+                                            // Для обычных строк с ИТОГО: сумма колонок клиентов в текущей строке
+                                            // Формула должна быть =SUM(D2:E2) где D и E - колонки клиентов
+                                            var customerCols = cell.getAttribute('data-customer-cols');
+                                            if (customerCols) {
+                                                var cols = customerCols.split(',');
+                                                if (cols.length > 0) {
+                                                    var firstCol = cols[0];
+                                                    var lastCol = cols[cols.length - 1];
+                                                    formula = '=SUM(' + firstCol + excelRowNum + ':' + lastCol + excelRowNum + ')';
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            } else if (cell.hasAttribute('data-formula')) {
+                                // Для колонок формул используем готовую формулу из атрибута
+                                formula = cell.getAttribute('data-formula');
+                                // Номер строки в Excel/Google Sheets
+                                var excelRowNum = r + headerRowCount + 1;
+                                
+                                // Заменяем ВСЕ ссылки на ячейки в формуле на правильный номер строки
+                                // Ищем паттерны вида B5, C10, B47 и т.д. и заменяем номер строки на текущий
+                                formula = formula.replace(/([A-Z]+)(\d+)/g, function(match, col, rowNum) {
+                                    // Заменяем номер строки на текущий номер строки в Google Sheets
+                                    // Это нужно для формул типа =IF(B5=0,"",B5*200&" г") или =MULTIPLY_NUMBERS_IN_STRING("...", B47)
+                                    return col + excelRowNum;
+                                });
+                            }
+                            
+                            if (formula) {
+                                rowData.push(formula);
+                            } else {
+                                rowData.push(cell.textContent.trim());
+                            }
+                        } else {
+                            rowData.push('');
+                        }
+                    }
+                    tsv += rowData.join('\t') + '\n';
+                }
+                
+                e.clipboardData.setData('text/plain', tsv);
+                e.preventDefault();
+            }
+        });
+    });
+    </script>
     <?php
+}
+
+// Вспомогательная функция для получения буквы колонки Excel (A, B, C, ..., Z, AA, AB, ...)
+function gustolocal_get_column_letter($col_num) {
+    $letter = '';
+    while ($col_num >= 0) {
+        $letter = chr(65 + ($col_num % 26)) . $letter;
+        $col_num = intval($col_num / 26) - 1;
+    }
+    return $letter;
 }
 
 /* ========================================
