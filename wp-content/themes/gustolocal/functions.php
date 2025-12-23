@@ -6252,3 +6252,1938 @@ function gustolocal_custom_feedback_results_page() {
     <?php
 }
 
+/* ========================================
+   ПЕЧАТЬ ЗАКАЗОВ НА ТЕРМОПРИНТЕРЕ
+   ======================================== */
+
+// Добавляем кнопку печати в админке заказов WooCommerce
+add_filter('woocommerce_order_actions', 'gustolocal_add_print_order_action', 10, 2);
+function gustolocal_add_print_order_action($actions, $order) {
+    if (!is_a($order, 'WC_Order')) {
+        return $actions;
+    }
+    
+    $actions['gustolocal_print_order'] = __('Печать на термобумаге', 'gustolocal');
+    return $actions;
+}
+
+// Обработка действия печати
+add_action('woocommerce_order_action_gustolocal_print_order', 'gustolocal_handle_print_order_action');
+function gustolocal_handle_print_order_action($order) {
+    if (!is_a($order, 'WC_Order')) {
+        return;
+    }
+    
+    // Перенаправляем на страницу печати
+    $print_url = admin_url('admin.php?page=gustolocal-print-order&order_id=' . $order->get_id());
+    wp_redirect($print_url);
+    exit;
+}
+
+// Добавляем страницу печати в админке
+add_action('admin_menu', 'gustolocal_add_print_order_page');
+function gustolocal_add_print_order_page() {
+    add_submenu_page(
+        null, // Скрытая страница
+        'Печать заказа',
+        'Печать заказа',
+        'manage_woocommerce',
+        'gustolocal-print-order',
+        'gustolocal_print_order_page'
+    );
+}
+
+// Страница печати заказа
+function gustolocal_print_order_page() {
+    if (!current_user_can('manage_woocommerce')) {
+        wp_die(__('У вас нет прав для доступа к этой странице.'));
+    }
+    
+    $order_id = isset($_GET['order_id']) ? intval($_GET['order_id']) : 0;
+    
+    if (!$order_id) {
+        echo '<div class="wrap"><h1>Ошибка</h1><p>Не указан ID заказа.</p></div>';
+        return;
+    }
+    
+    $order = wc_get_order($order_id);
+    
+    if (!$order) {
+        echo '<div class="wrap"><h1>Ошибка</h1><p>Заказ не найден.</p></div>';
+        return;
+    }
+    
+    // Получаем данные заказа для печати
+    $print_data = gustolocal_get_order_print_data($order);
+    
+    ?>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Печать заказа #<?php echo esc_html($order_id); ?></title>
+        <!-- QZ Tray JS Library -->
+        <script src="https://cdn.jsdelivr.net/npm/qz-tray@2.2/qz-tray.min.js"></script>
+        <style>
+            @media print {
+                body { margin: 0; padding: 0; }
+                .no-print { display: none !important; }
+                @page { margin: 0; size: 80mm auto; }
+            }
+            body {
+                font-family: 'Courier New', monospace;
+                font-size: 12px;
+                line-height: 1.4;
+                max-width: 80mm;
+                margin: 0 auto;
+                padding: 10px;
+            }
+            .print-header {
+                text-align: center;
+                border-bottom: 1px dashed #000;
+                padding-bottom: 10px;
+                margin-bottom: 10px;
+            }
+            .print-header h1 {
+                font-size: 16px;
+                margin: 5px 0;
+                font-weight: bold;
+            }
+            .print-section {
+                margin: 10px 0;
+                padding: 5px 0;
+            }
+            .print-section-title {
+                font-weight: bold;
+                text-transform: uppercase;
+                border-bottom: 1px solid #000;
+                margin-bottom: 5px;
+                padding-bottom: 3px;
+            }
+            .print-line {
+                margin: 3px 0;
+            }
+            .print-item {
+                margin: 5px 0;
+                padding: 3px 0;
+            }
+            .print-item-name {
+                font-weight: bold;
+            }
+            .print-item-meta {
+                font-size: 10px;
+                color: #666;
+                margin-left: 10px;
+            }
+            .print-footer {
+                border-top: 1px dashed #000;
+                margin-top: 15px;
+                padding-top: 10px;
+                text-align: center;
+                font-size: 10px;
+            }
+            .no-print {
+                text-align: center;
+                margin: 20px 0;
+            }
+            .print-btn {
+                background: #0073aa;
+                color: white;
+                padding: 10px 20px;
+                border: none;
+                cursor: pointer;
+                font-size: 16px;
+                border-radius: 3px;
+            }
+            .print-btn:hover {
+                background: #005a87;
+            }
+            .print-btn:disabled {
+                background: #ccc;
+                cursor: not-allowed;
+            }
+            .qz-status {
+                margin: 10px 0;
+                padding: 8px;
+                border-radius: 4px;
+                font-size: 12px;
+            }
+            .qz-status.connected {
+                background: #d4edda;
+                color: #155724;
+            }
+            .qz-status.disconnected {
+                background: #f8d7da;
+                color: #721c24;
+            }
+            .qz-status.connecting {
+                background: #fff3cd;
+                color: #856404;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="no-print">
+            <div id="qz-status" class="qz-status disconnected">QZ Tray: Не подключен</div>
+            <button class="print-btn" id="qz-print-btn" onclick="printViaQZTray()">🖨️ Печать через QZ Tray</button>
+            <button class="print-btn" onclick="window.print()">🖨️ Печать (браузер)</button>
+            <button class="print-btn" onclick="window.close()" style="background: #666; margin-left: 10px;">Закрыть</button>
+        </div>
+        
+        <div class="print-content">
+            <div class="print-header">
+                <h1><?php echo esc_html(get_bloginfo('name')); ?></h1>
+                <div class="print-line"><?php echo esc_html(get_bloginfo('description')); ?></div>
+            </div>
+            
+            <div class="print-section">
+                <div class="print-section-title"><?php echo esc_html($print_data['customer_name']); ?></div>
+            </div>
+            
+            <div class="print-section">
+                <div class="print-section-title">Содержимое заказа</div>
+                <?php foreach ($print_data['items'] as $item): ?>
+                <div class="print-item">
+                    <div class="print-item-name">
+                        <?php echo esc_html($item['name']); ?>
+                        <?php if (!empty($item['unit'])): ?>
+                        <span style="font-size: 10px;"> (<?php echo esc_html($item['unit']); ?>)</span>
+                        <?php endif; ?>
+                        <?php if ($item['quantity'] > 1): ?>
+                        <strong> x<?php echo esc_html($item['quantity']); ?></strong>
+                        <?php endif; ?>
+                    </div>
+                </div>
+                <?php endforeach; ?>
+            </div>
+            
+            <div class="print-section">
+                <div class="print-section-title">
+                    <?php if ($print_data['shipping_address']): ?>
+                        Доставка: <?php echo esc_html($print_data['shipping_address']); ?>
+                    <?php else: ?>
+                        Самовывоз
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        
+        <script>
+        // Функция декодирования unicode escape последовательностей
+        function decodeUnicode(str) {
+            if (typeof str !== 'string') return str;
+            return str.replace(/\\u([0-9a-fA-F]{4})/g, function(match, code) {
+                return String.fromCharCode(parseInt(code, 16));
+            });
+        }
+        
+        // Функция рекурсивного декодирования объекта
+        function decodeUnicodeRecursive(obj) {
+            if (typeof obj === 'string') {
+                return decodeUnicode(obj);
+            } else if (Array.isArray(obj)) {
+                return obj.map(decodeUnicodeRecursive);
+            } else if (obj !== null && typeof obj === 'object') {
+                const decoded = {};
+                for (let key in obj) {
+                    decoded[decodeUnicode(key)] = decodeUnicodeRecursive(obj[key]);
+                }
+                return decoded;
+            }
+            return obj;
+        }
+        
+        // Данные заказа для печати (с декодированием unicode escape)
+        const orderDataRaw = <?php echo json_encode($print_data, JSON_UNESCAPED_UNICODE | JSON_HEX_APOS); ?>;
+        const orderData = decodeUnicodeRecursive(orderDataRaw);
+        
+        const siteNameRaw = <?php echo json_encode(get_bloginfo('name'), JSON_UNESCAPED_UNICODE); ?>;
+        const siteName = decodeUnicode(siteNameRaw);
+        
+        const siteDescriptionRaw = <?php echo json_encode(get_bloginfo('description'), JSON_UNESCAPED_UNICODE); ?>;
+        const siteDescription = decodeUnicode(siteDescriptionRaw);
+        
+        // QZ Tray подключение
+        let qzConnected = false;
+        const PRINTER_NAME = 'Printer POS-80';
+        
+        // Подключение к QZ Tray при загрузке страницы
+        window.addEventListener('load', function() {
+            connectToQZTray();
+        });
+        
+        // Функция подключения к QZ Tray
+        async function connectToQZTray() {
+            const statusEl = document.getElementById('qz-status');
+            const printBtn = document.getElementById('qz-print-btn');
+            
+            try {
+                statusEl.textContent = 'QZ Tray: Подключение...';
+                statusEl.className = 'qz-status connecting';
+                
+                // Проверяем, доступен ли QZ Tray
+                if (typeof qz === 'undefined') {
+                    throw new Error('QZ Tray библиотека не загружена');
+                }
+                
+                // Подключаемся к QZ Tray
+                await qz.websocket.connect().then(function() {
+                    qzConnected = true;
+                    statusEl.textContent = 'QZ Tray: Подключен ✓';
+                    statusEl.className = 'qz-status connected';
+                    printBtn.disabled = false;
+                }).catch(function(err) {
+                    throw err;
+                });
+            } catch (err) {
+                qzConnected = false;
+                statusEl.textContent = 'QZ Tray: Не подключен (убедитесь, что QZ Tray запущен)';
+                statusEl.className = 'qz-status disconnected';
+                printBtn.disabled = true;
+                console.error('QZ Tray connection error:', err);
+            }
+        }
+        
+        // Функция конвертации UTF-8 в CP866 (DOS Cyrillic) для ESC-POS
+        function utf8ToCp866(str) {
+            if (!str) return str;
+            
+            // Таблица соответствия основных кириллических символов UTF-8 -> CP866
+            const utf8ToCp866Map = {
+                'А': '\x80', 'Б': '\x81', 'В': '\x82', 'Г': '\x83', 'Д': '\x84', 'Е': '\x85', 'Ж': '\x86', 'З': '\x87',
+                'И': '\x88', 'Й': '\x89', 'К': '\x8A', 'Л': '\x8B', 'М': '\x8C', 'Н': '\x8D', 'О': '\x8E', 'П': '\x8F',
+                'Р': '\x90', 'С': '\x91', 'Т': '\x92', 'У': '\x93', 'Ф': '\x94', 'Х': '\x95', 'Ц': '\x96', 'Ч': '\x97',
+                'Ш': '\x98', 'Щ': '\x99', 'Ъ': '\x9A', 'Ы': '\x9B', 'Ь': '\x9C', 'Э': '\x9D', 'Ю': '\x9E', 'Я': '\x9F',
+                'а': '\xA0', 'б': '\xA1', 'в': '\xA2', 'г': '\xA3', 'д': '\xA4', 'е': '\xA5', 'ж': '\xA6', 'з': '\xA7',
+                'и': '\xA8', 'й': '\xA9', 'к': '\xAA', 'л': '\xAB', 'м': '\xAC', 'н': '\xAD', 'о': '\xAE', 'п': '\xAF',
+                'р': '\xE0', 'с': '\xE1', 'т': '\xE2', 'у': '\xE3', 'ф': '\xE4', 'х': '\xE5', 'ц': '\xE6', 'ч': '\xE7',
+                'ш': '\xE8', 'щ': '\xE9', 'ъ': '\xEA', 'ы': '\xEB', 'ь': '\xEC', 'э': '\xED', 'ю': '\xEE', 'я': '\xEF',
+                'Ё': '\xF0', 'ё': '\xF1'
+            };
+            
+            let result = '';
+            for (let i = 0; i < str.length; i++) {
+                const char = str[i];
+                if (utf8ToCp866Map[char]) {
+                    result += utf8ToCp866Map[char];
+                } else if (char.charCodeAt(0) < 128) {
+                    // ASCII символы остаются без изменений
+                    result += char;
+                } else {
+                    // Для остальных символов используем '?' как fallback
+                    result += '?';
+                }
+            }
+            return result;
+        }
+        
+        // Функция генерации ESC-POS команд с CP866
+        function generateESCPOS(data) {
+            let commands = [];
+            
+            // ESC-POS команды
+            const ESC = '\x1B';
+            const GS = '\x1D';
+            const LF = '\x0A';
+            
+            // Инициализация принтера
+            commands.push(ESC + '@'); // Сброс принтера
+            
+            // Устанавливаем кодовую таблицу CP866 для кириллицы
+            commands.push(ESC + '\x74' + '\x11'); // ESC t 17 = CP866 (Cyrillic)
+            
+            // КРИТИЧЕСКИ ВАЖНО: Добавляем пустые строки после инициализации
+            // Это дает принтеру время полностью обработать команды инициализации
+            // перед началом печати текста
+            commands.push(LF + LF + LF + LF + LF);
+            
+            // Клиент
+            commands.push(ESC + '!' + '\x08'); // Полужирный
+            commands.push(utf8ToCp866(data.customer_name) + LF);
+            commands.push(ESC + '!' + '\x00'); // Обычный
+            commands.push(LF);
+            
+            // Содержимое заказа
+            commands.push('--------------------------------' + LF);
+            data.items.forEach(function(item) {
+                let itemLine = utf8ToCp866(item.name);
+                if (item.unit) {
+                    itemLine += ' (' + utf8ToCp866(item.unit) + ')';
+                }
+                if (item.quantity > 1) {
+                    itemLine += ' x' + item.quantity;
+                }
+                commands.push(itemLine + LF);
+            });
+            commands.push('--------------------------------' + LF);
+            commands.push(LF);
+            
+            // Доставка/Самовывоз (только тип, без адреса)
+            commands.push(utf8ToCp866(data.shipping_type || (data.shipping_address ? 'Доставка' : 'Самовывоз')) + LF);
+            commands.push(LF);
+            
+            // Стоимость заказа
+            commands.push(ESC + '!' + '\x08'); // Полужирный
+            const totalText = data.total_formatted || (data.total + ' ' + (data.currency_symbol || 'руб.'));
+            commands.push(utf8ToCp866('Сумма: ' + totalText) + LF);
+            commands.push(ESC + '!' + '\x00'); // Обычный
+            
+            // Статус оплаты (без символов галочки/крестика, т.к. они не поддерживаются в CP866)
+            if (data.is_paid) {
+                commands.push(utf8ToCp866(data.payment_status || 'Оплачено') + LF);
+            } else {
+                commands.push(utf8ToCp866(data.payment_status || 'Не оплачено') + LF);
+            }
+            commands.push(LF);
+            commands.push(LF);
+            commands.push(LF);
+            
+            // Отрезка бумаги (автоотрез между чеками)
+            commands.push(GS + 'V' + '\x41' + '\x03'); // Частичная отрезка
+            
+            return commands.join('');
+        }
+        
+        // Функция генерации содержимого одного заказа (без инициализации принтера)
+        function generateOrderContent(data) {
+            let commands = [];
+            const ESC = '\x1B';
+            const GS = '\x1D';
+            const LF = '\x0A';
+            
+            // Клиент
+            commands.push(ESC + '!' + '\x08'); // Полужирный
+            commands.push(utf8ToCp866(data.customer_name) + LF);
+            commands.push(ESC + '!' + '\x00'); // Обычный
+            commands.push(LF);
+            
+            // Содержимое заказа
+            commands.push('--------------------------------' + LF);
+            data.items.forEach(function(item) {
+                let itemLine = utf8ToCp866(item.name);
+                if (item.unit) {
+                    itemLine += ' (' + utf8ToCp866(item.unit) + ')';
+                }
+                if (item.quantity > 1) {
+                    itemLine += ' x' + item.quantity;
+                }
+                commands.push(itemLine + LF);
+            });
+            commands.push('--------------------------------' + LF);
+            commands.push(LF);
+            
+            // Доставка/Самовывоз (только тип, без адреса)
+            commands.push(utf8ToCp866(data.shipping_type || (data.shipping_address ? 'Доставка' : 'Самовывоз')) + LF);
+            commands.push(LF);
+            
+            // Стоимость заказа
+            commands.push(ESC + '!' + '\x08'); // Полужирный
+            const totalText = data.total_formatted || (data.total + ' ' + (data.currency_symbol || 'руб.'));
+            commands.push(utf8ToCp866('Сумма: ' + totalText) + LF);
+            commands.push(ESC + '!' + '\x00'); // Обычный
+            
+            // Статус оплаты (без символов галочки/крестика, т.к. они не поддерживаются в CP866)
+            if (data.is_paid) {
+                commands.push(utf8ToCp866(data.payment_status || 'Оплачено') + LF);
+            } else {
+                commands.push(utf8ToCp866(data.payment_status || 'Не оплачено') + LF);
+            }
+            commands.push(LF);
+            commands.push(LF);
+            commands.push(LF);
+            
+            // Отрезка бумаги (автоотрез между чеками)
+            commands.push(GS + 'V' + '\x41' + '\x03'); // Частичная отрезка
+            
+            return commands.join('');
+        }
+        
+        // Функция генерации ESC-POS команд для нескольких заказов подряд
+        // УДАЛЕНА - используется версия ниже в коде
+        
+        // Функция печати через QZ Tray
+        async function printViaQZTray() {
+            if (!qzConnected) {
+                alert('QZ Tray не подключен. Убедитесь, что QZ Tray запущен и доступен.');
+                await connectToQZTray();
+                if (!qzConnected) {
+                    return;
+                }
+            }
+            
+            const printBtn = document.getElementById('qz-print-btn');
+            printBtn.disabled = true;
+            printBtn.textContent = 'Печать...';
+            
+            try {
+                // Генерируем ESC-POS команды с CP866
+                const escposData = generateESCPOS(orderData);
+                console.log('Generated ESC-POS data length:', escposData.length);
+                
+                // Печать через QZ Tray как RAW данные
+                const config = qz.configs.create(PRINTER_NAME);
+                console.log('Printer config:', config);
+                
+                // Проверяем доступность принтера
+                const printers = await qz.printers.find();
+                console.log('Available printers:', printers);
+                
+                if (!printers.includes(PRINTER_NAME)) {
+                    throw new Error('Принтер ' + PRINTER_NAME + ' не найден. Доступные принтеры: ' + printers.join(', '));
+                }
+                
+                // Конвертируем строку ESC-POS в массив байтов
+                // Важно: CP866 символы уже в строке, нужно правильно извлечь байты
+                const bytes = [];
+                for (let i = 0; i < escposData.length; i++) {
+                    const char = escposData[i];
+                    const charCode = char.charCodeAt(0);
+                    // Если это однобайтовый символ (0-255), используем его как есть
+                    if (charCode < 256) {
+                        bytes.push(charCode);
+                    } else {
+                        // Для многобайтовых символов берем только младший байт
+                        bytes.push(charCode & 0xFF);
+                    }
+                }
+                
+                // Конвертируем массив байтов в base64
+                let binary = '';
+                for (let i = 0; i < bytes.length; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                const base64Data = btoa(binary);
+                
+                console.log('Sending RAW print job (base64 length):', base64Data.length);
+                
+                // Используем RAW печать
+                await qz.print(config, [
+                    {
+                        type: 'raw',
+                        format: 'base64',
+                        data: base64Data
+                    }
+                ]).then(function() {
+                    console.log('Print job sent successfully');
+                    alert('Заказ успешно отправлен на печать!');
+                }).catch(function(err) {
+                    console.error('QZ Tray print error:', err);
+                    console.error('Error details:', JSON.stringify(err, null, 2));
+                    throw err;
+                });
+            } catch (err) {
+                console.error('Print error:', err);
+                alert('Ошибка при печати: ' + (err.message || err.toString()) + '\n\nПроверьте консоль браузера (F12) для деталей.');
+            } finally {
+                printBtn.disabled = false;
+                printBtn.textContent = '🖨️ Печать через QZ Tray';
+            }
+        }
+        
+        // Отключение от QZ Tray при закрытии страницы
+        window.addEventListener('beforeunload', function() {
+            if (qzConnected && typeof qz !== 'undefined') {
+                qz.websocket.disconnect();
+            }
+        });
+        </script>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
+// Функция декодирования unicode escape последовательностей
+function gustolocal_decode_unicode($str) {
+    if (!is_string($str)) {
+        return $str;
+    }
+    // Декодируем unicode escape последовательности вида \u0421
+    return preg_replace_callback('/\\\\u([0-9a-fA-F]{4})/', function($matches) {
+        return mb_convert_encoding(pack('H*', $matches[1]), 'UTF-8', 'UCS-2BE');
+    }, $str);
+}
+
+// Функция рекурсивного декодирования массива
+function gustolocal_decode_unicode_recursive($data) {
+    if (is_string($data)) {
+        return gustolocal_decode_unicode($data);
+    } elseif (is_array($data)) {
+        $decoded = array();
+        foreach ($data as $key => $value) {
+            $decoded[gustolocal_decode_unicode_recursive($key)] = gustolocal_decode_unicode_recursive($value);
+        }
+        return $decoded;
+    }
+    return $data;
+}
+
+// Функция для получения данных заказа для печати
+function gustolocal_get_order_print_data($order) {
+    if (!is_a($order, 'WC_Order')) {
+        return array();
+    }
+    
+    // Информация о заказе
+    $customer_name = trim($order->get_billing_first_name() . ' ' . $order->get_billing_last_name());
+    if (empty($customer_name)) {
+        $customer_name = $order->get_billing_company() ?: 'Гость';
+    }
+    
+    // Товары - парсим JSON payload если есть
+    $items = array();
+    foreach ($order->get_items() as $item_id => $item) {
+        // Проверяем наличие _wmb_payload (JSON с деталями заказа)
+        $wmb_payload = $item->get_meta('_wmb_payload', true);
+        if (!$wmb_payload) {
+            $wmb_payload = $item->get_meta('Meal plan payload', true);
+        }
+        
+        if ($wmb_payload) {
+            // Парсим JSON payload
+            $payload = json_decode($wmb_payload, true);
+            if ($payload && isset($payload['items_list']) && is_array($payload['items_list'])) {
+                // Извлекаем товары из items_list
+                foreach ($payload['items_list'] as $payload_item) {
+                    if (isset($payload_item['qty']) && $payload_item['qty'] > 0) {
+                        $item_name = isset($payload_item['name']) ? $payload_item['name'] : 'Неизвестное блюдо';
+                        $item_name = gustolocal_decode_unicode($item_name);
+                        $item_qty = intval($payload_item['qty']);
+                        $item_unit = isset($payload_item['unit']) ? $payload_item['unit'] : '';
+                        
+                        $items[] = array(
+                            'name' => $item_name,
+                            'quantity' => $item_qty,
+                            'unit' => $item_unit
+                        );
+                    }
+                }
+            }
+        } else {
+            // Обычный товар без payload
+            $item_name = $item->get_name();
+            $item_name = gustolocal_decode_unicode($item_name);
+            
+            $items[] = array(
+                'name' => $item_name,
+                'quantity' => $item->get_quantity(),
+                'unit' => ''
+            );
+        }
+    }
+    
+    // Адрес доставки
+    $shipping_address = '';
+    if ($order->has_shipping_address()) {
+        $address_parts = array();
+        if ($order->get_shipping_address_1()) {
+            $address_parts[] = $order->get_shipping_address_1();
+        }
+        if ($order->get_shipping_address_2()) {
+            $address_parts[] = $order->get_shipping_address_2();
+        }
+        if ($order->get_shipping_city()) {
+            $address_parts[] = $order->get_shipping_city();
+        }
+        if ($order->get_shipping_postcode()) {
+            $address_parts[] = $order->get_shipping_postcode();
+        }
+        $shipping_address = implode(', ', $address_parts);
+    }
+    
+    // Проверка оплаты заказа
+    $is_paid = $order->is_paid() || $order->get_date_paid() !== null;
+    $payment_status = $is_paid ? 'Оплачено' : 'Не оплачено';
+    
+    // Форматируем сумму без HTML тегов
+    $order_total = floatval($order->get_total());
+    $currency_symbol_raw = get_woocommerce_currency_symbol();
+    // Заменяем HTML entities на обычные символы
+    $currency_symbol = html_entity_decode($currency_symbol_raw, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+    // Если символ евро не поддерживается, заменяем на "EUR"
+    if ($currency_symbol === '€' || $currency_symbol === '&euro;' || $currency_symbol === '€') {
+        $currency_symbol = 'EUR';
+    }
+    $total_formatted = number_format($order_total, 2, '.', ' ') . ' ' . $currency_symbol;
+    
+    // Определяем тип доставки (только текст, без адреса)
+    $shipping_type = $order->has_shipping_address() ? 'Доставка' : 'Самовывоз';
+    
+    return array(
+        'order_id' => $order->get_id(),
+        'order_date' => $order->get_date_created()->date_i18n('d.m.Y H:i'),
+        'order_status' => wc_get_order_status_name($order->get_status()),
+        'customer_name' => $customer_name,
+        'customer_phone' => $order->get_billing_phone(),
+        'customer_email' => $order->get_billing_email(),
+        'shipping_method' => $order->get_shipping_method() ?: 'Самовывоз',
+        'shipping_type' => $shipping_type,
+        'shipping_address' => $shipping_address,
+        'items' => $items,
+        'total' => $order_total,
+        'total_formatted' => $total_formatted,
+        'currency_symbol' => $currency_symbol,
+        'is_paid' => $is_paid,
+        'payment_status' => $payment_status,
+        'order_note' => $order->get_customer_note()
+    );
+}
+
+// Добавляем кнопку печати в список заказов (быстрая печать)
+add_filter('woocommerce_admin_order_actions', 'gustolocal_add_quick_print_action', 10, 2);
+function gustolocal_add_quick_print_action($actions, $order) {
+    if (!is_a($order, 'WC_Order')) {
+        return $actions;
+    }
+    
+    $print_url = admin_url('admin.php?page=gustolocal-print-order&order_id=' . $order->get_id());
+    
+    $actions['print'] = array(
+        'url' => $print_url,
+        'name' => __('Печать', 'gustolocal'),
+        'action' => 'print',
+    );
+    
+    return $actions;
+}
+
+// Добавляем стили для кнопки печати в списке заказов
+add_action('admin_head', 'gustolocal_print_order_admin_styles');
+function gustolocal_print_order_admin_styles() {
+    $screen = get_current_screen();
+    if ($screen && $screen->id === 'edit-shop_order') {
+        ?>
+        <style>
+        .wc-action-button.print::after {
+            content: "\f464"; /* dashicons-printer */
+            font-family: dashicons;
+        }
+        </style>
+        <?php
+    }
+}
+
+/* ========================================
+   РАБОЧЕЕ МЕСТО ДЛЯ СОТРУДНИКА ПЕЧАТИ
+   ======================================== */
+
+// Создаем кастомную роль для сотрудника печати
+add_action('init', 'gustolocal_create_printer_operator_role');
+function gustolocal_create_printer_operator_role() {
+    // Проверяем, существует ли роль
+    if (!get_role('printer_operator')) {
+        // Создаем роль на основе subscriber с доступом к админке
+        add_role('printer_operator', 'Оператор печати', array(
+            'read' => true,
+            'level_0' => true,
+        ));
+    }
+    
+    // Обновляем права для существующей роли, чтобы гарантировать доступ к админке
+    $role = get_role('printer_operator');
+    if ($role) {
+        // Минимальные права для доступа к админке
+        $role->add_cap('read');
+        $role->add_cap('level_0');
+    }
+}
+
+// Убеждаемся, что пользователи с ролью printer_operator могут войти в админку
+add_filter('user_has_cap', 'gustolocal_printer_operator_caps', 10, 4);
+function gustolocal_printer_operator_caps($allcaps, $caps, $args, $user) {
+    if (isset($user->ID) && in_array('printer_operator', $user->roles)) {
+        // Гарантируем доступ к админке
+        $allcaps['read'] = true;
+        $allcaps['level_0'] = true;
+    }
+    return $allcaps;
+}
+
+// Убираем редирект для printer_operator после входа
+add_filter('login_redirect', 'gustolocal_printer_operator_login_redirect', 999, 3);
+function gustolocal_printer_operator_login_redirect($redirect_to, $requested_redirect_to, $user) {
+    if (isset($user->roles) && in_array('printer_operator', $user->roles)) {
+        // Перенаправляем на рабочее место печати
+        return admin_url('admin.php?page=gustolocal-printer-workstation');
+    }
+    return $redirect_to;
+}
+
+// Убираем редирект на главную для printer_operator при попытке доступа к админке
+add_action('admin_init', 'gustolocal_prevent_admin_redirect_for_printer_operator', 1);
+function gustolocal_prevent_admin_redirect_for_printer_operator() {
+    $user = wp_get_current_user();
+    if (in_array('printer_operator', $user->roles)) {
+        // Убираем стандартный редирект subscriber на главную
+        remove_action('admin_init', '_maybe_update_core');
+        remove_action('admin_init', '_maybe_update_plugins');
+        remove_action('admin_init', '_maybe_update_themes');
+    }
+}
+
+// Убираем редирект на главную страницу для printer_operator
+add_filter('show_admin_bar', 'gustolocal_show_admin_bar_for_printer_operator');
+function gustolocal_show_admin_bar_for_printer_operator($show) {
+    $user = wp_get_current_user();
+    if (in_array('printer_operator', $user->roles)) {
+        return true; // Показываем админ-бар
+    }
+    return $show;
+}
+
+// Убираем редирект после логина, если пользователь printer_operator
+add_action('wp_login', 'gustolocal_printer_operator_wp_login', 999, 2);
+function gustolocal_printer_operator_wp_login($user_login, $user) {
+    if (in_array('printer_operator', $user->roles)) {
+        // Убираем все редиректы на главную
+        remove_action('template_redirect', 'wp_redirect_admin_locations', 1000);
+    }
+}
+
+// Принудительно разрешаем доступ к админке для printer_operator
+add_action('admin_page_access_denied', 'gustolocal_allow_printer_operator_admin', 1);
+function gustolocal_allow_printer_operator_admin() {
+    $user = wp_get_current_user();
+    if (in_array('printer_operator', $user->roles)) {
+        // Не показываем ошибку доступа
+        return;
+    }
+}
+
+// Добавляем кастомную страницу для рабочего места печати
+add_action('admin_menu', 'gustolocal_add_printer_workstation_page');
+function gustolocal_add_printer_workstation_page() {
+    add_menu_page(
+        'Рабочее место печати',
+        'Печать',
+        'read', // Минимальные права доступа
+        'gustolocal-printer-workstation',
+        'gustolocal_printer_workstation_page',
+        'dashicons-printer',
+        30
+    );
+}
+
+// Страница рабочего места печати
+function gustolocal_printer_workstation_page() {
+    if (!current_user_can('read')) {
+        wp_die(__('У вас нет прав для доступа к этой странице.'));
+    }
+    
+    $active_tab = isset($_GET['tab']) ? sanitize_text_field($_GET['tab']) : 'orders';
+    if (!in_array($active_tab, array('orders', 'dishes'))) {
+        $active_tab = 'orders';
+    }
+    
+    ?>
+    <div class="wrap">
+        <h1>🖨️ Рабочее место печати</h1>
+        
+        <nav class="nav-tab-wrapper">
+            <a href="?page=gustolocal-printer-workstation&tab=orders" class="nav-tab <?php echo $active_tab === 'orders' ? 'nav-tab-active' : ''; ?>">
+                📋 Заказы (ценники)
+            </a>
+            <a href="?page=gustolocal-printer-workstation&tab=dishes" class="nav-tab <?php echo $active_tab === 'dishes' ? 'nav-tab-active' : ''; ?>">
+                🏷️ Блюда (этикетки)
+            </a>
+        </nav>
+        
+        <?php if ($active_tab === 'orders'): ?>
+            <?php gustolocal_render_orders_tab(); ?>
+        <?php else: ?>
+            <?php gustolocal_render_dishes_tab(); ?>
+        <?php endif; ?>
+    </div>
+    <?php
+}
+
+// Вкладка заказов для печати ценников
+function gustolocal_render_orders_tab() {
+    // Получаем заказы за последние 7 дней
+    $orders_query = array(
+        'limit' => 100,
+        'orderby' => 'date',
+        'order' => 'DESC',
+        'date_created' => date('Y-m-d', strtotime('-7 days')) . '...' . date('Y-m-d'),
+        'status' => array('processing', 'on-hold', 'completed')
+    );
+    
+    $orders = wc_get_orders($orders_query);
+    
+    ?>
+    <div class="printer-workstation-orders">
+        <div style="margin: 20px 0;">
+            <button id="print-selected-orders" class="button button-primary button-large" style="background: #28a745; border-color: #28a745; font-size: 16px; padding: 10px 20px; height: auto;">
+                🖨️ Печать выбранных заказов
+            </button>
+            <span id="selected-count" style="margin-left: 15px; font-weight: bold; color: #28a745;"></span>
+        </div>
+        
+        <table class="wp-list-table widefat fixed striped">
+            <thead>
+                <tr>
+                    <th style="width: 40px;">
+                        <input type="checkbox" id="select-all-orders">
+                    </th>
+                    <th>№ заказа</th>
+                    <th>Дата</th>
+                    <th>Клиент</th>
+                    <th>Сумма</th>
+                    <th>Доставка</th>
+                    <th>Статус</th>
+                    <th style="width: 100px;">Действие</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($orders)): ?>
+                    <tr>
+                        <td colspan="8" style="text-align: center; padding: 20px;">
+                            Заказы не найдены
+                        </td>
+                    </tr>
+                <?php else: ?>
+                    <?php foreach ($orders as $order): 
+                        $customer_name = trim($order->get_billing_first_name() . ' ' . $order->get_billing_last_name());
+                        if (empty($customer_name)) {
+                            $customer_name = $order->get_billing_company() ?: 'Гость';
+                        }
+                        $shipping_method = $order->get_shipping_method() ?: 'Самовывоз';
+                        $order_total = $order->get_total();
+                        $currency_symbol = get_woocommerce_currency_symbol();
+                    ?>
+                        <tr>
+                            <td>
+                                <input type="checkbox" class="order-checkbox" value="<?php echo esc_attr($order->get_id()); ?>">
+                            </td>
+                            <td>
+                                <strong>
+                                    <a href="<?php echo esc_url(admin_url('post.php?post=' . $order->get_id() . '&action=edit')); ?>" target="_blank" style="text-decoration: none;">
+                                        #<?php echo esc_html($order->get_id()); ?>
+                                    </a>
+                                </strong>
+                            </td>
+                            <td><?php echo esc_html($order->get_date_created()->date_i18n('d.m.Y H:i')); ?></td>
+                            <td><?php echo esc_html($customer_name); ?></td>
+                            <td><?php echo esc_html(number_format($order_total, 2, '.', ' ') . ' ' . $currency_symbol); ?></td>
+                            <td><?php echo esc_html($shipping_method); ?></td>
+                            <td><?php echo esc_html(wc_get_order_status_name($order->get_status())); ?></td>
+                            <td>
+                                <a href="<?php echo esc_url(admin_url('post.php?post=' . $order->get_id() . '&action=edit')); ?>" target="_blank" class="button button-small">
+                                    Открыть
+                                </a>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+    
+    <script>
+    jQuery(document).ready(function($) {
+        // Выделить все
+        $('#select-all-orders').on('change', function() {
+            $('.order-checkbox').prop('checked', this.checked);
+            updateSelectedCount();
+        });
+        
+        // Обновление счетчика выбранных
+        $('.order-checkbox').on('change', function() {
+            updateSelectedCount();
+            $('#select-all-orders').prop('checked', $('.order-checkbox:checked').length === $('.order-checkbox').length);
+        });
+        
+        function updateSelectedCount() {
+            const count = $('.order-checkbox:checked').length;
+            $('#selected-count').text(count > 0 ? 'Выбрано: ' + count : '');
+        }
+        
+        // Печать выбранных заказов
+        $('#print-selected-orders').on('click', function() {
+            const selected = $('.order-checkbox:checked').map(function() {
+                return $(this).val();
+            }).get();
+            
+            if (selected.length === 0) {
+                alert('Выберите хотя бы один заказ для печати');
+                return;
+            }
+            
+            // Открываем страницу массовой печати с ID заказов
+            const printUrl = '<?php echo admin_url('admin.php?page=gustolocal-print-multiple-orders'); ?>' + 
+                '&order_ids=' + selected.join(',');
+            window.open(printUrl, '_blank');
+        });
+        
+        updateSelectedCount();
+    });
+    </script>
+    
+    <style>
+    .printer-workstation-orders {
+        margin-top: 20px;
+    }
+    .printer-workstation-orders table {
+        margin-top: 20px;
+    }
+    #print-selected-orders:hover {
+        background: #218838 !important;
+        border-color: #218838 !important;
+    }
+    </style>
+    <?php
+}
+
+// Вкладка блюд для печати этикеток
+function gustolocal_render_dishes_tab() {
+    // Получаем все активные блюда
+    $dishes = get_posts(array(
+        'post_type' => 'wmb_dish',
+        'posts_per_page' => -1,
+        'post_status' => 'publish',
+        'meta_query' => array(
+            array(
+                'key' => 'wmb_active',
+                'value' => '1',
+                'compare' => '='
+            )
+        ),
+        'orderby' => 'title',
+        'order' => 'ASC'
+    ));
+    
+    ?>
+    <div class="printer-workstation-dishes">
+        <div style="margin: 20px 0;">
+            <p style="font-size: 14px; color: #666;">
+                Выберите блюдо и укажите количество этикеток для печати (80x50 мм)
+            </p>
+        </div>
+        
+        <table class="wp-list-table widefat fixed striped">
+            <thead>
+                <tr>
+                    <th style="width: 200px;">Блюдо</th>
+                    <th>Состав</th>
+                    <th>Срок хранения</th>
+                    <th style="width: 150px;">Количество этикеток</th>
+                    <th style="width: 120px;">Действие</th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (empty($dishes)): ?>
+                    <tr>
+                        <td colspan="5" style="text-align: center; padding: 20px;">
+                            Блюда не найдены
+                        </td>
+                    </tr>
+                <?php else: ?>
+                    <?php foreach ($dishes as $dish): 
+                        $ingredients = get_post_meta($dish->ID, 'wmb_ingredients', true);
+                        $shelf_life = get_post_meta($dish->ID, 'wmb_shelf_life', true);
+                        $allergens = get_post_meta($dish->ID, 'wmb_allergens', true);
+                        $nutrition = get_post_meta($dish->ID, 'wmb_nutrition', true);
+                    ?>
+                        <tr data-dish-id="<?php echo esc_attr($dish->ID); ?>">
+                            <td><strong><?php echo esc_html($dish->post_title); ?></strong></td>
+                            <td><?php echo esc_html($ingredients ?: '—'); ?></td>
+                            <td><?php echo esc_html($shelf_life ?: '—'); ?></td>
+                            <td>
+                                <input type="number" 
+                                       class="dish-label-quantity" 
+                                       min="1" 
+                                       max="100" 
+                                       value="1" 
+                                       style="width: 80px;">
+                            </td>
+                            <td>
+                                <button class="button button-primary print-dish-labels" 
+                                        data-dish-id="<?php echo esc_attr($dish->ID); ?>"
+                                        data-dish-name="<?php echo esc_attr($dish->post_title); ?>"
+                                        data-ingredients="<?php echo esc_attr($ingredients); ?>"
+                                        data-shelf-life="<?php echo esc_attr($shelf_life); ?>"
+                                        data-allergens="<?php echo esc_attr($allergens); ?>"
+                                        data-nutrition="<?php echo esc_attr($nutrition); ?>">
+                                    🖨️ Печать
+                                </button>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php endif; ?>
+            </tbody>
+        </table>
+    </div>
+    
+    <script>
+    jQuery(document).ready(function($) {
+        $('.print-dish-labels').on('click', function() {
+            const dishId = $(this).data('dish-id');
+            const dishName = $(this).data('dish-name');
+            const ingredients = $(this).data('ingredients');
+            const shelfLife = $(this).data('shelf-life');
+            const allergens = $(this).data('allergens');
+            const nutrition = $(this).data('nutrition');
+            const quantity = $(this).closest('tr').find('.dish-label-quantity').val();
+            
+            if (!quantity || quantity < 1) {
+                alert('Укажите количество этикеток');
+                return;
+            }
+            
+            // Открываем страницу печати этикеток
+            const printUrl = '<?php echo admin_url('admin.php?page=gustolocal-print-label'); ?>' + 
+                '&dish_id=' + dishId + 
+                '&quantity=' + quantity +
+                '&dish_name=' + encodeURIComponent(dishName) +
+                '&ingredients=' + encodeURIComponent(ingredients || '') +
+                '&shelf_life=' + encodeURIComponent(shelfLife || '') +
+                '&allergens=' + encodeURIComponent(allergens || '') +
+                '&nutrition=' + encodeURIComponent(nutrition || '');
+            
+            window.open(printUrl, '_blank');
+        });
+    });
+    </script>
+    <?php
+}
+
+// Добавляем страницу печати этикеток
+add_action('admin_menu', 'gustolocal_add_print_label_page');
+function gustolocal_add_print_label_page() {
+    add_submenu_page(
+        null, // Скрытая страница
+        'Печать этикетки',
+        'Печать этикетки',
+        'read',
+        'gustolocal-print-label',
+        'gustolocal_print_label_page'
+    );
+}
+
+// Страница печати этикетки
+function gustolocal_print_label_page() {
+    if (!current_user_can('read')) {
+        wp_die(__('У вас нет прав для доступа к этой странице.'));
+    }
+    
+    $dish_id = isset($_GET['dish_id']) ? intval($_GET['dish_id']) : 0;
+    $quantity = isset($_GET['quantity']) ? intval($_GET['quantity']) : 1;
+    $dish_name = isset($_GET['dish_name']) ? sanitize_text_field($_GET['dish_name']) : '';
+    $ingredients = isset($_GET['ingredients']) ? sanitize_textarea_field($_GET['ingredients']) : '';
+    $shelf_life = isset($_GET['shelf_life']) ? sanitize_text_field($_GET['shelf_life']) : '';
+    $allergens = isset($_GET['allergens']) ? sanitize_text_field($_GET['allergens']) : '';
+    $nutrition = isset($_GET['nutrition']) ? sanitize_text_field($_GET['nutrition']) : '';
+    
+    if (!$dish_id || !$dish_name) {
+        echo '<div class="wrap"><h1>Ошибка</h1><p>Не указаны данные блюда.</p></div>';
+        return;
+    }
+    
+    // Рассчитываем срок годности от текущей даты
+    $expiry_date = '';
+    $print_date = current_time('d.m.Y');
+    if ($shelf_life) {
+        // Парсим срок хранения (например, "2-3 дня", "до 2х дней", "2 дня", "3 суток")
+        // Ищем максимальное число в строке
+        preg_match_all('/(\d+)/', $shelf_life, $matches);
+        if (!empty($matches[1])) {
+            // Берем максимальное значение (если указан диапазон "2-3 дня", берем 3)
+            $days = max(array_map('intval', $matches[1]));
+            if ($days > 0) {
+                $expiry_date = date('d.m.Y', strtotime('+' . $days . ' days'));
+            }
+        }
+    }
+    
+    // Подготавливаем данные для печати
+    $label_data = array(
+        'dish_name' => $dish_name,
+        'ingredients' => $ingredients,
+        'shelf_life' => $shelf_life,
+        'expiry_date' => $expiry_date,
+        'print_date' => $print_date,
+        'allergens' => $allergens,
+        'nutrition' => $nutrition,
+        'quantity' => $quantity
+    );
+    
+    ?>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Печать этикеток - <?php echo esc_html($dish_name); ?></title>
+        <!-- QZ Tray JS Library -->
+        <script src="https://cdn.jsdelivr.net/npm/qz-tray@2.2/qz-tray.min.js"></script>
+        <style>
+            @media print {
+                body { margin: 0; padding: 0; }
+                .no-print { display: none !important; }
+                @page { margin: 0; size: 80mm 50mm; }
+            }
+            body {
+                font-family: Arial, sans-serif;
+                font-size: 10px;
+                margin: 0;
+                padding: 10px;
+            }
+            .label-preview {
+                width: 80mm;
+                height: 50mm;
+                border: 1px solid #000;
+                padding: 5mm;
+                box-sizing: border-box;
+                margin: 0 auto;
+            }
+            .label-title {
+                font-weight: bold;
+                font-size: 12px;
+                margin-bottom: 3px;
+                text-align: center;
+            }
+            .label-content {
+                font-size: 9px;
+                line-height: 1.3;
+            }
+            .label-expiry {
+                font-weight: bold;
+                margin-top: 3px;
+                text-align: center;
+                font-size: 10px;
+            }
+            .no-print {
+                text-align: center;
+                margin: 20px 0;
+            }
+            .print-btn {
+                background: #0073aa;
+                color: white;
+                padding: 10px 20px;
+                border: none;
+                cursor: pointer;
+                font-size: 16px;
+                border-radius: 3px;
+                margin: 5px;
+            }
+            .print-btn:hover {
+                background: #005a87;
+            }
+            .qz-status {
+                margin: 10px 0;
+                padding: 8px;
+                border-radius: 4px;
+                font-size: 12px;
+            }
+            .qz-status.connected {
+                background: #d4edda;
+                color: #155724;
+            }
+            .qz-status.disconnected {
+                background: #f8d7da;
+                color: #721c24;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="no-print">
+            <div id="qz-status" class="qz-status disconnected">QZ Tray: Не подключен</div>
+            <button class="print-btn" id="qz-print-btn" onclick="printViaQZTray()">🖨️ Печать через QZ Tray (<?php echo $quantity; ?> шт.)</button>
+            <button class="print-btn" onclick="window.print()">🖨️ Печать (браузер)</button>
+            <button class="print-btn" onclick="window.close()" style="background: #666;">Закрыть</button>
+        </div>
+        
+        <?php for ($i = 0; $i < $quantity; $i++): ?>
+        <div class="label-preview" style="<?php echo $i > 0 ? 'page-break-before: always;' : ''; ?>">
+            <div class="label-title"><?php echo esc_html($dish_name); ?></div>
+            <?php if ($ingredients): ?>
+            <div class="label-content"><strong>Состав:</strong> <?php echo esc_html($ingredients); ?></div>
+            <?php endif; ?>
+            <?php if ($allergens): ?>
+            <div class="label-content"><strong>Аллергены:</strong> <?php echo esc_html($allergens); ?></div>
+            <?php endif; ?>
+            <?php if ($nutrition): ?>
+            <div class="label-content"><strong>КБЖУ:</strong> <?php echo esc_html($nutrition); ?></div>
+            <?php endif; ?>
+            <?php if ($expiry_date): ?>
+            <div class="label-expiry">Годен до: <?php echo esc_html($expiry_date); ?></div>
+            <?php elseif ($shelf_life): ?>
+            <div class="label-content"><strong>Срок хранения:</strong> <?php echo esc_html($shelf_life); ?></div>
+            <?php endif; ?>
+        </div>
+        <?php endfor; ?>
+        
+        <script>
+        const labelData = <?php echo json_encode($label_data, JSON_UNESCAPED_UNICODE); ?>;
+        const PRINTER_NAME = 'Printer POS-80';
+        let qzConnected = false;
+        
+        // Подключение к QZ Tray
+        window.addEventListener('load', function() {
+            connectToQZTray();
+        });
+        
+        async function connectToQZTray() {
+            const statusEl = document.getElementById('qz-status');
+            const printBtn = document.getElementById('qz-print-btn');
+            
+            try {
+                statusEl.textContent = 'QZ Tray: Подключение...';
+                statusEl.className = 'qz-status connecting';
+                
+                if (typeof qz === 'undefined') {
+                    throw new Error('QZ Tray библиотека не загружена');
+                }
+                
+                await qz.websocket.connect().then(function() {
+                    qzConnected = true;
+                    statusEl.textContent = 'QZ Tray: Подключен ✓';
+                    statusEl.className = 'qz-status connected';
+                    printBtn.disabled = false;
+                }).catch(function(err) {
+                    throw err;
+                });
+            } catch (err) {
+                qzConnected = false;
+                statusEl.textContent = 'QZ Tray: Не подключен';
+                statusEl.className = 'qz-status disconnected';
+                printBtn.disabled = true;
+                console.error('QZ Tray connection error:', err);
+            }
+        }
+        
+        // Функция конвертации UTF-8 в CP866 (DOS Cyrillic) для ESC-POS
+        function utf8ToCp866(str) {
+            if (!str) return str;
+            
+            // Таблица соответствия основных кириллических символов UTF-8 -> CP866
+            const utf8ToCp866Map = {
+                'А': '\x80', 'Б': '\x81', 'В': '\x82', 'Г': '\x83', 'Д': '\x84', 'Е': '\x85', 'Ж': '\x86', 'З': '\x87',
+                'И': '\x88', 'Й': '\x89', 'К': '\x8A', 'Л': '\x8B', 'М': '\x8C', 'Н': '\x8D', 'О': '\x8E', 'П': '\x8F',
+                'Р': '\x90', 'С': '\x91', 'Т': '\x92', 'У': '\x93', 'Ф': '\x94', 'Х': '\x95', 'Ц': '\x96', 'Ч': '\x97',
+                'Ш': '\x98', 'Щ': '\x99', 'Ъ': '\x9A', 'Ы': '\x9B', 'Ь': '\x9C', 'Э': '\x9D', 'Ю': '\x9E', 'Я': '\x9F',
+                'а': '\xA0', 'б': '\xA1', 'в': '\xA2', 'г': '\xA3', 'д': '\xA4', 'е': '\xA5', 'ж': '\xA6', 'з': '\xA7',
+                'и': '\xA8', 'й': '\xA9', 'к': '\xAA', 'л': '\xAB', 'м': '\xAC', 'н': '\xAD', 'о': '\xAE', 'п': '\xAF',
+                'р': '\xE0', 'с': '\xE1', 'т': '\xE2', 'у': '\xE3', 'ф': '\xE4', 'х': '\xE5', 'ц': '\xE6', 'ч': '\xE7',
+                'ш': '\xE8', 'щ': '\xE9', 'ъ': '\xEA', 'ы': '\xEB', 'ь': '\xEC', 'э': '\xED', 'ю': '\xEE', 'я': '\xEF',
+                'Ё': '\xF0', 'ё': '\xF1'
+            };
+            
+            let result = '';
+            for (let i = 0; i < str.length; i++) {
+                const char = str[i];
+                if (utf8ToCp866Map[char]) {
+                    result += utf8ToCp866Map[char];
+                } else if (char.charCodeAt(0) < 128) {
+                    // ASCII символы остаются без изменений
+                    result += char;
+                } else {
+                    // Для остальных символов используем '?' как fallback
+                    result += '?';
+                }
+            }
+            return result;
+        }
+        
+        // Функция генерации ESC-POS команд для этикетки 80x50 мм
+        function generateLabelESCPOS(data) {
+            let commands = [];
+            const ESC = '\x1B';
+            const GS = '\x1D';
+            const LF = '\x0A';
+            
+            // Инициализация принтера
+            commands.push(ESC + '@'); // Сброс принтера
+            commands.push(ESC + '\x74' + '\x11'); // ESC t 17 = CP866 (Cyrillic)
+            
+            // Настройка для этикетки 80x50 мм
+            // Устанавливаем минимальный левый отступ (2 мм = ~16 точек)
+            commands.push(GS + 'L' + '\x10' + '\x00'); // Левый отступ 16 точек (~2 мм)
+            
+            // Устанавливаем компактный межстрочный интервал
+            commands.push(ESC + '\x33' + '\x10'); // Межстрочный интервал 16 точек (компактнее)
+            
+            // Минимальные пустые строки для обработки инициализации
+            commands.push(LF + LF);
+            
+            // Название блюда (полужирный, без переноса строк)
+            commands.push(ESC + '!' + '\x08'); // Полужирный
+            // Устанавливаем режим без автоматического переноса (если поддерживается)
+            // ESC ! 0x00 - обычный шрифт, но мы уже установили полужирный
+            commands.push(utf8ToCp866(data.dish_name) + LF);
+            commands.push(ESC + '!' + '\x00'); // Обычный
+            commands.push(LF);
+            
+            // Разделитель
+            commands.push('--------------------------------' + LF);
+            commands.push(LF);
+            
+            // Состав
+            if (data.ingredients) {
+                commands.push(utf8ToCp866('Состав: ') + LF);
+                // Для этикетки 80мм используем более длинные строки (до 48 символов)
+                const ingredients = data.ingredients;
+                const maxLineLength = 48; // Максимальная длина строки для этикетки 80мм
+                let currentLine = '';
+                const words = ingredients.split(/[,\s]+/);
+                for (let w = 0; w < words.length; w++) {
+                    const word = words[w].trim();
+                    if (!word) continue;
+                    if (currentLine.length + word.length + 1 <= maxLineLength) {
+                        currentLine += (currentLine ? ', ' : '') + word;
+                    } else {
+                        if (currentLine) {
+                            commands.push(utf8ToCp866(currentLine) + LF);
+                        }
+                        currentLine = word;
+                    }
+                }
+                if (currentLine) {
+                    commands.push(utf8ToCp866(currentLine) + LF);
+                }
+                commands.push(LF);
+            }
+            
+            // Аллергены
+            if (data.allergens) {
+                commands.push(utf8ToCp866('Аллергены: ' + data.allergens) + LF);
+                commands.push(LF);
+            }
+            
+            // КБЖУ
+            if (data.nutrition) {
+                commands.push(utf8ToCp866('КБЖУ: ' + data.nutrition) + LF);
+                commands.push(LF);
+            }
+            
+            // Разделитель
+            commands.push('--------------------------------' + LF);
+            commands.push(LF);
+            
+            // Срок годности (полужирный, по левому краю)
+            commands.push(ESC + '!' + '\x08'); // Полужирный
+            if (data.expiry_date) {
+                commands.push(utf8ToCp866('Годен до: ' + data.expiry_date) + LF);
+            } else if (data.shelf_life) {
+                commands.push(utf8ToCp866('Срок хранения: ' + data.shelf_life) + LF);
+            }
+            commands.push(ESC + '!' + '\x00'); // Обычный
+            commands.push(LF);
+            
+            // Отрезка бумаги
+            commands.push(GS + 'V' + '\x41' + '\x03'); // Частичная отрезка
+            
+            return commands.join('');
+        }
+        
+        // Функция печати этикеток через QZ Tray
+        async function printViaQZTray() {
+            if (!qzConnected) {
+                alert('QZ Tray не подключен');
+                await connectToQZTray();
+                if (!qzConnected) return;
+            }
+            
+            const printBtn = document.getElementById('qz-print-btn');
+            printBtn.disabled = true;
+            printBtn.textContent = 'Печать...';
+            
+            try {
+                const config = qz.configs.create(PRINTER_NAME);
+                const printers = await qz.printers.find();
+                
+                if (!printers.includes(PRINTER_NAME)) {
+                    throw new Error('Принтер "' + PRINTER_NAME + '" не найден. Доступные принтеры: ' + printers.join(', '));
+                }
+                
+                console.log('Начало печати этикеток, количество:', labelData.quantity);
+                
+                // Печатаем каждую этикетку отдельно через RAW/ESC-POS
+                for (let i = 0; i < labelData.quantity; i++) {
+                    console.log('Печать этикетки', i + 1, 'из', labelData.quantity);
+                    
+                    // Генерируем ESC-POS команды для этикетки
+                    const escposData = generateLabelESCPOS(labelData);
+                    
+                    // Конвертируем в байты
+                    const bytes = [];
+                    for (let j = 0; j < escposData.length; j++) {
+                        const char = escposData[j];
+                        const charCode = char.charCodeAt(0);
+                        if (charCode < 256) {
+                            bytes.push(charCode);
+                        } else {
+                            bytes.push(charCode & 0xFF);
+                        }
+                    }
+                    
+                    // Конвертируем в base64
+                    let binary = '';
+                    for (let j = 0; j < bytes.length; j++) {
+                        binary += String.fromCharCode(bytes[j]);
+                    }
+                    const base64Data = btoa(binary);
+                    
+                    console.log('Отправка этикетки', i + 1, 'на печать (base64 длина:', base64Data.length, ')');
+                    
+                    try {
+                        await qz.print(config, [{
+                            type: 'raw',
+                            format: 'base64',
+                            data: base64Data
+                        }]);
+                        console.log('Этикетка', i + 1, 'отправлена на печать успешно');
+                    } catch (printErr) {
+                        console.error('Ошибка при печати этикетки', i + 1, ':', printErr);
+                        console.error('Детали ошибки:', printErr.message);
+                        throw printErr;
+                    }
+                    
+                    // Небольшая задержка между этикетками
+                    if (i < labelData.quantity - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 300));
+                    }
+                }
+                
+                alert('Этикетки успешно отправлены на печать! (' + labelData.quantity + ' шт.)');
+                setTimeout(function() {
+                    window.close();
+                }, 1000);
+            } catch (err) {
+                console.error('Print error:', err);
+                alert('Ошибка при печати: ' + err.message);
+            } finally {
+                printBtn.disabled = false;
+                printBtn.textContent = '🖨️ Печать через QZ Tray (' + labelData.quantity + ' шт.)';
+            }
+        }
+        
+        window.addEventListener('beforeunload', function() {
+            if (qzConnected && typeof qz !== 'undefined') {
+                qz.websocket.disconnect();
+            }
+        });
+        </script>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
+// Скрываем лишние элементы админки для роли printer_operator
+add_action('admin_menu', 'gustolocal_hide_admin_menu_for_printer_operator', 999);
+function gustolocal_hide_admin_menu_for_printer_operator() {
+    $user = wp_get_current_user();
+    if (in_array('printer_operator', $user->roles)) {
+        // Оставляем только нужные пункты меню
+        remove_menu_page('index.php'); // Dashboard
+        remove_menu_page('edit.php'); // Posts
+        remove_menu_page('upload.php'); // Media
+        remove_menu_page('edit.php?post_type=page'); // Pages
+        remove_menu_page('edit-comments.php'); // Comments
+        remove_menu_page('themes.php'); // Appearance
+        remove_menu_page('plugins.php'); // Plugins
+        remove_menu_page('users.php'); // Users
+        remove_menu_page('tools.php'); // Tools
+        remove_menu_page('options-general.php'); // Settings
+        
+        // Скрываем все подменю WooCommerce кроме заказов
+        remove_submenu_page('woocommerce', 'wc-admin');
+        remove_submenu_page('woocommerce', 'wc-settings');
+        remove_submenu_page('woocommerce', 'wc-addons');
+        remove_submenu_page('woocommerce', 'wc-status');
+        remove_submenu_page('woocommerce', 'wc-reports');
+        // Оставляем только заказы
+    }
+}
+
+// Автопечать при открытии страницы печати заказа (если auto_print=1)
+add_action('admin_init', 'gustolocal_auto_print_order');
+function gustolocal_auto_print_order() {
+    if (isset($_GET['page']) && $_GET['page'] === 'gustolocal-print-order' && isset($_GET['auto_print']) && $_GET['auto_print'] === '1') {
+        add_action('admin_footer', function() {
+            ?>
+            <script>
+            window.addEventListener('load', function() {
+                setTimeout(function() {
+                    const printBtn = document.getElementById('qz-print-btn');
+                    if (printBtn && !printBtn.disabled) {
+                        printBtn.click();
+                    }
+                }, 1000);
+            });
+            </script>
+            <?php
+        });
+    }
+}
+
+// Добавляем страницу массовой печати заказов
+add_action('admin_menu', 'gustolocal_add_print_multiple_orders_page');
+function gustolocal_add_print_multiple_orders_page() {
+    add_submenu_page(
+        null,
+        'Печать нескольких заказов',
+        'Печать нескольких заказов',
+        'read',
+        'gustolocal-print-multiple-orders',
+        'gustolocal_print_multiple_orders_page'
+    );
+}
+
+// Страница массовой печати заказов
+function gustolocal_print_multiple_orders_page() {
+    if (!current_user_can('read')) {
+        wp_die(__('У вас нет прав для доступа к этой странице.'));
+    }
+    
+    $order_ids_str = isset($_GET['order_ids']) ? sanitize_text_field($_GET['order_ids']) : '';
+    if (empty($order_ids_str)) {
+        echo '<div class="wrap"><h1>Ошибка</h1><p>Не указаны ID заказов.</p></div>';
+        return;
+    }
+    
+    $order_ids = array_map('intval', explode(',', $order_ids_str));
+    $orders_data = array();
+    
+    foreach ($order_ids as $order_id) {
+        $order = wc_get_order($order_id);
+        if ($order) {
+            $orders_data[] = gustolocal_get_order_print_data($order);
+        }
+    }
+    
+    if (empty($orders_data)) {
+        echo '<div class="wrap"><h1>Ошибка</h1><p>Заказы не найдены.</p></div>';
+        return;
+    }
+    
+    ?>
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Печать заказов</title>
+        <script src="https://cdn.jsdelivr.net/npm/qz-tray@2.2/qz-tray.min.js"></script>
+    </head>
+    <body>
+        <div style="text-align: center; margin: 20px;">
+            <div id="qz-status" style="margin: 10px 0; padding: 8px; border-radius: 4px; font-size: 12px; background: #f8d7da; color: #721c24;">
+                QZ Tray: Не подключен
+            </div>
+            <button id="qz-print-btn" onclick="printMultipleOrders()" style="background: #28a745; color: white; padding: 15px 30px; border: none; cursor: pointer; font-size: 18px; border-radius: 5px; font-weight: bold;">
+                🖨️ Печать всех заказов (<?php echo count($orders_data); ?> шт.)
+            </button>
+        </div>
+        
+        <script>
+        const ordersData = <?php echo json_encode($orders_data, JSON_UNESCAPED_UNICODE); ?>;
+        const PRINTER_NAME = 'Printer POS-80';
+        let qzConnected = false;
+        
+        // Подключение к QZ Tray
+        window.addEventListener('load', function() {
+            connectToQZTray();
+        });
+        
+        async function connectToQZTray() {
+            const statusEl = document.getElementById('qz-status');
+            const printBtn = document.getElementById('qz-print-btn');
+            
+            try {
+                if (typeof qz === 'undefined') {
+                    throw new Error('QZ Tray библиотека не загружена');
+                }
+                
+                await qz.websocket.connect().then(function() {
+                    qzConnected = true;
+                    statusEl.textContent = 'QZ Tray: Подключен ✓';
+                    statusEl.style.background = '#d4edda';
+                    statusEl.style.color = '#155724';
+                    printBtn.disabled = false;
+                });
+            } catch (err) {
+                qzConnected = false;
+                statusEl.textContent = 'QZ Tray: Не подключен';
+                printBtn.disabled = true;
+            }
+        }
+        
+        // Функции конвертации UTF-8 в CP866 (скопированы из основного файла)
+        function utf8ToCp866(str) {
+            if (!str) return str;
+            const utf8ToCp866Map = {
+                'А': '\x80', 'Б': '\x81', 'В': '\x82', 'Г': '\x83', 'Д': '\x84', 'Е': '\x85', 'Ж': '\x86', 'З': '\x87',
+                'И': '\x88', 'Й': '\x89', 'К': '\x8A', 'Л': '\x8B', 'М': '\x8C', 'Н': '\x8D', 'О': '\x8E', 'П': '\x8F',
+                'Р': '\x90', 'С': '\x91', 'Т': '\x92', 'У': '\x93', 'Ф': '\x94', 'Х': '\x95', 'Ц': '\x96', 'Ч': '\x97',
+                'Ш': '\x98', 'Щ': '\x99', 'Ъ': '\x9A', 'Ы': '\x9B', 'Ь': '\x9C', 'Э': '\x9D', 'Ю': '\x9E', 'Я': '\x9F',
+                'а': '\xA0', 'б': '\xA1', 'в': '\xA2', 'г': '\xA3', 'д': '\xA4', 'е': '\xA5', 'ж': '\xA6', 'з': '\xA7',
+                'и': '\xA8', 'й': '\xA9', 'к': '\xAA', 'л': '\xAB', 'м': '\xAC', 'н': '\xAD', 'о': '\xAE', 'п': '\xAF',
+                'р': '\xE0', 'с': '\xE1', 'т': '\xE2', 'у': '\xE3', 'ф': '\xE4', 'х': '\xE5', 'ц': '\xE6', 'ч': '\xE7',
+                'ш': '\xE8', 'щ': '\xE9', 'ъ': '\xEA', 'ы': '\xEB', 'ь': '\xEC', 'э': '\xED', 'ю': '\xEE', 'я': '\xEF',
+                'Ё': '\xF0', 'ё': '\xF1'
+            };
+            let result = '';
+            for (let i = 0; i < str.length; i++) {
+                const char = str[i];
+                if (utf8ToCp866Map[char]) {
+                    result += utf8ToCp866Map[char];
+                } else if (char.charCodeAt(0) < 128) {
+                    result += char;
+                } else {
+                    result += '?';
+                }
+            }
+            return result;
+        }
+        
+        function generateESCPOS(data) {
+            let commands = [];
+            const ESC = '\x1B';
+            const GS = '\x1D';
+            const LF = '\x0A';
+            
+            // Инициализация принтера
+            commands.push(ESC + '@'); // Сброс принтера
+            commands.push(ESC + '\x74' + '\x11'); // ESC t 17 = CP866 (Cyrillic)
+            
+            // КРИТИЧЕСКИ ВАЖНО: Много пустых строк после инициализации
+            // Принтер должен полностью обработать команды инициализации перед началом печати
+            // Увеличиваем до 10 пустых строк для надежности
+            commands.push(LF + LF + LF + LF + LF + LF + LF + LF + LF + LF);
+            
+            // Клиент
+            commands.push(ESC + '!' + '\x08'); // Полужирный
+            commands.push(utf8ToCp866(data.customer_name) + LF);
+            commands.push(ESC + '!' + '\x00'); // Обычный
+            commands.push(LF);
+            
+            commands.push('--------------------------------' + LF);
+            data.items.forEach(function(item) {
+                let itemLine = utf8ToCp866(item.name);
+                if (item.unit) {
+                    itemLine += ' (' + utf8ToCp866(item.unit) + ')';
+                }
+                if (item.quantity > 1) {
+                    itemLine += ' x' + item.quantity;
+                }
+                commands.push(itemLine + LF);
+            });
+            commands.push('--------------------------------' + LF);
+            commands.push(LF);
+            
+            // Доставка/Самовывоз (только тип, без адреса)
+            commands.push(utf8ToCp866(data.shipping_type || (data.shipping_address ? 'Доставка' : 'Самовывоз')) + LF);
+            commands.push(LF);
+            
+            // Стоимость заказа
+            commands.push(ESC + '!' + '\x08'); // Полужирный
+            const totalText = data.total_formatted || (data.total + ' ' + (data.currency_symbol || 'руб.'));
+            commands.push(utf8ToCp866('Сумма: ' + totalText) + LF);
+            commands.push(ESC + '!' + '\x00'); // Обычный
+            
+            // Статус оплаты (без символов галочки/крестика, т.к. они не поддерживаются в CP866)
+            if (data.is_paid) {
+                commands.push(utf8ToCp866(data.payment_status || 'Оплачено') + LF);
+            } else {
+                commands.push(utf8ToCp866(data.payment_status || 'Не оплачено') + LF);
+            }
+            commands.push(LF);
+            commands.push(LF);
+            commands.push(LF);
+            
+            // Автоотрез между чеками
+            commands.push(GS + 'V' + '\x41' + '\x03');
+            
+            return commands.join('');
+        }
+        
+        function generateMultipleESCPOS(ordersData) {
+            let allCommands = [];
+            const ESC = '\x1B';
+            const LF = '\x0A';
+            
+            ordersData.forEach(function(orderData, index) {
+                if (index === 0) {
+                    // Для первого заказа: инициализация + пустые строки + имя клиента
+                    allCommands.push(ESC + '@'); // Сброс принтера
+                    allCommands.push(ESC + '\x74' + '\x11'); // ESC t 17 = CP866 (Cyrillic)
+                    // Пустые строки для обработки инициализации (увеличено до максимума)
+                    allCommands.push(LF + LF + LF + LF + LF + LF + LF + LF + LF);
+                    
+                    // Теперь добавляем содержимое заказа БЕЗ повторной инициализации
+                    const GS = '\x1D';
+                    // Клиент
+                    allCommands.push(ESC + '!' + '\x08'); // Полужирный
+                    // Пустая строка после команды форматирования
+                    allCommands.push(LF);
+                    allCommands.push(utf8ToCp866(orderData.customer_name) + LF);
+                    allCommands.push(ESC + '!' + '\x00'); // Обычный
+                    allCommands.push(LF);
+                    
+                    // Содержимое заказа
+                    allCommands.push('--------------------------------' + LF);
+                    orderData.items.forEach(function(item) {
+                        let itemLine = utf8ToCp866(item.name);
+                        if (item.unit) {
+                            itemLine += ' (' + utf8ToCp866(item.unit) + ')';
+                        }
+                        if (item.quantity > 1) {
+                            itemLine += ' x' + item.quantity;
+                        }
+                        allCommands.push(itemLine + LF);
+                    });
+                    allCommands.push('--------------------------------' + LF);
+                    allCommands.push(LF);
+                    
+                    // Доставка/Самовывоз
+                    allCommands.push(utf8ToCp866(orderData.shipping_type || (orderData.shipping_address ? 'Доставка' : 'Самовывоз')) + LF);
+                    allCommands.push(LF);
+                    
+                    // Стоимость заказа
+                    allCommands.push(ESC + '!' + '\x08'); // Полужирный
+                    const totalText = orderData.total_formatted || (orderData.total + ' ' + (orderData.currency_symbol || 'руб.'));
+                    allCommands.push(utf8ToCp866('Сумма: ' + totalText) + LF);
+                    allCommands.push(ESC + '!' + '\x00'); // Обычный
+                    
+                    // Статус оплаты
+                    if (orderData.is_paid) {
+                        allCommands.push(utf8ToCp866(orderData.payment_status || 'Оплачено') + LF);
+                    } else {
+                        allCommands.push(utf8ToCp866(orderData.payment_status || 'Не оплачено') + LF);
+                    }
+                    allCommands.push(LF);
+                    allCommands.push(LF);
+                    allCommands.push(LF);
+                    
+                    // Автоотрез
+                    allCommands.push(GS + 'V' + '\x41' + '\x03');
+                } else {
+                    // Для остальных заказов: минимальная инициализация (принтер уже готов)
+                    allCommands.push(ESC + '@'); // Сброс принтера
+                    allCommands.push(ESC + '\x74' + '\x11'); // ESC t 17 = CP866 (Cyrillic)
+                    // Минимальные пустые строки (принтер уже инициализирован)
+                    allCommands.push(LF);
+                    
+                    // Содержимое заказа
+                    const GS = '\x1D';
+                    // Клиент
+                    allCommands.push(ESC + '!' + '\x08'); // Полужирный
+                    allCommands.push(utf8ToCp866(orderData.customer_name) + LF);
+                    allCommands.push(ESC + '!' + '\x00'); // Обычный
+                    allCommands.push(LF);
+                    
+                    // Содержимое заказа
+                    allCommands.push('--------------------------------' + LF);
+                    orderData.items.forEach(function(item) {
+                        let itemLine = utf8ToCp866(item.name);
+                        if (item.unit) {
+                            itemLine += ' (' + utf8ToCp866(item.unit) + ')';
+                        }
+                        if (item.quantity > 1) {
+                            itemLine += ' x' + item.quantity;
+                        }
+                        allCommands.push(itemLine + LF);
+                    });
+                    allCommands.push('--------------------------------' + LF);
+                    allCommands.push(LF);
+                    
+                    // Доставка/Самовывоз
+                    allCommands.push(utf8ToCp866(orderData.shipping_type || (orderData.shipping_address ? 'Доставка' : 'Самовывоз')) + LF);
+                    allCommands.push(LF);
+                    
+                    // Стоимость заказа
+                    allCommands.push(ESC + '!' + '\x08'); // Полужирный
+                    const totalText = orderData.total_formatted || (orderData.total + ' ' + (orderData.currency_symbol || 'руб.'));
+                    allCommands.push(utf8ToCp866('Сумма: ' + totalText) + LF);
+                    allCommands.push(ESC + '!' + '\x00'); // Обычный
+                    
+                    // Статус оплаты
+                    if (orderData.is_paid) {
+                        allCommands.push(utf8ToCp866(orderData.payment_status || 'Оплачено') + LF);
+                    } else {
+                        allCommands.push(utf8ToCp866(orderData.payment_status || 'Не оплачено') + LF);
+                    }
+                    allCommands.push(LF);
+                    allCommands.push(LF);
+                    allCommands.push(LF);
+                    
+                    // Автоотрез
+                    allCommands.push(GS + 'V' + '\x41' + '\x03');
+                }
+                
+                // Минимальный отступ между заказами (кроме последнего)
+                if (index < ordersData.length - 1) {
+                    allCommands.push(LF);
+                }
+            });
+            return allCommands.join('');
+        }
+        
+        async function printMultipleOrders() {
+            if (!qzConnected) {
+                alert('QZ Tray не подключен');
+                return;
+            }
+            
+            const printBtn = document.getElementById('qz-print-btn');
+            printBtn.disabled = true;
+            printBtn.textContent = 'Печать...';
+            
+            try {
+                // Генерируем все заказы одним блоком ESC-POS команд
+                const escposData = generateMultipleESCPOS(ordersData);
+                
+                const bytes = [];
+                for (let i = 0; i < escposData.length; i++) {
+                    const char = escposData[i];
+                    const charCode = char.charCodeAt(0);
+                    if (charCode < 256) {
+                        bytes.push(charCode);
+                    } else {
+                        bytes.push(charCode & 0xFF);
+                    }
+                }
+                
+                let binary = '';
+                for (let i = 0; i < bytes.length; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                const base64Data = btoa(binary);
+                
+                const config = qz.configs.create(PRINTER_NAME);
+                const printers = await qz.printers.find();
+                
+                if (!printers.includes(PRINTER_NAME)) {
+                    throw new Error('Принтер не найден');
+                }
+                
+                // Печатаем все заказы одним запросом
+                await qz.print(config, [{
+                    type: 'raw',
+                    format: 'base64',
+                    data: base64Data
+                }]).then(function() {
+                    alert('Все заказы успешно отправлены на печать!');
+                    window.close();
+                });
+            } catch (err) {
+                console.error('Print error:', err);
+                alert('Ошибка при печати: ' + err.message);
+            } finally {
+                printBtn.disabled = false;
+                printBtn.textContent = '🖨️ Печать всех заказов (' + ordersData.length + ' шт.)';
+            }
+        }
+        
+        window.addEventListener('beforeunload', function() {
+            if (qzConnected && typeof qz !== 'undefined') {
+                qz.websocket.disconnect();
+            }
+        });
+        </script>
+    </body>
+    </html>
+    <?php
+    exit;
+}
+
