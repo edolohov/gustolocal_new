@@ -2497,9 +2497,12 @@ function gustolocal_generate_weight_formula($unit, $qty_cell_ref, $unit_cell_ref
             $unit_escaped = str_replace('"', '""', $unit);
             
             // Формула с использованием Apps Script функции
-            // Предполагаем, что единица измерения будет в скобках в ячейке A (название блюда)
-            // Или можно использовать прямое значение единицы
-            $formula_apps_script = '=MULTIPLY_NUMBERS_IN_STRING("' . $unit_escaped . '", ' . $qty_cell_ref . ')';
+            // Используем INDIRECT для фиксированной ссылки на колонку B, чтобы она не менялась при перемещении колонки
+            // Извлекаем номер строки из ссылки (например, $B25 -> 25)
+            $row_num = preg_replace('/[^0-9]/', '', $qty_cell_ref);
+            $b_cell_ref = 'INDIRECT("B' . $row_num . '")';
+            // Добавляем проверку на ноль, как в простых случаях
+            $formula_apps_script = '=IF(' . $b_cell_ref . '=0,"",MULTIPLY_NUMBERS_IN_STRING("' . $unit_escaped . '", ' . $b_cell_ref . '))';
             
             // Альтернатива: если единица хранится в отдельной колонке или извлекается из названия
             // Можно использовать REGEXEXTRACT для извлечения единицы из названия блюда
@@ -2526,8 +2529,11 @@ function gustolocal_generate_weight_formula($unit, $qty_cell_ref, $unit_cell_ref
         $value = floatval(str_replace(',', '.', $matches[1]));
         $unit_type = $matches[2];
         // Формула: количество * значение единицы измерения
-        // Добавляем проверку на пустое значение, чтобы не было ошибки
-        $formula = '=IF(' . $qty_cell_ref . '=0,"",' . $qty_cell_ref . '*' . $value . '&" ' . $unit_type . '")';
+        // Используем INDIRECT для фиксированной ссылки на колонку B, чтобы она не менялась при перемещении колонки
+        // Извлекаем номер строки из ссылки (например, $B25 -> 25)
+        $row_num = preg_replace('/[^0-9]/', '', $qty_cell_ref);
+        $b_cell_ref = 'INDIRECT("B' . $row_num . '")';
+        $formula = '=IF(' . $b_cell_ref . '=0,"",' . $b_cell_ref . '*' . $value . '&" ' . $unit_type . '")';
         return array(
             'formula' => $formula,
             'type' => 'simple',
@@ -2825,13 +2831,11 @@ function gustolocal_display_breakdown_table($data) {
                             <strong style="font-size: 12px; margin-top: 5px; display: block;"><?php echo wc_price($customer['total']); ?></strong>
                         </th>
                     <?php endforeach; ?>
-                    <th class="formula-col" style="background-color: #e8f5e9; min-width: 120px; font-size: 11px; text-align: center;">
-                        Формула ИТОГО<br>
-                        <small style="font-weight: normal;">(колонка B)</small>
+                    <th class="formula-col" style="background-color: #e8f5e9; min-width: 120px; font-size: 12px; text-align: center; font-weight: bold;">
+                        Итого
                     </th>
-                    <th class="formula-col" style="background-color: #fff3cd; min-width: 150px; font-size: 11px; text-align: center;">
-                        Формула Вес<br>
-                        <small style="font-weight: normal;">(колонка C)</small>
+                    <th class="formula-col" style="background-color: #fff3cd; min-width: 150px; font-size: 12px; text-align: center; font-weight: bold;">
+                        ВЕС
                     </th>
                 </tr>
                 <tr>
@@ -2930,16 +2934,18 @@ function gustolocal_display_breakdown_table($data) {
                         // Для третьей строки данных (блюдо): row_index = 3, excel_row = 3 + 2 = 5 ✓
                         $excel_row = $row_index + $excel_base_row;
                         
-                        // Формируем формулу для ИТОГО: суммируем ТОЛЬКО колонки клиентов (не включая колонки формул)
-                        $first_customer_col_letter = !empty($customer_cols) ? $customer_cols[0] : '';
-                        $last_customer_col_letter = !empty($customer_cols) ? end($customer_cols) : '';
-                        // Формула должна суммировать только колонки клиентов, например: =SUM(D5:K5) для 8 клиентов
-                        $total_formula = !empty($customer_cols) ? '=SUM(' . $first_customer_col_letter . $excel_row . ':' . $last_customer_col_letter . $excel_row . ')' : '';
+                        // Формируем формулу для ИТОГО
+                        // После перемещения колонки на место B, формула должна суммировать все колонки клиентов начиная с D
+                        // Используем большой диапазон D:ZZ чтобы покрыть все возможные колонки клиентов
+                        $total_formula = '=SUM(D' . $excel_row . ':ZZ' . $excel_row . ')';
                         
                         // Генерируем формулу для веса
+                        // После перемещения колонки на место C, формула должна ссылаться на колонку B (Итого)
                         $weight_formula_info = array('formula' => '', 'description' => '');
                         if (!empty($dish_data['unit'])) {
-                            $qty_cell = 'B' . $excel_row; // Колонка ИТОГО
+                            // Используем смешанную ссылку: $B{row} (абсолютная колонка B, относительная строка)
+                            // Это позволит при копировании сохранить ссылку на колонку B, но адаптировать строку
+                            $qty_cell = '$B' . $excel_row; // Колонка ИТОГО с абсолютной ссылкой на колонку
                             $weight_formula_info = gustolocal_generate_weight_formula($dish_data['unit'], $qty_cell);
                         }
                     ?>
@@ -2971,25 +2977,19 @@ function gustolocal_display_breakdown_table($data) {
                                 </td>
                         <?php endforeach; ?>
                             <!-- Колонка формул для ИТОГО -->
-                            <td class="formula-col" style="background-color: #f1f8e9; font-size: 10px; font-family: monospace; text-align: left; padding: 3px;" data-formula="<?php echo esc_attr($total_formula); ?>">
+                            <td class="formula-col total-row" style="background-color: #fff3cd; font-size: 12px; font-weight: bold; text-align: center; padding: 5px;" data-formula="<?php echo esc_attr($total_formula); ?>">
                                 <?php if (!empty($total_formula)): ?>
-                                    <div style="font-family: monospace; background: #fff; padding: 3px; border: 1px solid #c8e6c9; cursor: pointer;" onclick="navigator.clipboard.writeText('<?php echo esc_js($total_formula); ?>').then(() => alert('Формула скопирована!'))">
+                                    <div style="font-family: monospace; background: #fff; padding: 4px; border: 1px solid #c8e6c9; font-size: 10px; text-align: left;">
                                         <?php echo esc_html($total_formula); ?>
                                     </div>
                                 <?php endif; ?>
                             </td>
                             <!-- Колонка формул для Веса -->
-                            <td class="formula-col" style="background-color: #fffbf0; font-size: 10px; font-family: monospace; text-align: left; padding: 3px;" data-formula="<?php echo !empty($weight_formula_info['formula']) ? esc_attr($weight_formula_info['formula']) : ''; ?>">
+                            <td class="formula-col total-row" style="background-color: #fff3cd; font-size: 12px; font-weight: bold; text-align: center; padding: 5px;" data-formula="<?php echo !empty($weight_formula_info['formula']) ? esc_attr($weight_formula_info['formula']) : ''; ?>">
                                 <?php if (!empty($weight_formula_info['formula'])): ?>
-                                    <?php if ($weight_formula_info['type'] === 'complex'): ?>
-                                        <div style="font-family: monospace; background: #fff; padding: 3px; border: 1px solid #ffcc02; cursor: pointer;" onclick="navigator.clipboard.writeText('<?php echo esc_js($weight_formula_info['formula']); ?>').then(() => alert('Формула скопирована!'))">
-                                            <?php echo esc_html($weight_formula_info['formula']); ?>
-                                        </div>
-                                    <?php else: ?>
-                                        <div style="font-family: monospace; background: #fff; padding: 3px; border: 1px solid #ffcc02; cursor: pointer;" onclick="navigator.clipboard.writeText('<?php echo esc_js($weight_formula_info['formula']); ?>').then(() => alert('Формула скопирована!'))">
-                                            <?php echo esc_html($weight_formula_info['formula']); ?>
-                                        </div>
-                                    <?php endif; ?>
+                                    <div style="font-family: monospace; background: #fff; padding: 4px; border: 1px solid #ffcc02; font-size: 10px; text-align: left;">
+                                        <?php echo esc_html($weight_formula_info['formula']); ?>
+                                    </div>
                                 <?php endif; ?>
                             </td>
                     </tr>
@@ -3017,12 +3017,10 @@ function gustolocal_display_breakdown_table($data) {
                 }
                 
                 // Формируем формулы для итоговой строки
-                // Для общего ИТОГО - сумма всех колонок ИТОГО выше
-                $total_col_letter = gustolocal_get_column_letter(1); // Колонка B (ИТОГО)
+                // После перемещения колонки на место B, формула должна суммировать все колонки клиентов в этой строке
                 $excel_total_row = $row_index + $excel_base_row; // Номер строки итогов в Google Sheets
-                $first_data_row = $excel_base_row + 1; // Первая строка с данными (после заголовка и примечаний)
-                $last_data_row = $row_index + $excel_base_row - 1; // Последняя строка с данными перед итогами
-                $grand_total_formula = '=SUM(' . $total_col_letter . $first_data_row . ':' . $total_col_letter . $last_data_row . ')';
+                // Формула суммирует все колонки клиентов начиная с D в текущей строке
+                $grand_total_formula = '=SUM(D' . $excel_total_row . ':ZZ' . $excel_total_row . ')';
                 
                 // Собираем колонки клиентов для итоговой строки
                 $total_customer_cols = array();
@@ -3064,15 +3062,15 @@ function gustolocal_display_breakdown_table($data) {
                         </td>
                     <?php endforeach; ?>
                     <!-- Колонка формул для ИТОГО итоговой строки -->
-                    <td class="formula-col" style="background-color: #f1f8e9; font-size: 10px; font-family: monospace; text-align: left; padding: 3px;">
+                    <td class="formula-col total-row" style="background-color: #fff3cd; font-size: 12px; font-weight: bold; text-align: center; padding: 5px;" data-formula="<?php echo esc_attr($grand_total_formula); ?>">
                         <?php if (!empty($grand_total_formula)): ?>
-                            <div style="font-family: monospace; background: #fff; padding: 3px; border: 1px solid #c8e6c9; cursor: pointer;" onclick="navigator.clipboard.writeText('<?php echo esc_js($grand_total_formula); ?>').then(() => alert('Формула скопирована!'))">
+                            <div style="font-family: monospace; background: #fff; padding: 4px; border: 1px solid #c8e6c9; font-size: 10px; text-align: left;">
                                 <?php echo esc_html($grand_total_formula); ?>
                             </div>
                         <?php endif; ?>
                     </td>
                     <!-- Колонка формул для Веса итоговой строки (пустая) -->
-                    <td class="formula-col" style="background-color: #fffbf0;"></td>
+                    <td class="formula-col total-row" style="background-color: #fff3cd;"></td>
                 </tr>
             </tbody>
         </table>
@@ -3229,18 +3227,9 @@ function gustolocal_display_breakdown_table($data) {
                                     }
                                 }
                             } else if (cell.hasAttribute('data-formula')) {
-                                // Для колонок формул используем готовую формулу из атрибута
+                                // Для колонок формул просто копируем формулу как есть, без обработки
+                                // Пусть Google Sheets сам обрабатывает ссылки при вставке
                                 formula = cell.getAttribute('data-formula');
-                                // Номер строки в Excel/Google Sheets
-                                var excelRowNum = r + headerRowCount + 1;
-                                
-                                // Заменяем ВСЕ ссылки на ячейки в формуле на правильный номер строки
-                                // Ищем паттерны вида B5, C10, B47 и т.д. и заменяем номер строки на текущий
-                                formula = formula.replace(/([A-Z]+)(\d+)/g, function(match, col, rowNum) {
-                                    // Заменяем номер строки на текущий номер строки в Google Sheets
-                                    // Это нужно для формул типа =IF(B5=0,"",B5*200&" г") или =MULTIPLY_NUMBERS_IN_STRING("...", B47)
-                                    return col + excelRowNum;
-                                });
                             }
                             
                             if (formula) {
